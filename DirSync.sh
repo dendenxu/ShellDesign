@@ -1,9 +1,5 @@
 #!/bin/bash
 # DirSync
-if [ ! -d $1 ] ; then 
-    echo "$1 is not a directory"
-    exit 1
-fi
 echo "\$1 is $1"
 echo "\$2 is $2"
 echo "\$3 is $3"
@@ -31,14 +27,21 @@ copyContent() {
     done
 }
 
+if [ ! -d $1 ] ; then 
+    echo "$1 is not a directory"
+    exit 1
+fi
+
 if [ "$3" = "-a" -o "${#3}" -eq 0 ]; then
-    copyContent $1 $2
+    echo "Are you trying to back up a directory?"
+    copyContent $1 $2 $3
 elif [ $3 = "-s" ]; then
     echo "Are you trying to sync these directories?"
     if [ ! -d $1 ]; then
         echo "$2 is not a directory"
         exit 1
     fi
+    copyContent $1 $2 $3 
+    copyContent $2 $1 $3
 fi
-
 
