@@ -55,12 +55,18 @@ syncContent() {
             dir_time=$(stat -c %Y $2)
             echo "$file is last modified at $file_time"
             echo "$2 is last modified at $dir_time"
-            if [ $file_time -gt $dir_time ]; then
-                echo "[SYNC] I think we should sync the file since the file is newer than the target dir"
-                cp -a $file $2
+            if [ ! -f $2/$stripped ]; then
+                echo "Careful now, there's a new file or a file to be deleted"
+                if [ $file_time -gt $dir_time ]; then
+                    echo "[SYNC] I think we should sync the file since the file is newer than the target dir"
+                    cp -ua $file $2
+                else
+                    echo "[DELETE] I think the file is ought to be deleted since it's not newer than the target dir"
+                    rm -rf $file
+                fi
             else
-                echo "[DELETE] I think the file is ought to be deleted since it's not newer than the target dir"
-                rm -rf $file
+                echo "Whatever, we'll still do a -au copy"
+                cp -ua $file $2
             fi
         else
             echo "This is where the syncing recursion starts"
