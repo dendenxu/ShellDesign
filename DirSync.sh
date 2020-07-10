@@ -12,6 +12,8 @@
 #     2. 激进型同步（-s：sync）     ：我们根据文件夹和文件的修改时间戳判断文件是否应得到保留：
 #                                     修改时间（dir1中文件（夹））晚于目标文件夹（dir2）的文件
 
+# 注意，若被同步目录下有同名文件，但两者类型不同，我们不敢贸然复制，请用户手动选择要保留文件夹还是文件
+
 # 对于两个文件夹的同步功能，我们必须认识到的一点是：
 # 若要完全保证所有修改都按照时间顺序进行，我们就不得不进行log记录
 # 作为一个普通shell脚本而非Microsoft OneDrive这种具有自我储存的文件同步程序
@@ -48,16 +50,21 @@ copyContent() {
             # 我们假设新的文件夹是不存在的（当然若已经存在我们会转移报错信息）
             mkdir $2/$stripped > /dev/null 2>&1
             # 我们进行一次全脚本的递归调用，以对子目录进行相同选项下的同步操作
-            DirSync.sh $file $2/$stripped $3  "DUMMY"
+            DirSync.sh $file $2/$stripped $3  "DUMMY" # 我们传入DUMMY参数以禁用提示符
         fi
     done
 }
 
 syncContent() {
+    # 我们调用此函数来进行不同文件夹下的同步
+    # 同步的逻辑如文件开头所说，根据目标目录和当前文件的文件的最近修改时间来确定何时删除
+    # 因此这一操作是危险的，若用户的改动较为复杂，我们不推荐使用这种方式
     for file in $1/*
     do
         stripped=${file##*/}
         if [ -f $file -o ! -d $2/$stripped ]; then
+            # 对于在目标目录不存在的文件，我们进行按照时间的更新
+            # 若$file是目录，而目标目录下不存在这一子目录，我们将其当作文件处理
             file_time=$(stat -c %Y $file)
             dir_time=$(stat -c %Y $2)
             # echo "$file is last modified at $file_time"
@@ -76,15 +83,17 @@ syncContent() {
                 cp -ua $file $2
             fi
         else
+            # 我们在目标目录下存在$file对应的子目录的情况下进行递归调用
             echo "[RECURSION] Source: $file"
             echo "[RECURSION] Destination: $2/$stripped"
             # echo "This is where the syncing recursion starts"
-            DirSync.sh $file $2/$stripped $3 "DUMMY"
+            DirSync.sh $file $2/$stripped $3 "DUMMY" # 我们传入DUMMY参数以禁用提示符
         fi
     done
 }
 
 testDir() {
+    # 检查是否为目录，否则退出整个脚本
     if [ ! -d $1 ]; then
         echo "[FATAL] $1 is not a directory"
         exit 1
@@ -92,6 +101,8 @@ testDir() {
 }
 
 promptYN() {
+    # 提示用户确认操作
+    # 我们通过调用local确定相关regex
     message=$1
     set -- $(locale LC_MESSAGES)
     yesptrn=$1
@@ -101,37 +112,54 @@ promptYN() {
     while true; do
     read -p "$message(Y/n)? " yn
         case $yn in
-            ${yesptrn##^} ) return 0;;
-            ${noptrn##^} ) return 1;;
-            * ) echo "Please answer (Y/n).";;
+            ${yesptrn##^} ) return 0;; # 这里返回零表示True
+            ${noptrn##^} ) return 1;; # 这里返回一表示False（我们也很奇怪）
+            * ) echo "Please answer (Y/n).";; #用户输入的内容有误
         esac
     done
 }
 
-if [ ! -d $1 ] ; then 
-    echo "[FATAL] $1 is not a directory"
-    exit 1
+displayHelp()
+{
+    echo -e "\n-a"
+    echo "    Perform an appending backup: files not in dir1 will be retained in dir2"
+    echo -e "\n-r"
+    echo "    Perform a replacing backup: everything under dir2 will be exact what they were in dir1"
+    echo -e "\n-u"
+    echo "    Perform a mutual update: files with same names will be updated to the newest versioni"
+    echo -e "\n-s"
+    echo "    Perform a syncing update: we'll decide that a file is newly created if its timestamp is bigger than the destination dir"
+    echo "    and there's no same-named file in the destination dir. And we'll decided that the user deleted the file if otherwise (no same-named and dir newer than file)"
+    echo -e "\n-h"
+    echo "    Display this help page. This option should be used separatedly: ./DirSync.sh -h"
+}
+
+# 程序的主逻辑
+if [ $1 = "-h" ]; then
+    displayHelp
+    exit 0
 fi
+
+testDir $1
 
 if [ "$3" = "-a" -o "${#3}" -eq 0 ]; then
     if [ -z $4 ]; then
         echo "[INFO] Are you trying to back up $1 to $2?"
-        promptYN || exit 0;
+        promptYN || exit 0
     fi
     copyContent $1 $2 "-a"
 elif [ $3 = "-r" ]; then
     if [ -z $4 ]; then
         echo "[INFO] Are you trying to do a replace backup from $1 to $2?"
         echo "All the files originally in $2 will be deleted"
-        promptYN || exit 0;
+        promptYN || exit 0
     fi
     rm -rf $2
-    # copyContent $1 $2 "-a"
     cp -ua $1 $2
 elif [ $3 = "-u" ]; then
     if [ -z $4 ]; then
         echo "[INFO] Are you trying to update between $1 and $2?"
-        promptYN || exit 0;
+        promptYN || exit 0
     fi
     testDir $2
     copyContent $1 $2 $3 
@@ -140,12 +168,13 @@ elif [ $3 = "-s" ]; then
     if [ -z $4 ]; then
         echo "[INFO] This is the syncing part, aha! And it's DANGEROUS TO USE!"
         echo "[INFO] You'd only want to use this when you've only made DIR CHANGE IN ONE OF THE TWO DIRS"
-        promptYN || exit 0;
+        promptYN || exit 0
     fi
     testDir $2
     syncContent $1 $2 $3
     syncContent $2 $1 $3
 else
-    echo "[FATAL] Unrecognized flag, you can use -u to do updates between two dirs and -a to make appending backups"
+    echo "[FATAL] Unrecognized flag, use -a to do appending update, -u to do mutual update, -r to do full replacement and -s to do sync"
+    displayHelp
 fi
 
