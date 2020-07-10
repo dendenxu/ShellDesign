@@ -37,18 +37,18 @@ copyContent() {
     for file in $1/*
     do
         if [ -f $file ]; then
-            echo "We're copying $file to $2"    
+            # echo "We're copying $file to $2"    
             cp $3a $file $2 # 这里的$3可能是-a或者-u，分别进行更新拷贝或全覆盖拷贝
         else
             stripped=${file##*/} # Expanding
-            echo "This is where the recursion starts"
-            echo "The stripped version is: $stripped"
-            echo "Source: $file"
-            echo "Destination: $2/$stripped"
+            # echo "This is where the recursion starts"
+            # echo "The stripped version is: $stripped"
+            echo "[RECURSION] Source: $file"
+            echo "[RECURSION] Destination: $2/$stripped"
             # 我们假设新的文件夹是不存在的（当然若已经存在我们会转移报错信息）
             mkdir $2/$stripped > /dev/null 2>&1
             # 我们进行一次全脚本的递归调用，以对子目录进行相同选项下的同步操作
-            DirSync.sh $file $2/$stripped $3 
+            DirSync.sh $file $2/$stripped $3  "DUMMY"
         fi
     done
 }
@@ -60,60 +60,92 @@ syncContent() {
         if [ -f $file -o ! -d $2/$stripped ]; then
             file_time=$(stat -c %Y $file)
             dir_time=$(stat -c %Y $2)
-            echo "$file is last modified at $file_time"
-            echo "$2 is last modified at $dir_time"
+            # echo "$file is last modified at $file_time"
+            # echo "$2 is last modified at $dir_time"
             if [ ! -f $2/$stripped ]; then
-                echo "Careful now, there's a new file or a file to be deleted"
-                if [ $file_time -gt $dir_time ]; then
-                    echo "[SYNC] I think we should sync the file since the file is newer than the target dir"
-                    cp -ua $file $2
-                else
+                # echo "Careful now, there's a new file or a file to be deleted"
+                if [ $file_time -lt $dir_time ]; then
                     echo "[DELETE] I think the file is ought to be deleted since it's not newer than the target dir"
                     rm -rf $file
+                else
+                    echo "[SYNC] I think we should sync the file since the file is newer than the target dir"
+                    cp -ua $file $2
                 fi
             else
-                echo "Whatever, we'll still do a -au copy"
+                # echo "Whatever, we'll still do a -au copy"
                 cp -ua $file $2
             fi
         else
-            echo "This is where the syncing recursion starts"
-            DirSync.sh $file $2/$stripped $3
+            echo "[RECURSION] Source: $file"
+            echo "[RECURSION] Destination: $2/$stripped"
+            # echo "This is where the syncing recursion starts"
+            DirSync.sh $file $2/$stripped $3 "DUMMY"
         fi
     done
 }
 
 testDir() {
     if [ ! -d $1 ]; then
-        echo "$1 is not a directory"
+        echo "[FATAL] $1 is not a directory"
         exit 1
     fi
 }
 
+promptYN() {
+    message=$1
+    set -- $(locale LC_MESSAGES)
+    yesptrn=$1
+    noptrn=$2
+    # echo $yesptrn
+    # echo $noptrn
+    while true; do
+    read -p "$message(Y/n)? " yn
+        case $yn in
+            ${yesptrn##^} ) return 0;;
+            ${noptrn##^} ) return 1;;
+            * ) echo "Please answer (Y/n).";;
+        esac
+    done
+}
+
 if [ ! -d $1 ] ; then 
-    echo "$1 is not a directory"
+    echo "[FATAL] $1 is not a directory"
     exit 1
 fi
 
 if [ "$3" = "-a" -o "${#3}" -eq 0 ]; then
-    echo "Are you trying to back up a directory?"
+    if [ -z $4 ]; then
+        echo "[INFO] Are you trying to back up $1 to $2?"
+        promptYN || exit 0;
+    fi
     copyContent $1 $2 "-a"
 elif [ $3 = "-r" ]; then
-    echo "Are you trying to do a replace backup? All the files originally in $2 will be deleted"
+    if [ -z $4 ]; then
+        echo "[INFO] Are you trying to do a replace backup from $1 to $2?"
+        echo "All the files originally in $2 will be deleted"
+        promptYN || exit 0;
+    fi
     rm -rf $2
     # copyContent $1 $2 "-a"
     cp -ua $1 $2
 elif [ $3 = "-u" ]; then
-    echo "Are you trying to update between these directories?"
+    if [ -z $4 ]; then
+        echo "[INFO] Are you trying to update between $1 and $2?"
+        promptYN || exit 0;
+    fi
     testDir $2
     copyContent $1 $2 $3 
     copyContent $2 $1 $3
 elif [ $3 = "-s" ]; then
-    echo "This is the syncing part, aha! And it's DANGEROUS TO USE!"
-    echo "You'd only want to use this when you've only made DIR CHANGE IN ONE OF THE TWO DIRS"
+    if [ -z $4 ]; then
+        echo "[INFO] This is the syncing part, aha! And it's DANGEROUS TO USE!"
+        echo "[INFO] You'd only want to use this when you've only made DIR CHANGE IN ONE OF THE TWO DIRS"
+        promptYN || exit 0;
+    fi
     testDir $2
     syncContent $1 $2 $3
     syncContent $2 $1 $3
 else
-    echo "Unrecognized flag, you can use -u to do updates between two dirs and -a to make appending backups"
+    echo "[FATAL] Unrecognized flag, you can use -u to do updates between two dirs and -a to make appending backups"
 fi
 
