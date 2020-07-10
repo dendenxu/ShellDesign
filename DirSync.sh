@@ -1,8 +1,8 @@
 #!/bin/bash
 # DirSync
-echo "\$1 is $1"
-echo "\$2 is $2"
-echo "\$3 is $3"
+# echo "\$1 is $1"
+# echo "\$2 is $2"
+# echo "\$3 is $3"
 
 # 我们实现了目录备份：
 #     1. 增添型备份（-a：append）   ：目标目录中的非重名文件会得到保留
@@ -27,21 +27,28 @@ echo "\$3 is $3"
 # 当然这种操作有删除不必要文件的风险（某些新文件可能不会得到同步）
 # 若用户希望保留所有文件，他/她应使用-u（update）而非-s（sync）
 
+export PATH="$PATH:."
+
 copyContent() {
-    mkdir $2 > /dev/null 2>&1
+    # 本函数的功能是进行不检查时间的文件与目录同步
+    # 我们会默认$2所示的目录不存在
+    # 创建相关文件夹后我们会对文件进行拷贝，对目录进行递归调用操作
+    mkdir $2 > /dev/null 2>&1 # SILENCE
     for file in $1/*
     do
         if [ -f $file ]; then
-            cp $3a $file $2
             echo "We're copying $file to $2"    
+            cp $3a $file $2 # 这里的$3可能是-a或者-u，分别进行更新拷贝或全覆盖拷贝
         else
-            echo "This is where the recursion starts"
             stripped=${file##*/} # Expanding
+            echo "This is where the recursion starts"
             echo "The stripped version is: $stripped"
             echo "Source: $file"
             echo "Destination: $2/$stripped"
+            # 我们假设新的文件夹是不存在的（当然若已经存在我们会转移报错信息）
             mkdir $2/$stripped > /dev/null 2>&1
-            ./DirSync.sh $file $2/$stripped $3 
+            # 我们进行一次全脚本的递归调用，以对子目录进行相同选项下的同步操作
+            DirSync.sh $file $2/$stripped $3 
         fi
     done
 }
@@ -70,9 +77,16 @@ syncContent() {
             fi
         else
             echo "This is where the syncing recursion starts"
-            ./DirSync.sh $file $2/$stripped $3
+            DirSync.sh $file $2/$stripped $3
         fi
     done
+}
+
+testDir() {
+    if [ ! -d $1 ]; then
+        echo "$1 is not a directory"
+        exit 1
+    fi
 }
 
 if [ ! -d $1 ] ; then 
@@ -86,18 +100,17 @@ if [ "$3" = "-a" -o "${#3}" -eq 0 ]; then
 elif [ $3 = "-r" ]; then
     echo "Are you trying to do a replace backup? All the files originally in $2 will be deleted"
     rm -rf $2
-    copyContent $1 $2 "-a"
+    # copyContent $1 $2 "-a"
+    cp -ua $1 $2
 elif [ $3 = "-u" ]; then
     echo "Are you trying to update between these directories?"
-    if [ ! -d $1 ]; then
-        echo "$2 is not a directory"
-        exit 1
-    fi
+    testDir $2
     copyContent $1 $2 $3 
     copyContent $2 $1 $3
 elif [ $3 = "-s" ]; then
     echo "This is the syncing part, aha! And it's DANGEROUS TO USE!"
     echo "You'd only want to use this when you've only made DIR CHANGE IN ONE OF THE TWO DIRS"
+    testDir $2
     syncContent $1 $2 $3
     syncContent $2 $1 $3
 else
