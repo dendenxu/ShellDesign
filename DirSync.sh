@@ -31,7 +31,7 @@ copyContent() {
     mkdir $2 > /dev/null 2>&1
     for file in $1/*
     do
-        if [[ -f $file ]]; then
+        if [ -f $file ]; then
             cp $3a $file $2
             echo "We're copying $file to $2"    
         else
@@ -42,6 +42,29 @@ copyContent() {
             echo "Destination: $2/$stripped"
             mkdir $2/$stripped > /dev/null 2>&1
             ./DirSync.sh $file $2/$stripped $3 
+        fi
+    done
+}
+
+syncContent() {
+    for file in $1/*
+    do
+        stripped=${file##*/}
+        if [ -f $file -o ! -d $2/$stripped ]; then
+            file_time=$(stat -c %Y $file)
+            dir_time=$(stat -c %Y $2)
+            echo "$file is last modified at $file_time"
+            echo "$2 is last modified at $dir_time"
+            if [ $file_time -gt $dir_time ]; then
+                echo "[SYNC] I think we should sync the file since the file is newer than the target dir"
+                cp -a $file $2
+            else
+                echo "[DELETE] I think the file is ought to be deleted since it's not newer than the target dir"
+                rm -rf $file
+            fi
+        else
+            echo "This is where the syncing recursion starts"
+            ./DirSync.sh $file $2/$stripped $3
         fi
     done
 }
@@ -69,6 +92,8 @@ elif [ $3 = "-u" ]; then
 elif [ $3 = "-s" ]; then
     echo "This is the syncing part, aha! And it's DANGEROUS TO USE!"
     echo "You'd only want to use this when you've only made DIR CHANGE IN ONE OF THE TWO DIRS"
+    syncContent $1 $2 $3
+    syncContent $2 $1 $3
 else
     echo "Unrecognized flag, you can use -u to do updates between two dirs and -a to make appending backups"
 fi
