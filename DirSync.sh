@@ -121,17 +121,15 @@ promptYN() {
 
 displayHelp()
 {
-    echo -e "\n-a"
-    echo "    Perform an appending backup: files not in dir1 will be retained in dir2"
-    echo -e "\n-r"
-    echo "    Perform a replacing backup: everything under dir2 will be exact what they were in dir1"
-    echo -e "\n-u"
-    echo "    Perform a mutual update: files with same names will be updated to the newest versioni"
-    echo -e "\n-s"
-    echo "    Perform a syncing update: we'll decide that a file is newly created if its timestamp is bigger than the destination dir"
-    echo "    and there's no same-named file in the destination dir. And we'll decided that the user deleted the file if otherwise (no same-named and dir newer than file)"
-    echo -e "\n-h"
-    echo "    Display this help page. This option should be used separatedly: ./DirSync.sh -h"
+    echo -e "\nUsage: DirSync.sh [-a|-r|-u|-s] Source Destination"
+    echo -e "\n-a    Perform an appending backup: files not in dir1 will be retained in dir2"
+    echo -e "\n-r    Perform a replacing backup: everything under dir2 will be exact what they were in dir1"
+    echo -e "\n-u    Perform a mutual update: files with same names will be updated to the newest versioni"
+    echo -e "\n-s    Perform a syncing update: "
+    echo "      We'll decide that a file is newly created if its timestamp is bigger than the destination dir"
+    echo "      and there's no same-named file in the destination dir."
+    echo "      And we'll decided that the user deleted the file if otherwise (no same-named and dir newer than file)"
+    echo -e "\n-h    Display this help page. This option should be used separatedly: ./DirSync.sh -h"
 }
 
 # 程序的主逻辑
