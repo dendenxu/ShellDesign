@@ -4,6 +4,10 @@
 # echo "\$2 is $2"
 # echo "\$3 is $3"
 
+##############################################
+# 程序说明
+##############################################
+
 # 我们实现了目录备份：
 #     1. 增添型备份（-a：append）   ：目标目录中的非重名文件会得到保留
 #     2. 覆盖型备份（-r：replace）  ：目标目录中的非重名文件不会得到保留
@@ -36,6 +40,7 @@ copyContent() {
     # 我们会默认$2所示的目录不存在
     # 创建相关文件夹后我们会对文件进行拷贝，对目录进行递归调用操作
     mkdir $2 > /dev/null 2>&1 # SILENCE
+    [ -z "$(ls $1)" ] && return
     for file in $1/*
     do
         if [ -f $file ]; then
@@ -45,8 +50,7 @@ copyContent() {
             stripped=${file##*/} # Expanding
             # echo "This is where the recursion starts"
             # echo "The stripped version is: $stripped"
-            echo "[RECURSION] Source: $file"
-            echo "[RECURSION] Destination: $2/$stripped"
+            echo "[RECURSION] Source: $file, Destination: $2/$stripped"
             # 我们假设新的文件夹是不存在的（当然若已经存在我们会转移报错信息）
             mkdir $2/$stripped > /dev/null 2>&1
             # 我们进行一次全脚本的递归调用，以对子目录进行相同选项下的同步操作
@@ -59,6 +63,8 @@ syncContent() {
     # 我们调用此函数来进行不同文件夹下的同步
     # 同步的逻辑如文件开头所说，根据目标目录和当前文件的文件的最近修改时间来确定何时删除
     # 因此这一操作是危险的，若用户的改动较为复杂，我们不推荐使用这种方式
+    [ -z "$(ls $1)" ] && return
+    dir_time=$(stat -c %Y $2) # 我们在进入循环前就计算目标目录的修改时间，因为循环内部的文件操作可能会导致修改时间发生改变
     for file in $1/*
     do
         stripped=${file##*/}
@@ -66,7 +72,6 @@ syncContent() {
             # 对于在目标目录不存在的文件，我们进行按照时间的更新
             # 若$file是目录，而目标目录下不存在这一子目录，我们将其当作文件处理
             file_time=$(stat -c %Y $file)
-            dir_time=$(stat -c %Y $2)
             # echo "$file is last modified at $file_time"
             # echo "$2 is last modified at $dir_time"
             if [ ! -f $2/$stripped ]; then
@@ -84,8 +89,7 @@ syncContent() {
             fi
         else
             # 我们在目标目录下存在$file对应的子目录的情况下进行递归调用
-            echo "[RECURSION] Source: $file"
-            echo "[RECURSION] Destination: $2/$stripped"
+            echo "[RECURSION] Source: $file, Destination: $2/$stripped"
             # echo "This is where the syncing recursion starts"
             DirSync.sh $file $2/$stripped $3 "DUMMY" # 我们传入DUMMY参数以禁用提示符
         fi
@@ -121,7 +125,9 @@ promptYN() {
 
 displayHelp()
 {
-    echo -e "\nUsage: DirSync.sh [-a|-r|-u|-s] Source Destination"
+    # 显示帮助信息
+    # 在程序遇到无法识别的flag或识别到-h选项时会打印出相关信息
+    echo -e "\nUsage: DirSync.sh Source Destination [ -a | -r | -u | -s ]"
     echo -e "\n-a    Perform an appending backup: files not in dir1 will be retained in dir2"
     echo -e "\n-r    Perform a replacing backup: everything under dir2 will be exact what they were in dir1"
     echo -e "\n-u    Perform a mutual update: files with same names will be updated to the newest versioni"
@@ -130,28 +136,38 @@ displayHelp()
     echo "      and there's no same-named file in the destination dir."
     echo "      And we'll decided that the user deleted the file if otherwise (no same-named and dir newer than file)"
     echo -e "\n-h    Display this help page. This option should be used separatedly: ./DirSync.sh -h"
+    echo -e "\nAnd you can pass in the fourth argument to silence the program, not asking for your permission"
+    echo -e "\nExample:\n          DirSync.sh Source Destination -a -y # run the programm right on, performing appending updates from \"Source\" to \"Destination\""
+    echo "          DirSync.sh dir1 dir2 -s             # run the programm with user confirmation, doing a dangerous syncing between \"dir1\" and \"dir2\""
 }
 
+######################################
 # 程序的主逻辑
+######################################
+
 if [ $1 = "-h" ]; then
+    # 对于-h选项，我们打印帮助信息
     displayHelp
     exit 0
 fi
 
-testDir $1
+testDir $1 # 检查$1是否为有效目录
 
 if [ "$3" = "-a" -o "${#3}" -eq 0 ]; then
+    # 没有给出选项的情况下默认使用"增加同步"的功能
     if [ -z $4 ]; then
+        # 注意，第四个命令行参数是用于让程序安静运行的（不给出用户确认机会，一般用于内部递归调用）
         echo "[INFO] Are you trying to back up $1 to $2?"
-        promptYN || exit 0
+        promptYN || exit 0 # 调用promptYN获取用户的答案
     fi
-    copyContent $1 $2 "-a"
-elif [ $3 = "-r" ]; then
-    if [ -z $4 ]; then
+    copyContent $1 $2 "-a" # 调用内部赋值函数
+elif [ $3 = "-r" ]; then # 覆盖型同步
+    if [ -z $4 ]; then # 同上
         echo "[INFO] Are you trying to do a replace backup from $1 to $2?"
         echo "All the files originally in $2 will be deleted"
         promptYN || exit 0
     fi
+    # 我们会清空原目标目录，接着将相关内容原封不动的复制到目标目录
     rm -rf $2
     cp -ua $1 $2
 elif [ $3 = "-u" ]; then
@@ -159,6 +175,7 @@ elif [ $3 = "-u" ]; then
         echo "[INFO] Are you trying to update between $1 and $2?"
         promptYN || exit 0
     fi
+    # 对于同步型复制，我们进行左右复制以保留两个文件夹中都没有的内容
     testDir $2
     copyContent $1 $2 $3 
     copyContent $2 $1 $3
@@ -168,11 +185,14 @@ elif [ $3 = "-s" ]; then
         echo "[INFO] You'd only want to use this when you've only made DIR CHANGE IN ONE OF THE TWO DIRS"
         promptYN || exit 0
     fi
+    # 我们进行同步，调用方式同上，只不过我们会根据目标文件夹与当前目录的时间戳判断文件为新添加或将要被删除的
     testDir $2
     syncContent $1 $2 $3
     syncContent $2 $1 $3
 else
+    # 对于未识别的参数，我们打印帮助信息后直接退出
     echo "[FATAL] Unrecognized flag, use -a to do appending update, -u to do mutual update, -r to do full replacement and -s to do sync"
     displayHelp
+    exit 1
 fi
 
