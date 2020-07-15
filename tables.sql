@@ -66,7 +66,7 @@ create table `take`
 );
 
 # this is a dummy class so that we can ensure foreign key references from attachments to both submissions and homework
-create table content
+create table `content`
 (
     id bigint primary key
 );
@@ -78,7 +78,7 @@ create table `info`
     cid          bigint,
     release_time datetime,
     foreign key (`cid`) references course (`id`),
-    foreign key (`id`) references content (`id`),
+    foreign key (`id`) references content (`id`)
 );
 
 create table `homework`
