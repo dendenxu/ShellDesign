@@ -14,7 +14,11 @@ TeacherUI()
     courses=($(mysql -u$mysql_u -p$mysql_p $mysql_d -se "$query_id;" 2>/dev/null))
     
     echo "欢迎来到现代作业管理系统（Modern Coursework Manage System）"
-    echo "$name老师您好，您本学期共${#courses[@]}有门课程，他们分别为："
+    if [ ${#courses[@]} -eq 0 ]; then
+        echo "$name老师您好，您本学期没有课程，再见！"
+        exit 0
+    fi
+    echo "$name老师您好，您本学期共${#courses[@]}有门课程，它们分别为："
     mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_course;" 2>/dev/null
     while :; do
         read -p "请输入您想要管理的课程号：" cid
@@ -29,49 +33,81 @@ TeacherUI()
 
     echo "您选择的课程为："
     mysql -u$mysql_u -p$mysql_p $mysql_d -e "select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id=$cid;" 2>/dev/null
-    echo "与您一同教这门课的老师有："
-    mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_teacher and id <> $tid;" 2>/dev/null
-    echo "选上这门课的同学们有："
-    mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_student;" 2>/dev/null
+    
+    tids=($(mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_tid and tid <> $tid;" 2>/dev/null))
+    if [ ${#tids[@]} -gt 0 ]; then
+        echo "与您一同教这门课的老师有："
+        mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_teacher and id <> $tid;" 2>/dev/null
+    fi
+    
+    sids=($(mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_sid;" 2>/dev/null))
+    if [ ${#sids[@]} -gt 0 ]; then
+        echo "选上这门课的同学们有："
+        mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_student;" 2>/dev/null
+    fi
 
     TeacherOP
 }
 
 TeacherOP()
 {
-    ops=(1 2 3)
+    # ops=(1 2 3)
     echo "您可以进行的操作有："
     echo "1. 管理修读课程的学生"
     echo "2. 管理课程作业/实验"
     echo "3. 管理本课程（发布公告/信息，修改课程要求等）"
     while :;do
         read -p "请输入您想要进行的操作：" op
-        [[ "${ops[@]}" =~ "${op}" ]] && break
-        echo "您输入的操作$op有误，请输入上面列出的操作"
-    done
-    echo "您选择了操作：$op"
+        # [[ "${ops[@]}" =~ "${op}" ]] && break
+        # echo "您选择了操作：$op"
+        case $op in
+            1)
+                echo "您想要管理学生？"
+                break;;
+            2)
+                echo "您想要管理作业?"
+                break;;
+            3)
+                echo "您想要管理课程?"
+                TeacherManageCourse
+                break;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+        esac
+    done 
 }
 
 TeacherManageCourse()
 {
-    ops=(1 2 3)
+    ops=(1 2)
     echo "您可以进行的操作有："
     echo "1. 管理课程公告"
-    echo "2. 修改课程简介" 
+    echo "2. 修改课程简介"
     while :;do
         read -p "请输入您想要进行的操作：" op
-        [[ "${ops[@]}" =~ "${op}" ]] && break
-        echo "您输入的操作$op有误，请输入上面列出的操作"
+        # [[ "${ops[@]}" =~ "${op}" ]] && break
+        # echo "您选择了操作：$op"
+        case $op in
+            1)
+                echo "您想要管理课程公告？"
+                break;;
+            2)
+                echo "您想要修改课程简介?"
+                break;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+        esac
     done
-    echo "您选择了操作：$op"
 }
 
 TeacherManageStudent()
 {
+    echo "Placeholder"
 }
 
 TeacherManageHW()
 {
+    echo "Placeholder"
 }
 
 TeacherUI
