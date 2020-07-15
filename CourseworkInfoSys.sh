@@ -21,7 +21,7 @@ TeacherUI()
     echo "$name老师您好，您本学期共${#courses[@]}有门课程，它们分别为："
     mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_course;" 2>/dev/null
     while :; do
-        read -p "请输入您想要管理的课程号：" cid
+        read -rp "请输入您想要管理的课程号：" cid
         [[ "${courses[@]}" =~ "${cid}" ]] && break
         echo "您输入的课程号$cid有误，请输入上表中列举出的某个课程号"
     done
@@ -57,18 +57,18 @@ TeacherOP()
     echo "2. 管理课程作业/实验"
     echo "3. 管理本课程（发布公告/信息，修改课程要求等）"
     while :;do
-        read -p "请输入您想要进行的操作：" op
+        read -rp "请输入您想要进行的操作：" op
         # [[ "${ops[@]}" =~ "${op}" ]] && break
         # echo "您选择了操作：$op"
         case $op in
             1)
-                echo "您想要管理学生？"
+                echo "您选择了管理修读该课程的学生"
                 break;;
             2)
-                echo "您想要管理作业?"
+                echo "您选择了管理本课程的实验和作业"
                 break;;
             3)
-                echo "您想要管理课程?"
+                echo "您选择了管理本课程的设置"
                 TeacherManageCourse
                 break;;
             *)
@@ -79,20 +79,26 @@ TeacherOP()
 
 TeacherManageCourse()
 {
-    ops=(1 2)
+    # ops=(1 2)
     echo "您可以进行的操作有："
     echo "1. 管理课程公告"
     echo "2. 修改课程简介"
     while :;do
-        read -p "请输入您想要进行的操作：" op
+        read -rp "请输入您想要进行的操作：" op
         # [[ "${ops[@]}" =~ "${op}" ]] && break
         # echo "您选择了操作：$op"
         case $op in
             1)
-                echo "您想要管理课程公告？"
+                echo "您选择了管理课程公告"
                 break;;
             2)
-                echo "您想要修改课程简介?"
+                echo "您选择了修改课程简介"
+                echo "请输入课程简介的新内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+                echo -e "您的新课程简介内容为\n$full_string"
                 break;;
             *)
                 echo "您输入的操作$op有误，请输入上面列出的操作"
