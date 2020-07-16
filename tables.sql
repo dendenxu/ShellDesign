@@ -20,7 +20,7 @@ drop table if exists `course`;
 create table `teacher`
 (
     name          varchar(100),
-    id            bigint primary key,
+    id            bigint primary key auto_increment,
     brief         varchar(2000),
     password_hash varchar(64)
 );
@@ -28,7 +28,7 @@ create table `teacher`
 create table `student`
 (
     name          varchar(100),
-    id            bigint primary key,
+    id            bigint primary key auto_increment,
     brief         varchar(2000),
     password_hash char(64)
 );
@@ -36,7 +36,7 @@ create table `student`
 create table `admin`
 (
     name          varchar(100),
-    id            bigint primary key,
+    id            bigint primary key auto_increment,
     password_hash char(64)
 );
 
@@ -46,7 +46,7 @@ create table `course`
     name_en  varchar(100),
     brief    varchar(2000),
     syllabus varchar(4000),
-    id       bigint primary key
+    id       bigint primary key auto_increment
 );
 
 create table `teach`
@@ -68,7 +68,7 @@ create table `take`
 # this is a dummy class so that we can ensure foreign key references from attachments to both submissions and homework
 create table `content`
 (
-    id bigint primary key
+    id bigint primary key auto_increment
 );
 
 create table `info`
@@ -111,7 +111,7 @@ create table `submission`
 
 create table `attachment`
 (
-    id    bigint primary key,
+    id    bigint primary key auto_increment,
     name  varchar(100),
     url   varchar(800),
     brief varchar(2000)
@@ -180,3 +180,22 @@ values (1, 1),
        (6, 1),
        (6, 7),
        (6, 8);
+
+
+insert into content(id)
+values (1),
+       (2),
+       (3),
+       (4);
+
+insert into attachment(id, name, url)
+values (1, 'Linux Shell Program Design 3rd Edition.pdf', 'https://raw.githubusercontent.com/dendenxu/miniSQL/master/miniSQL.tex'),
+       (2, '数据库系统实验报告', 'https://raw.githubusercontent.com/dendenxu/miniSQL/master/xz.tex'),
+       (3, '蒙特卡洛树搜索实现', 'https://raw.githubusercontent.com/dendenxu/DeepOthello/master/MCTS.py');
+
+insert into info(id, content, cid, release_time)
+values
+(1,'作业1的提交就要截止啦！请大家及时关注。',1,NOW()),
+(2,'实验5的验收将在本周六下午4点开始，请需要验收的组长搜索"数据库系统"钉钉群并加入，钉钉群二维码详见附件',1,NOW()),
+(3,'ADS考试将在6月24日以线上/机房同时考试的形式进行，YDS老师的复习视频已上传到学在浙大系统，详见附件',3,NOW()),
+(4,'明天的实验内容为样条插值（Spline）以及贝塞尔曲线的拟合（Bezier Path），请同学们提前预习相关内容，PPT已上传附件并开放下载',4,NOW());
