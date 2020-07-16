@@ -92,12 +92,13 @@ TeacherManageCourse()
                 echo "您选择了管理课程公告"
                 query_iid="select id from info where cid=$cid"
                 query_info="select I.id, release_time, content from info I join course C on I.cid = C.id where I.cid in ($query_iid)"
-
+                
                 iids=($(mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_iid;" 2>/dev/null))
                 if [ ${#iids[@]} -gt 0 ]; then
                     echo "本课程已有的课程公告如下图所示"
                     mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_info;" 2>/dev/null
                 fi
+                TeacherManageCourseInfo
             break;;
             2)
                 echo "您选择了修改课程简介"
@@ -106,7 +107,75 @@ TeacherManageCourse()
                 while read -r temp; do
                     full_string+="$temp"$'\n'
                 done
+                
+                full_string=$(RemoveDanger "$full_string")
+                
                 echo -e "您的新课程简介内容为\n$full_string"
+                query_brief_update="update course set brief = \"$full_string\" where id=$cid"
+                # 我们增加了字符串处理函数以减少受到SQL注入攻击的可能性。
+                # we can easily perfomr SQL injection if the string is not carefully treated
+                # update course set brief = "Hello, world.";select * from admin;\" where id=$cid
+                mysql -u$mysql_u -p$mysql_p $mysql_d -e "$query_brief_update;" 2>/dev/null
+            break;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+        esac
+    done
+}
+
+TeacherManageCourseInfo()
+{
+    echo "您可以进行的操作有："
+    echo "1. 发布新的课程公告"
+    echo "2. 删除已发布的课程公告"
+    while :;do
+        read -rp "请输入您想要进行的操作：" op
+        case $op in
+            1)
+                echo "您选择了发布新的课程公告"
+                echo "请输入课程公告的新内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+
+                full_string=$(RemoveDanger "$full_string")
+                
+                echo -e "您的新课程公告内容为\n$full_string"
+
+                # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
+                query_insert_content="insert into content value ()"
+                query_insert_info="insert into info(id, content, cid, release_time) value (last_insert_id(), \"$full_string\", $cid, now())"
+
+                content_id=$(mysql -u$mysql_u -p$mysql_p $mysql_d -se "set autocommit=0;$query_insert_content;select last_insert_id();$query_insert_info;commit;set autocommit=1;")
+
+                echo "您刚刚发布的课程公告ID为：$content_id"
+
+                while :;do
+                    read -rp "请输入您是否需要为课程公告添加附件（Y/n）：" need_attach
+                    if [[ $need_attach =~ ^[1Yy] ]];then
+                        echo "您选择了添加附件"
+                        read -rp "请输入您想要添加的附件名称：" attach_name
+                        attach_name=$(RemoveDanger "$attach_name")
+                        echo "您的附件名称为：$attach_name"
+                        read -rp "请输入您想要添加的附件URL：" attach_url
+                        # 对于URL，我们使用不同的转义策略
+                        attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
+                        echo "您的附件URL为：$attach_url"
+                        query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
+                        query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $content_id)"
+                        attach_id=$(mysql -u$mysql_u -p$mysql_p $mysql_d -se "set autocommit=0;$query_insert_attach;select last_insert_id();$query_insert_attach_to;commit;set autocommit=1;")
+                        echo "您刚刚添加的附件ID为：$attach_id"
+
+                    else
+                        break
+                    fi
+                done
+
+            break;;
+            2)
+                echo "您选择了删除已发布的课程公告"
+                
             break;;
             *)
                 echo "您输入的操作$op有误，请输入上面列出的操作"
@@ -122,6 +191,25 @@ TeacherManageStudent()
 TeacherManageHW()
 {
     echo "Placeholder"
+}
+
+RemoveDanger()
+{
+    danger_set="[\"'\.\*;%]"
+    [ ${#2} -gt 0 ] && danger_set=$2
+    danger=$1
+    safe=""
+    for i in $(seq ${#danger})
+    do
+        thechar="${danger:$i-1:1}"
+        if [[ "$thechar" =~ $danger_set ]];then
+            # echo "$thechar"
+            safe="$safe"'\'"$thechar"
+        else
+            safe="$safe$thechar"
+        fi
+    done
+    echo "$safe"
 }
 
 TeacherUI
