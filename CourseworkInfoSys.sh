@@ -37,7 +37,7 @@ TeacherUI() {
             1)
                 echo "您选择了管理课程"
                 if [ ${#cids[@]} -eq 0 ]; then
-                    echo "您本学期没有课程，再见！"
+                    echo "您本学期没有课程"
                     exit 0
                 fi
                 echo "您本学期共${#cids[@]}有门课程，它们分别为："
@@ -75,6 +75,8 @@ TeacherOPCourse() {
         if [ ${#tids[@]} -gt 0 ]; then
             echo "与您一同教这门课的老师有："
             $mysql_prefix -e "$query_teacher and id <> $tid;"
+        else
+            echo "这门课程只有您自己在教"
         fi
 
         # ops=(1 2 3)
@@ -171,12 +173,14 @@ TeacherManageCourseBrief() {
 TeacherManageCourseInfo() {
     while :; do
         query_iid="select id from info where cid=$cid"
-        query_info="select I.id 公告ID, release_time 公告发布时间, content 公告内容 from info I join course C on I.cid = C.id where I.cid in ($query_iid)"
+        query_info="select id 公告ID, release_time 公告发布时间, content 公告内容 from info where cid=$cid"
 
         iids=($($mysql_prefix -e "$query_iid;"))
         if [ ${#iids[@]} -gt 0 ]; then
             echo "本课程已有的课程公告如下图所示"
             $mysql_prefix -e "$query_info;"
+        else
+            echo "本课程没有已发布的公告"
         fi
 
         echo "您可以进行的操作有："
@@ -237,23 +241,38 @@ TeacherManageCourseInfo() {
                 if [ $attachment_count -gt 0 ]; then
                     echo "本公告的附件包括："
                     $mysql_prefix -e "$query_attachment_info;"
+                else
+                    echo "本公告没有附件"
                 fi
 
                 break
                 ;;
             2)
+                if [ ${#iids[@]} -eq 0 ]; then
+                    echo "本门课程还没有已发布的公告"
+                    break
+                fi
                 echo "您选择了删除已发布的课程公告"
                 while :; do
                     read -rp "请输入您想要删除的公告ID：" iid
                     [[ "${iids[@]}" =~ "${iid}" ]] && break
                     echo "您输入的公告ID$iid有误，请输入上表中列举出的某个公告ID"
                 done
+                query_delete_attach_to="delete from attach_to where uid=$iid"
                 query_delete_info="delete from info where id=$iid"
-                $mysql_prefix -e "$query_delete_info"
+                query_delete_content="delete from content where id=$iid"
+                $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_info;$query_delete_content;commit;set autocommit=1;"
+                # $mysql_prefix -e "$query_delete_attach_to;"
+                # $mysql_prefix -e "$query_delete_info;"
+                # $mysql_prefix -e "$query_delete_content;"
                 break
                 ;;
             3)
-                echo "您选择了修改已发布的"
+                if [ ${#iids[@]} -eq 0 ]; then
+                    echo "本门课程还没有已发布的公告"
+                    break
+                fi
+                echo "您选择了修改已发布的课程公告"
                 while :; do
                     read -rp "请输入您想要修改的公告ID：" iid
                     [[ "${iids[@]}" =~ "${iid}" ]] && break
@@ -269,6 +288,8 @@ TeacherManageCourseInfo() {
                 if [ "$attachment_count" -gt 0 ]; then
                     echo "本公告的附件包括："
                     $mysql_prefix -e "$query_attachment_info;"
+                else
+                    echo "本公告没有附件"
                 fi
 
                 echo "请输入课程公告的新内容，以EOF结尾（换行后Ctrl+D）"
@@ -313,6 +334,8 @@ TeacherManageCourseInfo() {
                 if [ $attachment_count -gt 0 ]; then
                     echo "本公告的附件包括："
                     $mysql_prefix -e "$query_attachment_info;"
+                else
+                    echo "本公告没有附件"
                 fi
 
                 break
@@ -338,6 +361,8 @@ TeacherManageStudent() {
         if [ ${#sids[@]} -gt 0 ]; then
             echo "选上这门课的同学们有："
             $mysql_prefix -e "$query_student;"
+        else
+            echo "没有同学选上这门课"
         fi
         echo "您可以进行的操作有："
         echo "1. 向课程名单中添加学生"
@@ -366,9 +391,13 @@ TeacherManageStudent() {
                     query_insert_student_course="insert into take(sid, cid) value ($sid, $cid)"
                     $mysql_prefix -e "$query_insert_student_course;"
                 fi
-                break
+                breaks
                 ;;
             2)
+                if [ ${#sids[@]} -eq 0 ]; then
+                    echo "本门课程还没有学生选上"
+                    break
+                fi
                 echo "您选择了从课程名单中移除学生"
                 while :; do
                     read -rp "请输入您想要删除的学生学号：" sid
@@ -381,7 +410,9 @@ TeacherManageStudent() {
                 read -rp "是否要移除（Y/n）：" need_remove_student_course
                 if [[ $need_remove_student_course =~ ^[1Yy] ]]; then
                     query_remove_student_course="delete from take where sid=$sid and cid=$cid"
-                    $mysql_prefix -e "$query_remove_student_course;"
+                    query_remove_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and cid=$cid)"
+                    query_remove_student_submission="delete from submission where sid=$sid and cid=$cid"
+                    $mysql_prefix -e "set autocommit=0;$query_remove_student_course;$query_remove_student_attach_to;$query_remove_student_submission;commit;set autocommit=1;"
                 fi
                 break
                 ;;
@@ -398,17 +429,19 @@ TeacherManageStudent() {
 }
 
 TeacherManageHomework() {
-        while :; do
+    while :; do
         query_hid="select id from homework where cid=$cid"
-        query_hw="select H.id 作业ID, intro 作业简介, creation_time 作业发布时间 from homework H join course C on H.cid = C.id where I.cid in ($query_hid)"
+        query_hw="select id 作业ID, intro 作业简介, creation_time 作业发布时间, end_time 作业截止时间 from homework where cid=$cid"
 
         hids=($($mysql_prefix -e "$query_hid;"))
         if [ ${#hids[@]} -gt 0 ]; then
             echo "本课程已有的课程作业/实验如下图所示"
             $mysql_prefix -e "$query_hw;"
+        else
+            echo "本课程还没有已发布的作业/实验"
         fi
 
-        echo "您可以进行的操作有："H
+        echo "您可以进行的操作有："
         echo "1. 发布新的课程作业/实验"
         echo "2. 删除已发布的课程作业/实验"
         echo "3. 修改已发布的课程作业/实验"
@@ -427,26 +460,26 @@ TeacherManageHomework() {
 
                 full_string=$(RemoveDanger "$full_string")
 
-                echo -e "您的课程实验的简介内容为\n$full_string"
+                echo -e "您的课程作业/实验的简介内容为\n$full_string"
 
                 read -rp "请输入您想要创建的是作业还是实验（H/E）：" h_or_e
                 [[ $h_or_e =~ ^[Hh] ]] && h_or_e="H" || h_or_e="E"
 
-                while : ;do
+                while :; do
                     read -rp "请输入作业的持续时间（天）：" days
                     [[ $days =~ ^[0-9]+$ ]] && break || echo "请输入整数"
                 done
 
                 # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
                 query_insert_content="insert into content value ()"
-                query_insert_hw="insert into homework(cid,tid,intro,creation_time,end_time) value ($cid,$tid,\"$full_string\",now(),from_unixtime($(expr $(date +%s) + "$days" '*' 86400)))"
+                query_insert_hw="insert into homework(id, cid,tid,intro,creation_time,end_time) value (last_insert_id(),$cid,$tid,\"$full_string\",now(),from_unixtime($(expr $(date +%s) + "$days" '*' 86400)))"
 
                 hid=$($mysql_prefix -se "set autocommit=0;$query_insert_content;select last_insert_id();$query_insert_hw;commit;set autocommit=1;")
 
                 echo "您刚刚添加的课程作业/实验ID为：$hid"
                 attachment_count=0
                 while :; do
-                    read -rp "请输入您是否需要为课程公告添加附件（Y/n）：" need_attach
+                    read -rp "请输入您是否需要为课程作业/实验添加附件（Y/n）：" need_attach
                     if [[ $need_attach =~ ^[1Yy] ]]; then
                         attachment_count+=1
                         echo "您选择了添加附件"
@@ -458,7 +491,7 @@ TeacherManageHomework() {
                         attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
                         echo "您的附件URL为：$attach_url"
                         query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
-                        query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $iid)"
+                        query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $hid)"
                         attach_id=$($mysql_prefix -se "set autocommit=0;$query_insert_attach;select last_insert_id();$query_insert_attach_to;commit;set autocommit=1;")
                         echo "您刚刚添加的附件ID为：$attach_id"
                     else
@@ -466,49 +499,65 @@ TeacherManageHomework() {
                     fi
                 done
 
-                echo "您刚刚对课程号为$cid的课程发布了如下的课程公告："
-                query_course_info="select I.id 公告ID, I.content 公告内容, I.release_time 公告发布时间 from (info I join course C on I.cid=C.id) where I.id=$iid;"
-                query_attachment_info="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$iid"
-                $mysql_prefix -e "$query_course_info;"
+                echo "您刚刚对课程号为$cid的课程发布了如下的作业/实验："
+                query_course_homework="select H.id \`作业/实验ID\`, H.intro \`作业/实验简介\`, H.creation_time 创建时间, H.end_time 结束时间 from homework H where H.id=$hid;"
+                query_attachment_homework="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
+                $mysql_prefix -e "$query_course_homework;"
 
                 if [ $attachment_count -gt 0 ]; then
-                    echo "本公告的附件包括："
-                    $mysql_prefix -e "$query_attachment_info;"
+                    echo "本作业/实验的附件包括："
+                    $mysql_prefix -e "$query_attachment_homework;"
+                else
+                    echo "本课程还没有已发布的作业/实验"
                 fi
 
                 break
                 ;;
             2)
-                echo "您选择了删除已发布的课程公告"
+                if [ ${#hids[@]} -eq 0 ]; then
+                    echo "本门课程还没有已发布的作业/实验"
+                    break
+                fi
+                echo "您选择了删除已发布的课程作业/实验"
                 while :; do
-                    read -rp "请输入您想要删除的公告ID：" iid
-                    [[ "${iids[@]}" =~ "${iid}" ]] && break
-                    echo "您输入的公告ID$iid有误，请输入上表中列举出的某个公告ID"
+                    read -rp "请输入您想要删除的作业/实验ID：" hid
+                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    echo "您输入的课程作业/实验ID$hid有误，请输入上表中列举出的某个课程作业/实验ID"
                 done
-                query_delete_info="delete from info where id=$iid"
-                $mysql_prefix -e "$query_delete_info"
+                query_delete_attach_to="delete from attach_to where uid=$hid"
+                query_delete_submission="delete from submission where hid=$hid"
+                query_delete_homework="delete from homework where id=$hid"
+                query_delete_content="delete from content where id=$hid"
+                $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_submission;$query_delete_homework;$query_delete_content;commit;set autocommit=1;"
+
                 break
                 ;;
             3)
-                echo "您选择了修改已发布的"
+                if [ ${#hids[@]} -eq 0 ]; then
+                    echo "本门课程还没有已发布的作业/实验"
+                    break
+                fi
+                echo "您选择了修改已发布的课程作业/实验"
                 while :; do
-                    read -rp "请输入您想要修改的公告ID：" iid
-                    [[ "${iids[@]}" =~ "${iid}" ]] && break
-                    echo "您输入的公告ID$iid有误，请输入上表中列举出的某个公告ID"
+                    read -rp "请输入您想要修改的课程作业/实验ID：" hid
+                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    echo "您输入的课程作业/实验ID$hid有误，请输入上表中列举出的某个课程作业/实验ID"
                 done
 
-                echo "您选择了修改以下的公告："
-                query_course_info="select I.id 公告ID, I.content 公告内容, I.release_time 公告发布时间 from (info I join course C on I.cid=C.id) where I.id=$iid;"
-                query_attachment_info="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$iid"
-                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$iid"
-                $mysql_prefix -e "$query_course_info;"
+                echo "您选择了修改以下的课程作业/实验："
+                query_course_homework="select id \`作业/实验ID\`, intro \`作业/实验简介\`, creation_time 创建时间, end_time 截止时间 from homework where id=$hid"
+                query_attachment_homework="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
+                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$hid"
+                $mysql_prefix -e "$query_course_homework;"
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
                 if [ "$attachment_count" -gt 0 ]; then
-                    echo "本公告的附件包括："
-                    $mysql_prefix -e "$query_attachment_info;"
+                    echo "本课程作业/实验的附件包括："
+                    $mysql_prefix -e "$query_attachment_homework;"
+                else
+                    echo "本实验/作业还没有附件"
                 fi
 
-                echo "请输入课程公告的新内容，以EOF结尾（换行后Ctrl+D）"
+                echo "请输入课程作业/实验简介的新内容，以EOF结尾（换行后Ctrl+D）"
                 full_string=""
                 while read -r temp; do
                     full_string+="$temp"$'\n'
@@ -516,16 +565,26 @@ TeacherManageHomework() {
 
                 full_string=$(RemoveDanger "$full_string")
 
-                echo -e "您的新课程公告内容为\n$full_string"
+                echo -e "您的新课程作业/实验简介内容为\n$full_string"
 
-                query_insert_info="update info set content=\"$full_string\" where id=$iid"
+                query_insert_homework="update homework set intro=\"$full_string\" where id=$hid"
 
-                $mysql_prefix -se "$query_insert_info;"
+                $mysql_prefix -se "$query_insert_homework;"
 
-                echo "您刚刚修改的课程公告ID为：$iid"
+                while :; do
+                    read -rp "请输入作业的持续时间（天）：" days
+                    [[ $days =~ ^[0-9]+$ ]] && break || echo "请输入整数"
+                done
+
+                query_get_start_time="select unix_timestamp(creation_time) from homework where id=$hid"
+                creation_time=$($mysql_prefix -se "$query_get_start_time;")
+                query_update_end_time="update homework set end_time=from_unixtime($(expr $creation_time + "$days" '*' 86400)) where id=$hid"
+                $mysql_prefix -e  "$query_update_end_time;"
+
+                echo "您刚刚修改的课程课程作业/实验ID为：$hid"
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
                 while :; do
-                    read -rp "请输入您是否需要为课程公告添加新的附件（Y/n）：" need_attach
+                    read -rp "请输入您是否需要为课程课程作业/实验添加新的附件（Y/n）：" need_attach
                     if [[ $need_attach =~ ^[1Yy] ]]; then
                         echo "您选择了添加附件"
                         read -rp "请输入您想要添加的附件名称：" attach_name
@@ -536,7 +595,7 @@ TeacherManageHomework() {
                         attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
                         echo "您的附件URL为：$attach_url"
                         query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
-                        query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $iid)"
+                        query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $hid)"
                         attach_id=$($mysql_prefix -se "set autocommit=0;$query_insert_attach;select last_insert_id();$query_insert_attach_to;commit;set autocommit=1;")
                         echo "您刚刚添加的附件ID为：$attach_id"
                     else
@@ -544,12 +603,14 @@ TeacherManageHomework() {
                     fi
                 done
 
-                echo "您刚刚对课程号为$cid的课程发布了如下的课程公告："
-                $mysql_prefix -e "$query_course_info;"
+                echo "您刚刚对课程号为$cid的课程发布了如下的课程课程作业/实验："
+                $mysql_prefix -e "$query_course_homework;"
 
                 if [ $attachment_count -gt 0 ]; then
-                    echo "本公告的附件包括："
-                    $mysql_prefix -e "$query_attachment_info;"
+                    echo "本课程作业/实验的附件包括："
+                    $mysql_prefix -e "$query_attachment_homework;"
+                else
+                    echo "本实验/作业还没有附件"
                 fi
 
                 break
