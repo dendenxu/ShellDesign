@@ -17,8 +17,8 @@ mysql_prefix="mysql --defaults-extra-file=$mysql_f $mysql_d"
 
 TeacherUI() {
     # login informations
-    name="zy"
-    tid=1
+    [ -z $1 ] && tid=1 || tid=$1
+    [ -z $2 ] && name="zy" || name=$2
 
     while :; do
         query_id="select cid from teach where tid=$tid"
@@ -445,6 +445,7 @@ TeacherManageHomework() {
         echo "1. 发布新的课程作业/实验"
         echo "2. 删除已发布的课程作业/实验"
         echo "3. 修改已发布的课程作业/实验"
+        echo "4. 查看已发布的课程作业/实验的完成情况"
         echo "0. 返回上一级"
 
         while :; do
@@ -579,7 +580,7 @@ TeacherManageHomework() {
                 query_get_start_time="select unix_timestamp(creation_time) from homework where id=$hid"
                 creation_time=$($mysql_prefix -se "$query_get_start_time;")
                 query_update_end_time="update homework set end_time=from_unixtime($(expr $creation_time + "$days" '*' 86400)) where id=$hid"
-                $mysql_prefix -e  "$query_update_end_time;"
+                $mysql_prefix -e "$query_update_end_time;"
 
                 echo "您刚刚修改的课程课程作业/实验ID为：$hid"
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
@@ -615,6 +616,38 @@ TeacherManageHomework() {
 
                 break
                 ;;
+            4)
+                if [ ${#hids[@]} -eq 0 ]; then
+                    echo "本门课程还没有已发布的作业/实验"
+                    break
+                fi
+                echo "您选择了查看已发布的课程作业/实验的完成情况"
+                while :; do
+                    read -rp "请输入您想要修改的课程作业/实验ID：" hid
+                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    echo "您输入的课程作业/实验ID$hid有误，请输入上表中列举出的某个课程作业/实验ID"
+                done
+
+                query_sid="select sid from take where cid=$cid"
+                query_finish="select stu.id 学生学号, stu.name 学生姓名, if(count(sub.id)>0,\"是\",\"否\") 是否完成, count(sub.id) 创建的提交数目 from (select * from submission where hid=$hid) sub right join (select * from student where id in ($query_sid)) stu on sub.sid=stu.id group by stu.id"
+
+                $mysql_prefix -e "$query_finish"
+
+                # insert into submission value (null,1,1,6,"就是一个测试辣",now(),now());
+
+                while :; do
+                    read -rp "请输入您是否需要查询完成情况（Y/n）：" check_finish
+                    if [[ $check_finish =~ ^[1Yy] ]]; then
+                        read -rp "请输入您要查询完成情况的学号：" sid
+                        query_finish_sid="$query_finish having stu.id=$sid"
+                        $mysql_prefix -e "$query_finish_sid"
+                    else
+                        break
+                    fi
+                done
+
+                break
+                ;;
             0)
                 echo "您选择了返回上一级"
                 return 0
@@ -644,6 +677,60 @@ RemoveDanger() {
     echo "$safe"
 }
 
-TeacherUI
+LoginInUI() {
+    while :; do
+        while :; do
+            read -rp "请输入您的身份（T/S/A）或输入0退出系统：" identity
+            case $identity in
+            [Tt])
+                identity="teacher"
+                break
+                ;;
+            [Ss])
+                identity="student"
+                break
+                ;;
+            [Aa])
+                identity="admin"
+                break
+                ;;
+            0)
+                exit 0
+                ;;
+            *) echo "请输入T, S, A或0" ;;
+            esac
+        done
+        while :; do
+            read -rp "请输入您的工号/学号/管理员账号：" user_id
+            user_id=$(RemoveDanger $user_id)
+            query_all_hash="select id, name, password_hash from $identity"
+            query_right_hash="select password_hash from ($query_all_hash) all_hash where id=\"$user_id\""
+            right_hash=$($mysql_prefix -se "$query_right_hash;")
+            # [ -z $right_hash ] && echo "The right hash is zero length, user doesn't exist" || echo "right_hash is $right_hash"
+            [ -z "$right_hash" ] || break
+            echo "用户不存在，请重新输入"
+        done
+        while :; do
+            read -rp "请输入您的密码：" -s password
+            echo ""
+            password_hash=$(echo "$password" | sha256sum - | tr -d "[ \-]")
+            [ "$password_hash" = "$right_hash" ] && break
+            echo "验证失败，请重新输入"
+        done
+        echo "验证成功"
+        query_name="select name from $identity where id=$user_id"
+        name=$($mysql_prefix -se "$query_name")
+        case $identity in
+        "teacher")
+            TeacherUI "$user_id" "$name"
+            ;;
+        "student") ;;
+
+        "admin") ;;
+
+        esac
+    done
+}
+LoginInUI
 
 rm -rf $mysql_f
