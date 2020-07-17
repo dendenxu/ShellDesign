@@ -1,55 +1,73 @@
 #!/bin/bash
+# shellcheck disable=SC2076
 # 这是一个现代教务管理系统，主要面向作业管理
-# 我们通过编写Shell程序来管理作业数据库
+# 我们通过编写Shell程序，调用MySQL数据库来管理作业系统
 
-# colors
-# Num  Colour    #define         R G B
-#
-# 0    black     COLOR_BLACK     0,0,0
-# 1    red       COLOR_RED       1,0,0
-# 2    green     COLOR_GREEN     0,1,0
-# 3    yellow    COLOR_YELLOW    1,1,0
-# 4    blue      COLOR_BLUE      0,0,1
-# 5    magenta   COLOR_MAGENTA   1,0,1
-# 6    cyan      COLOR_CYAN      0,1,1
-# 7    white     COLOR_WHITE     1,1,1
-# tput bold    # Select bold mode
-# tput dim     # Select dim (half-bright) mode
-# tput smul    # Enable underline mode
-# tput rmul    # Disable underline mode
-# tput rev     # Turn on reverse video mode
-# tput smso    # Enter standout (bold) mode
-# tput rmso    # Exit standout mode
+function DefineColor() {
+    # 我们使用tput命令来定义颜色信息
+    # 各类颜色常数，通过echo调用可以改变Shell的输出样式
+    # 例如echo "${Red}Hello${NoColor}, world."会打印红色的Hello和原色的World
+    # 上述例子会展开成echo "$(tput setaf 1)Hello$(tput sgr0), world."
+    # ! consider more about this colorization
+    Red=$(tput setaf 1)
+    Green=$(tput setaf 2)
+    Yellow=$(tput setaf 3)
+    Blue=$(tput setaf 4)
+    Magenta=$(tput setaf 5)
+    Cyan=$(tput setaf 6)
+    NoColor=$(tput sgr0)
+    ReturnPrev="$Yellow返回上一级$NoColor"
+}
 
-Bold=$(tput bold)
-Dim=$(tput dim)
-Red=$(tput setaf 1)
-#! consider more about this colorization
-Green=$(tput setaf 2)
-# Green=$(tput sgr0)
-Yellow=$(tput setaf 3)
-Blue=$(tput setaf 4)
-Magenta=$(tput setaf 5)
-Cyan=$(tput setaf 6)
-NoColor=$(tput sgr0)
+function DefineMySQL() {
+    # 我们通过mysql命令来直接执行数据库操作，这也是本实验的核心内容
+    # 我们通过设置文件的方式使得MySQL不会抱怨直接在命令行输入密码不安全：
+    # mysql: [Warning] Using a password on the command line interface can be insecure.
+    # * 注意：您可以修改程序运行目录下的.mysql.cnf文件来设置自己的数据库登陆信息
 
-mysql_u="ShellDesigner"
-mysql_p="ShellDesigner"
-mysql_h="localhost"
-mysql_d="ShellDesign"
-mysql_f=".mysql.cnf"
-# rm -rf $mysql_f
-echo "[client]" >$mysql_f
-echo "user=$mysql_u" >>$mysql_f
-echo "password=$mysql_p" >>$mysql_f
-echo "host=$mysql_h" >>$mysql_f
+    # ! 请保证MySQL已经在本机正确安装，且.mysql.cnf已经被正确配置
+    # 您需要在.mysql.cnf中设置您的登录名/密码/服务器，并设置数据库名称(和您在MySQL中使用的相同)
+    # 例如您在MySQL中创建了ShellDesigner这个用户，密码为ShellDesigner，并打算使用ShellDesign这个数据库来管理本软件涉及到的内容
+    # .mysql.cnf就将有类似如下的内容
+    # [client]
+    # user=ShellDesigner
+    # password=ShellDesigner
+    # host=localhost
+    # database=ShellDesign
 
-mysql_prefix="mysql --defaults-extra-file=$mysql_f $mysql_d"
+    # ! 第一次使用本软件时请运行当前目录下的table.sql来初始化数据库中的表
+    # 必须运行的部分是所有的create table
+    # 后面的insert内容是可选的，但是至少要有一个管理员账户，否则本软件没有什么意义
+    # 样例初始化语句（假设用户和密码如上所述）：mysql -uShellDesigner -pShellDesigner < tables.sql
 
-PrintBanner() {
-    # line="##################################################################################################################################"
-    # echo "$Yellow$line"
-    # echo ""
+    # 下列是我们默认的一些设置
+    mysql_u_default="ShellDesigner"
+    mysql_p_default="ShellDesigner"
+    mysql_h_default="localhost"
+    mysql_d_default="ShellDesign"
+    mysql_f=".mysql.cnf"
+
+    # 若.mysql.cnf在当前目录不存在，我们会创建一个并将默认内容写入
+    if [ ! -f "$mysql_f" ]; then
+        echo "Automatically generating configuration file..." >&2
+        echo "[client]" >$mysql_f
+        echo "user=$mysql_u_default" >>$mysql_f
+        echo "password=$mysql_p_default" >>$mysql_f
+        echo "host=$mysql_h_default" >>$mysql_f
+        echo "database=$mysql_d_default" >>$mysql_f
+    fi
+
+    # 类似调用alias，我们在下面的Shell语句中执行MySQL调用时都会使用$mysql_prefix来开头
+    mysql_prefix="mysql --defaults-extra-file=$mysql_f"
+}
+
+# 以下几个Print函数都是用于打印ASCII Art的
+# 同时，它们通过调用clear函数来进行假GUI的页面模拟功能
+# 我们使用ASCII Art的初衷是让用户能在程序的不同Section中更快的找到自己想要的信息
+# 后来我们发现通过调用clear函数可以达到模拟GUI的功能
+function PrintBanner() {
+    # 程序的主横幅：CourseworkManger
+    # 会在初始登陆界面打印
     clear
     cat <<"EOF"
    _________                                                       __        _____                                                  
@@ -58,15 +76,13 @@ PrintBanner() {
    \     \___(  <_> )  |  /|  | \/\___ \\  ___/\     (  <_> )  | \/    <  /    Y    \/ __ \|   |  \/ __ \_/ /_/  >  ___/|  | \/     
     \______  /\____/|____/ |__|  /____  >\___  >\/\_/ \____/|__|  |__|_ \ \____|__  (____  /___|  (____  /\___  / \___  >__|        
            \/                         \/     \/                        \/         \/     \/     \/     \//_____/      \/            
+                                                                                                                                    
 EOF
-    # echo ""
-    # echo "$line$NoColor"
 }
 
-PrintDelimiter() {
+function PrintDelimiter() {
+    # SECTION分隔符，会在无法确定用户身份但需要分隔的位置打印
     clear
-    line="###########################################################################"
-    echo "$line"
     cat <<"EOF"
    ______     ______     ______     ______   __     ______     __   __     
   /\  ___\   /\  ___\   /\  ___\   /\__  _\ /\ \   /\  __ \   /\ "-.\ \    
@@ -75,14 +91,11 @@ PrintDelimiter() {
     \/_____/   \/_____/   \/_____/     \/_/   \/_/   \/_____/   \/_/ \/_/  
                                                                            
 EOF
-    echo "$line"
 }
 
-PrintTeacher() {
+function PrintTeacher() {
+    # TEACHER分隔符，会在老师登陆后的管理界面打印
     clear
-
-    line="##############################################################################"
-    echo "$line"
     cat <<"EOF"
    ______   ______     ______     ______     __  __     ______     ______    
   /\__  _\ /\  ___\   /\  __ \   /\  ___\   /\ \_\ \   /\  ___\   /\  == \   
@@ -91,14 +104,11 @@ PrintTeacher() {
       \/_/   \/_____/   \/_/\/_/   \/_____/   \/_/\/_/   \/_____/   \/_/ /_/ 
                                                                              
 EOF
-    echo "$line"
 }
 
-PrintStudent() {
+function PrintStudent() {
+    # STUDENT分隔符，会在学生登陆后的管理界面打印
     clear
-
-    line="#############################################################################"
-    echo "$line"
     cat <<"EOF"
    ______     ______   __  __     _____     ______     __   __     ______  
   /\  ___\   /\__  _\ /\ \/\ \   /\  __-.  /\  ___\   /\ "-.\ \   /\__  _\ 
@@ -107,14 +117,11 @@ PrintStudent() {
     \/_____/     \/_/   \/_____/   \/____/   \/_____/   \/_/ \/_/     \/_/ 
                                                                            
 EOF
-    echo "$line"
 }
 
-PrintAdmin() {
+function PrintAdmin() {
+    # ADMIN分隔符，会在管理员登陆后的管理界面打印
     clear
-
-    line="#########################################################"
-    echo "$line"
     cat <<"EOF"
    ______     _____     __    __     __     __   __    
   /\  __ \   /\  __-.  /\ "-./  \   /\ \   /\ "-.\ \   
@@ -123,103 +130,181 @@ PrintAdmin() {
     \/_/\/_/   \/____/   \/_/  \/_/   \/_/   \/_/ \/_/ 
                                                        
 EOF
-    echo "$line"
 }
 
-StudentUI() {
-    # login informations
-    [ -z $1 ] && sid=1 || sid=$1
-    [ -z $2 ] && name="st1" || name=$2
-    while :; do # student main UI event loop
-        PrintStudent
+function StudentUI() {
+    # 学生UI主界面，为了方便测试我们为sid, name变量加入了默认值
+    sid=${1:-"1"}
+    name=${2:-"st1"}
+    while :; do      # 学生主界面UI循环
+        PrintStudent # 打印Banner
 
+
+        # 无内容提示信息
+        no_publication="$Red您本学期没有课程$NoColor"
+
+        # 为了方便复用和嵌套，我们将所有的SQL查询语句存储在字符串变量中（容易遭到SQL Injection攻击，后面会提到如何防御）
+        # 注意在每一次事件循环后我们都会尽量更新一次查询语句的变量内容（除非此语句是固定的）。
         query_id="select cid from take where sid=$sid"
         query_course="select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id in ($query_id)"
+
+        # 第一层括号将返回结果当作数组处理，第二层$()是执行了一个Bash语句，在此是执行了一个MySQL查询
+        # ! 在本程序中，我们将结果存入变量时基本都会采用这种调用MySQL的方式，我们会使用-se选项，其中-e代表执行，-s --slient，安静模式，在此的效果是去除列名
+        # ! 在直接执行MySQL并原封不动的打印信息时，我们会使用-e选项，代表执行
+
+        # * 值得注意的是，在命令行直接调用MySQL时，会打印列分隔符，而将结果存入变量则不会打印（列分隔符自动会得到删除）
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" > temp.txt; cat temp.txt
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # name    id      password_hash
+        # root    1       53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a
+        # admin   2       fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;"
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # +-------+----+------------------------------------------------------------------+
+        # | name  | id | password_hash                                                    |
+        # +-------+----+------------------------------------------------------------------+
+        # | root  |  1 | 53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a |
+        # | admin |  2 | fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7 |
+        # +-------+----+------------------------------------------------------------------+
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" > /dev/tty
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # +-------+----+------------------------------------------------------------------+
+        # | name  | id | password_hash                                                    |
+        # +-------+----+------------------------------------------------------------------+
+        # | root  |  1 | 53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a |
+        # | admin |  2 | fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7 |
+        # +-------+----+------------------------------------------------------------------+
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" | read temp; echo "$temp"
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # name    id      password_hash
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  temp=$(mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;");echo "$temp"
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # name    id      password_hash
+        # root    1       53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a
+        # admin   2       fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ● 
+
+        # * 因此当我们想要让此变量获取打印的信息时，我们应直接将返回信息赋值到变量中
+        # * 当我们想直接使用MySQL的格式化功能时，我们应直接使用命令将输出导入到/dev/tty
         cids=($($mysql_prefix -se "$query_id;"))
+
         echo "$name同学您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
+        if [ ${#cids[@]} -eq 0 ]; then
+            echo "$no_publication"
+            break
+        else
+            echo "您本学期共${#cids[@]}有门课程，它们分别为："
+        fi
         echo "您可以进行的操作有："
         echo "1. 管理课程"
-        echo "0. 返回上一级"
+        echo "0. ${ReturnPrev}"
         while :; do # 操作循环UI，直到获得正确的输入
             read -rp "请输入您想要进行的操作：" op
             case $op in
             1)
                 echo "您选择了管理课程"
                 if [ ${#cids[@]} -eq 0 ]; then
-                    echo "您本学期没有课程"
-                    exit 0
+                    echo "$no_publication"
+                    break
                 fi
-                echo "您本学期共${#cids[@]}有门课程，它们分别为："
+                # 直接调用MySQL并输出到/dev/tty可以使MySQL用分割线打印各种信息
                 $mysql_prefix -e "$query_course;"
                 while :; do
                     read -rp "请输入您想要管理的课程号：" cid
-                    [[ "${cids[@]}" =~ "${cid}" ]] && break
+
+                    # 注意到我们使用正则表达式展开数组来进行元素检查
+                    # 因此表达式右侧的值应用引号括起以保证完全匹配
+                    # 我们使用了ShellCheck工具，而此工具会对=~右侧的表达式报错，因此我们使用了
+                    # shellcheck disable=SC2076
+                    # 来关闭这一报错
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
                     echo "您输入的课程号$cid有误，请输入上表中列举出的某个课程号"
                 done
 
+                # 每次调用新的函数代表我们将要进入一个新的页面，我们不想让用户在下一页面刷新时每次都重复选择某一门课程的过程
+                # 因此我们将选择好的课程号存储到cid变量中，隐式传递到函数StudentOPCourse中
                 StudentOPCourse
                 break
                 ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
                 echo "您输入的操作$op有误，请输入上面列出的操作"
+                # 此时不进行Break而是继续请求用户的操作选择
                 ;;
             esac
         done
     done
 }
 
-StudentOPCourse() {
+function StudentOPCourse() {
     while :; do
+        # 打印STUDENT Banner
         PrintStudent
 
+        # target代指我们想要管理的内容的字符串，可以是课程或课程实验/作业。用于格式化打印
+        # 每次刷新页面时都要清空
         target="$Green课程实验/作业$NoColor"
+        # 内容未发布提示信息
+        no_publication="$Red本课程还没有已发布的$NoColor${target}"
+
+        # 课程教师查询语句
         query_tid="select tid from teach where cid=$cid"
         query_teacher="select id 教师工号, name 教师姓名 from teacher where id in ($query_tid)"
+
+        # 课程信息查询语句
+        query_course="select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course where id=$cid"
+
         echo "您选择的课程为："
-        $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id=$cid;"
+        $mysql_prefix -e "$query_course;"
 
         echo "教这门课的老师有："
         $mysql_prefix -e "$query_teacher;"
 
-        # ops=(1 2 3)
+        # 相关作业/实验查询
+        query_hid="select id from homework where cid=$cid"
+        query_hw="select id 作业ID, intro 作业简介, creation_time 作业发布时间, end_time 作业截止时间 from homework where cid=$cid"
+
+        # 以数组形式存入变量
+        hids=($($mysql_prefix -e "$query_hid;"))
+
+        # 根据数量显示不同的提示
+        if [ ${#hids[@]} -gt 0 ]; then
+            echo "本课程已有的${target}如下图所示"
+            $mysql_prefix -e "$query_hw;"
+        else
+            echo "$no_publication"
+            break
+        fi
+
         echo "您可以进行的操作有："
         echo "1. 管理${target}"
-        echo "0. 返回上一级"
+        echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
-            # [[ "${ops[@]}" =~ "${op}" ]] && break
-            # echo "您选择了操作：$op"
             case $op in
             1)
                 echo "您选择了管理本课程的${target}"
-                query_hid="select id from homework where cid=$cid"
-                query_hw="select id 作业ID, intro 作业简介, creation_time 作业发布时间, end_time 作业截止时间 from homework where cid=$cid"
-
-                hids=($($mysql_prefix -e "$query_hid;"))
-                if [ ${#hids[@]} -gt 0 ]; then
-                    echo "本课程已有的${target}如下图所示"
-                    $mysql_prefix -e "$query_hw;"
-                else
-                    echo "本课程还没有已发布的${target}"
-                    return 0
+                # 根据数量显示不同的提示
+                if [ ${#hids[@]} -eq 0 ]; then
+                    echo "$no_publication"
+                    break
                 fi
-                echo "您选择了管理${target}"
                 while :; do
                     read -rp "请输入您想要管理的${target}ID：" hid
-                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
-
+                # 每次调用新的函数代表我们将要进入一个新的页面，我们不想让用户在下一页面刷新时每次都重复选择某一项课程作业/实验
+                # 因此我们将选择好的课程号存储到hid变量中，隐式传递到函数中
                 StudentManageSubmission
 
                 break
                 ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
@@ -230,7 +315,8 @@ StudentOPCourse() {
     done
 }
 
-PrintAttachment() {
+function PrintAttachment() {
+    # 用于打印附件信息的小函数，可以提高代码可读性
     if [ "$attachment_count" -gt 0 ]; then
         echo "本${target}的附件包括："
         $mysql_prefix -e "$query_attachment;"
@@ -239,12 +325,14 @@ PrintAttachment() {
     fi
 }
 
-StudentManageSubmission() {
+function StudentManageSubmission() {
     while :; do
         PrintStudent
 
         upper="$Green课程作业/实验$NoColor"
         target="$upper$Green提交$NoColor"
+        no_publication="$Red您在本$NoColor$upper$Red下还没有$NoColor${target}"
+
         echo "您选择了修改以下的$upper："
         query_course_homework="select id \`作业/实验ID\`, intro \`作业/实验简介\`, creation_time 创建时间, end_time 截止时间 from homework where id=$hid"
         query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
@@ -264,7 +352,7 @@ StudentManageSubmission() {
             echo "您在本$upper创建的${target}如下所示"
             $mysql_prefix -e "$query_subs;"
         else
-            echo "您在本$upper下还没有${target}"
+            echo "$no_publication"
         fi
 
         echo "您可以进行的操作有："
@@ -272,7 +360,7 @@ StudentManageSubmission() {
         echo "2. 删除已发布的${target}"
         echo "3. 修改已发布的${target}"
         echo "4. 查看已发布的${target}"
-        echo "0. 返回上一级"
+        echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
             case $op in
@@ -328,12 +416,12 @@ StudentManageSubmission() {
             2)
                 echo "您选择了删除已发布的${target}"
                 if [ ${#subids[@]} -eq 0 ]; then
-                    echo "您在本$upper下还没有${target}"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要删除的${target}ID：" subid
-                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    [[ "${subids[*]}" =~ "${subid}" ]] && break
                     echo "您输入的${target}ID$subid有误，请输入上表中列举出的某个${target}ID"
                 done
                 # query_delete_attach_to="delete from attach_to where uid=$subid"
@@ -346,12 +434,12 @@ StudentManageSubmission() {
             3)
                 echo "您选择了修改已发布的${target}"
                 if [ ${#subids[@]} -eq 0 ]; then
-                    echo "您在本$upper下还没有${target}"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要修改的${target}ID：" subid
-                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    [[ "${subids[*]}" =~ "${subid}" ]] && break
                     echo "您输入的${target}ID$subid有误，请输入上表中列举出的某个${target}ID"
                 done
 
@@ -408,12 +496,12 @@ StudentManageSubmission() {
             4)
                 echo "您选择了查询已发布的${target}"
                 if [ ${#subids[@]} -eq 0 ]; then
-                    echo "您在本$upper下还没有${target}"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要查询的作业/实验提交ID：" subid
-                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    [[ "${subids[*]}" =~ "${subid}" ]] && break
                     echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
                 done
 
@@ -428,7 +516,7 @@ StudentManageSubmission() {
                 break
                 ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
@@ -439,22 +527,30 @@ StudentManageSubmission() {
     done
 }
 
-TeacherUI() {
+function TeacherUI() {
     # login informations
-    [ -z "$1" ] && tid=1 || tid=$1
-    [ -z "$2" ] && name="zy" || name=$2
+    tid=${1:-"1"}
+    name=${2:-"zy"}
 
     while :; do
         PrintTeacher
+        no_publication="$Red您本学期没有课程$NoColor"
 
         query_id="select cid from teach where tid=$tid"
         query_course="select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id in ($query_id)"
         cids=($($mysql_prefix -se "$query_id;"))
 
         echo "$name老师您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
+        if [ ${#cids[@]} -eq 0 ]; then
+            echo "您本学期没有课程"
+            break
+        else
+            echo "您本学期共${#cids[@]}有门课程，它们分别为："
+            $mysql_prefix -e "$query_course;"
+        fi
         echo "您可以进行的操作有："
         echo "1. 管理课程"
-        echo "0. 返回上一级"
+        echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
             # [[ "${ops[@]}" =~ "${op}" ]] && break
@@ -466,11 +562,9 @@ TeacherUI() {
                     echo "您本学期没有课程"
                     break
                 fi
-                echo "您本学期共${#cids[@]}有门课程，它们分别为："
-                $mysql_prefix -e "$query_course;"
                 while :; do
                     read -rp "请输入您想要管理的课程号：" cid
-                    [[ "${cids[@]}" =~ "${cid}" ]] && break
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
                     echo "您输入的课程号$cid有误，请输入上表中列举出的某个课程号"
                 done
 
@@ -478,7 +572,7 @@ TeacherUI() {
                 break
                 ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
@@ -489,7 +583,7 @@ TeacherUI() {
     done
 }
 
-TeacherOPCourse() {
+function TeacherOPCourse() {
     while :; do
         PrintTeacher
 
@@ -498,7 +592,7 @@ TeacherOPCourse() {
         query_teacher="select id 教师工号, name 教师姓名 from teacher where id in ($query_tid)"
 
         echo "您选择的${target}为："
-        $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id=$cid;"
+        $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course where id=$cid;"
 
         tids=($($mysql_prefix -e "$query_tid and tid <> $tid;"))
         if [ ${#tids[@]} -gt 0 ]; then
@@ -513,7 +607,7 @@ TeacherOPCourse() {
         echo "1. 管理修读${target}的学生"
         echo "2. 管理${target}作业/实验"
         echo "3. 管理本${target}信息（管理公告/简介等）"
-        echo "0. 返回上一级"
+        echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
             # [[ "${ops[@]}" =~ "${op}" ]] && break
@@ -535,7 +629,7 @@ TeacherOPCourse() {
                 break
                 ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
@@ -546,7 +640,7 @@ TeacherOPCourse() {
     done
 }
 
-TeacherManageCourse() {
+function TeacherManageCourse() {
     # ops=(1 2)
     while :; do
         PrintTeacher
@@ -556,7 +650,7 @@ TeacherManageCourse() {
         echo "您可以进行的操作有："
         echo "1. 管理课程$target1"
         echo "2. 修改课程$target2"
-        echo "0. 返回上一级"
+        echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
             # [[ "${ops[@]}" =~ "${op}" ]] && break
@@ -573,7 +667,7 @@ TeacherManageCourse() {
                 break
                 ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
@@ -584,7 +678,7 @@ TeacherManageCourse() {
     done
 }
 
-TeacherManageCourseBrief() {
+function TeacherManageCourseBrief() {
     target="$Green课程简介$NoColor"
     echo "${target}的原内容为"
     $mysql_prefix -e "select brief 课程简介 from course where id=$cid"
@@ -604,11 +698,13 @@ TeacherManageCourseBrief() {
     $mysql_prefix -e "$query_brief_update;"
 }
 
-TeacherManageCourseInfo() {
+function TeacherManageCourseInfo() {
     while :; do
         PrintTeacher
 
         target="$Green课程公告$NoColor"
+        no_publication="$Red本课程没有已发布的$NoColor${target}"
+
         query_iid="select id from info where cid=$cid"
         query_info="select id 公告ID, release_time 公告发布时间, content 公告内容 from info where cid=$cid"
 
@@ -617,14 +713,15 @@ TeacherManageCourseInfo() {
             echo "本课程已有的${target}如下图所示"
             $mysql_prefix -e "$query_info;"
         else
-            echo "本课程没有已发布的${target}"
+            echo "$no_publication"
         fi
 
         echo "您可以进行的操作有："
         echo "1. 发布新的${target}"
         echo "2. 删除已发布的${target}"
         echo "3. 修改已发布的${target}"
-        echo "0. 返回上一级"
+        echo "4. 查询已发布的${target}"
+        echo "0. ${ReturnPrev}"
 
         while :; do
             read -rp "请输入您想要进行的操作：" op
@@ -682,32 +779,27 @@ TeacherManageCourseInfo() {
             2)
                 echo "您选择了删除已发布的${target}"
                 if [ ${#iids[@]} -eq 0 ]; then
-                    echo "本门课程还没有已发布的${target}"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要删除的${target}ID：" iid
-                    [[ "${iids[@]}" =~ "${iid}" ]] && break
+                    [[ "${iids[*]}" =~ "${iid}" ]] && break
                     echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
                 done
-                # query_delete_attach_to="delete from attach_to where uid=$iid"
-                # query_delete_info="delete from info where id=$iid"
                 query_delete_content="delete from content where id=$iid"
-                # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_info;$query_delete_content;commit;set autocommit=1;"
-                # $mysql_prefix -e "$query_delete_attach_to;"
-                # $mysql_prefix -e "$query_delete_info;"
                 $mysql_prefix -e "$query_delete_content;"
                 break
                 ;;
             3)
                 echo "您选择了修改已发布的${target}"
                 if [ ${#iids[@]} -eq 0 ]; then
-                    echo "本门课程还没有已发布的${target}"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要修改的${target}ID：" iid
-                    [[ "${iids[@]}" =~ "${iid}" ]] && break
+                    [[ "${iids[*]}" =~ "${iid}" ]] && break
                     echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
                 done
 
@@ -762,8 +854,29 @@ TeacherManageCourseInfo() {
 
                 break
                 ;;
+            4)
+                echo "您选择了查询已发布的${target}"
+                if [ ${#iids[@]} -eq 0 ]; then
+                    echo "$no_publication"
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要查询的${target}ID：" iid
+                    [[ "${iids[*]}" =~ "${iid}" ]] && break
+                    echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
+                done
+                echo "您选择了查询以下的${target}："
+                query_course_info="select I.id 公告ID, I.content 公告内容, I.release_time 公告发布时间 from (info I join course C on I.cid=C.id) where I.id=$iid;"
+                query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$iid"
+                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$iid"
+                $mysql_prefix -e "$query_course_info;"
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+                PrintAttachment
+                read -n 1 -rp "按任意键继续..." -s
+                break
+                ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
@@ -774,10 +887,11 @@ TeacherManageCourseInfo() {
     done
 }
 
-TeacherManageStudent() {
+function TeacherManageStudent() {
     while :; do
-        target="$Green学生$NoColor"
         PrintTeacher
+        target="$Green学生$NoColor"
+        no_publication="$Red没有$NoColor$target$Red选上这门课$NoColor"
 
         query_sid="select sid from take where cid=$cid"
         query_student="select id 学生学号, name 学生姓名 from student where id in ($query_sid)"
@@ -786,12 +900,12 @@ TeacherManageStudent() {
             echo "选上这门课的$target们有："
             $mysql_prefix -e "$query_student;"
         else
-            echo "没有$target选上这门课"
+            echo "$no_publication"
         fi
         echo "您可以进行的操作有："
         echo "1. 向课程名单中添加$target"
         echo "2. 从课程名单中移除$target"
-        echo "0. 返回上一级"
+        echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
             case $op in
@@ -804,7 +918,7 @@ TeacherManageStudent() {
                 $mysql_prefix -e "$query_all_students;"
                 while :; do
                     read -rp "请输入您想要添加的$target学号：" sid
-                    [[ "${all_sids[@]}" =~ "${sid}" ]] && break
+                    [[ "${all_sids[*]}" =~ "${sid}" ]] && break
                     echo "您输入的学号$sid有误，请输入上表中列举出的某个$target的学号"
                 done
                 echo "您选择了将下列$target添加进课程名单："
@@ -815,17 +929,17 @@ TeacherManageStudent() {
                     query_insert_student_course="insert into take(sid, cid) value ($sid, $cid)"
                     $mysql_prefix -e "$query_insert_student_course;"
                 fi
-                breaks
+                break
                 ;;
             2)
                 echo "您选择了从课程名单中移除$target"
                 if [ ${#sids[@]} -eq 0 ]; then
-                    echo "本门课程还没有$target选上"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要删除的$target学号：" sid
-                    [[ "${sids[@]}" =~ "${sid}" ]] && break
+                    [[ "${sids[*]}" =~ "${sid}" ]] && break
                     echo "您输入的学号$sid有误，请输入上表中列举出的某个$target的学号"
                 done
                 echo "您选择了将下列$target从课程名单中移除："
@@ -833,15 +947,16 @@ TeacherManageStudent() {
                 $mysql_prefix -e "$query_student_info;"
                 read -rp "是否要移除（Y/n）：" need_delete_student_course
                 if [[ $need_delete_student_course =~ ^[1Yy] ]]; then
+                    echo "正在删除...$sid from $cid"
                     query_delete_student_course="delete from take where sid=$sid and cid=$cid"
-                    query_delete_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and cid=$cid)"
-                    query_delete_student_submission="delete from submission where sid=$sid and cid=$cid"
+                    query_delete_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and hid in (select id from homework where cid=$cid))"
+                    query_delete_student_submission="delete from submission where sid=$sid and hid in (select id from homework where cid=$cid)"
                     $mysql_prefix -e "set autocommit=0;$query_delete_student_course;$query_delete_student_attach_to;$query_delete_student_submission;commit;set autocommit=1;"
                 fi
                 break
                 ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
@@ -852,11 +967,13 @@ TeacherManageStudent() {
     done
 }
 
-TeacherManageHomework() {
+function TeacherManageHomework() {
     while :; do
         PrintTeacher
 
         target="$Green课程作业/实验$NoColor"
+        no_publication="$Red本课程还没有已发布的$NoColor$target"
+
         query_hid="select id from homework where cid=$cid"
         query_hw="select id 作业ID, intro 作业简介, creation_time 作业发布时间, end_time 作业截止时间 from homework where cid=$cid"
 
@@ -865,15 +982,15 @@ TeacherManageHomework() {
             echo "本课程已有的${target}如下图所示"
             $mysql_prefix -e "$query_hw;"
         else
-            echo "本课程还没有已发布的$target"
+            echo "$no_publication"
         fi
 
         echo "您可以进行的操作有："
         echo "1. 发布新的${target}"
         echo "2. 删除已发布的${target}"
         echo "3. 修改已发布的${target}"
-        echo "4. 查看已发布的${target}的完成情况"
-        echo "0. 返回上一级"
+        echo "4. 查看已发布的${target}"
+        echo "0. ${ReturnPrev}"
 
         while :; do
             read -rp "请输入您想要进行的操作：" op
@@ -900,7 +1017,7 @@ TeacherManageHomework() {
 
                 # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
                 query_insert_content="insert into content value ()"
-                query_insert_hw="insert into homework(id, cid,tid,intro,creation_time,end_time) value (last_insert_id(),$cid,$tid,\"$full_string\",now(),from_unixtime($(expr $(date +%s) + "$days" '*' 86400)))"
+                query_insert_hw="insert into homework(id, cid,tid,intro,creation_time,end_time) value (last_insert_id(),$cid,$tid,\"$full_string\",now(),from_unixtime($(($(date +%s) + days * 86400))))"
 
                 hid=$($mysql_prefix -se "set autocommit=0;$query_insert_content;select last_insert_id();$query_insert_hw;commit;set autocommit=1;")
 
@@ -939,12 +1056,12 @@ TeacherManageHomework() {
             2)
                 echo "您选择了删除已发布的${target}"
                 if [ ${#hids[@]} -eq 0 ]; then
-                    echo "本门课程还没有已发布的${target}"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要删除的${target}ID：" hid
-                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
                 # query_delete_attach_to="delete from attach_to where uid=$hid"
@@ -959,12 +1076,12 @@ TeacherManageHomework() {
             3)
                 echo "您选择了修改已发布的${target}"
                 if [ ${#hids[@]} -eq 0 ]; then
-                    echo "本门课程还没有已发布的${target}"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要修改的${target}ID：" hid
-                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
 
@@ -997,7 +1114,7 @@ TeacherManageHomework() {
 
                 query_get_start_time="select unix_timestamp(creation_time) from homework where id=$hid"
                 creation_time=$($mysql_prefix -se "$query_get_start_time;")
-                query_update_end_time="update homework set end_time=from_unixtime($(expr "$creation_time" + "$days" '*' 86400)) where id=$hid"
+                query_update_end_time="update homework set end_time=from_unixtime($((creation_time + days * 86400))) where id=$hid"
                 $mysql_prefix -e "$query_update_end_time;"
 
                 echo "您刚刚修改的课程${target}ID为：$hid"
@@ -1032,14 +1149,22 @@ TeacherManageHomework() {
             4)
                 echo "您选择了查看已发布的${target}的完成情况"
                 if [ ${#hids[@]} -eq 0 ]; then
-                    echo "本门课程还没有已发布的${target}"
+                    echo "$no_publication"
                     break
                 fi
                 while :; do
                     read -rp "请输入您想要查看的${target}ID：" hid
-                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
+
+                echo "您选择了查询以下的${target}："
+                query_course_homework="select id \`作业/实验ID\`, intro \`作业/实验简介\`, creation_time 创建时间, end_time 截止时间 from homework where id=$hid"
+                query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
+                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$hid"
+                $mysql_prefix -e "$query_course_homework;"
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+                PrintAttachment
 
                 query_sid="select sid from take where cid=$cid"
                 query_finish="select stu.id 学生学号, stu.name 学生姓名, if(count(sub.id)>0,\"是\",\"否\") 是否完成, count(sub.id) 创建的提交数目 from (select * from submission where hid=$hid) sub right join (select * from student where id in ($query_sid)) stu on sub.sid=stu.id group by stu.id"
@@ -1062,7 +1187,7 @@ TeacherManageHomework() {
                 break
                 ;;
             0)
-                echo "您选择了返回上一级"
+                echo "您选择了${ReturnPrev}"
                 return 0
                 ;;
             *)
@@ -1073,7 +1198,7 @@ TeacherManageHomework() {
     done
 }
 
-RemoveDanger() {
+function RemoveDanger() {
     danger_set="[\"'\.\*;%]"
     [ ${#2} -gt 0 ] && danger_set=$2
     danger=$1
@@ -1082,7 +1207,7 @@ RemoveDanger() {
         thechar="${danger:$i-1:1}"
         if [[ "$thechar" =~ $danger_set ]]; then
             # echo "$thechar"
-            safe="$safe"'\'"$thechar"
+            safe="$safe""\\""$thechar"
         else
             safe="$safe$thechar"
         fi
@@ -1090,13 +1215,9 @@ RemoveDanger() {
     echo "$safe"
 }
 
-LoginInUI() {
+function LoginInUI() {
     while :; do
         PrintBanner
-        # PrintDelimiter
-        # PrintTeacher
-        # PrintStudent
-        # PrintAdmin
         while :; do
             read -rp "请输入您的身份（T/S/A）或输入0退出系统：" identity
             case $identity in
@@ -1113,7 +1234,7 @@ LoginInUI() {
                 break
                 ;;
             0)
-                echo "再见！祝您生活愉快。"
+                echo "再见！"
                 exit 0
                 ;;
             *) echo "请输入T, S, A或0" ;;
@@ -1125,14 +1246,13 @@ LoginInUI() {
             query_all_hash="select id, name, password_hash from $identity"
             query_right_hash="select password_hash from ($query_all_hash) all_hash where id=\"$user_id\""
             right_hash=$($mysql_prefix -se "$query_right_hash;")
-            # [ -z $right_hash ] && echo "The right hash is zero length, user doesn't exist" || echo "right_hash is $right_hash"
             [ -z "$right_hash" ] || break
             echo "用户不存在，请重新输入"
         done
         while :; do
             read -rp "请输入您的密码：" -s password
             echo ""
-            password_hash=$(echo "$password" | sha256sum - | tr -d "[ \-]")
+            password_hash=$(echo "$password" | sha256sum - | tr -d " -")
             [ "$password_hash" = "$right_hash" ] && break
             echo "验证失败，请重新输入"
         done
@@ -1152,6 +1272,9 @@ LoginInUI() {
         esac
     done
 }
-LoginInUI
 
-rm -rf $mysql_f
+# 主程序从这里开始，上面定义的都是可供调用的函数
+# 请查看对程序的注释来理解本软件的工作原理
+DefineColor
+DefineMySQL
+LoginInUI
