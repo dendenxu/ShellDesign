@@ -2,6 +2,25 @@
 # 这是一个现代教务管理系统，主要面向作业管理
 # 我们通过编写Shell程序来管理作业数据库
 
+# colors
+Black='\033[0;30m'
+Red='\033[0;31m'
+Green='\033[0;32m'
+BrownOrange='\033[0;33m'
+Blue='\033[0;34m'
+Purple='\033[0;35m'
+Cyan='\033[0;36m'
+LightGray='\033[0;37m'
+DarkGray='\033[1;30m'
+LightRed='\033[1;31m'
+LightGreen='\033[1;32m'
+Yellow='\033[1;33m'
+LightBlue='\033[1;34m'
+LightPurple='\033[1;35m'
+LightCyan='\033[1;36m'
+White='\033[1;37m'
+NoColor='\033[0m'
+
 mysql_u="ShellDesigner"
 mysql_p="ShellDesigner"
 mysql_h="localhost"
@@ -215,6 +234,10 @@ StudentManageSubmission() {
                     [[ "${subids[@]}" =~ "${subid}" ]] && break
                     echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
                 done
+                query_remove_attach_to="delete from attach_to where uid=$subid"
+                query_remove_submission="delete from submission where id=$subid"
+                query_remove_content="delete from content where id=$subid"
+                $mysql_prefix -e "set autocommit=0;$query_remove_attach_to;$query_remove_submission;$query_remove_content;commit;set autocommit=1;"
                 break
                 ;;
             3)
@@ -224,23 +247,96 @@ StudentManageSubmission() {
                     break
                 fi
                 while :; do
-                    read -rp "请输入您想要修改的作业/实验ID：" subid
+                    read -rp "请输入您想要修改的作业/实验提交ID：" subid
                     [[ "${subids[@]}" =~ "${subid}" ]] && break
                     echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
                 done
+
+                echo "您选择修改的提交为："
+                query_course_submission="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id=$subid"
+                query_attachment_submission="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$subid"
+                $mysql_prefix -e "$query_course_submission;"
+                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$subid"
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+
+                if [ $attachment_count -gt 0 ]; then
+                    echo "本提交的附件包括："
+                    $mysql_prefix -e "$query_attachment_submission;"
+                else
+                    echo "本提交还没有附件"
+                fi
+
+                echo "请输入提交的简介内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+
+                full_string=$(RemoveDanger "$full_string")
+
+                echo -e "您的提交的简介内容为\n$full_string"
+
+                # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
+                query_modify_submission="update submission set submission_text=\"$full_string\", latest_modification_time=now() where id=$subid"
+                $mysql_prefix -e "$query_modify_submission;"
+                echo "您刚刚修改的课程作业/实验提交ID为：$subid"
+                while :; do
+                    read -rp "请输入您是否需要为提交内容添加附件（Y/n）：" need_attach
+                    if [[ $need_attach =~ ^[1Yy] ]]; then
+                        echo "您选择了添加附件"
+                        read -rp "请输入您想要添加的附件名称：" attach_name
+                        attach_name=$(RemoveDanger "$attach_name")
+                        echo "您的附件名称为：$attach_name"
+                        read -rp "请输入您想要添加的附件URL：" attach_url
+                        # 对于URL，我们使用不同的转义策略
+                        attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
+                        echo "您的附件URL为：$attach_url"
+                        query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
+                        query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $subid)"
+                        attach_id=$($mysql_prefix -se "set autocommit=0;$query_insert_attach;select last_insert_id();$query_insert_attach_to;commit;set autocommit=1;")
+                        echo "您刚刚添加的附件ID为：$attach_id"
+                    else
+                        break
+                    fi
+                done
+
+                echo "您刚刚对课程号为$cid的课程的ID为$hid的作业/实验修改了如下的提交："
+                $mysql_prefix -e "$query_course_submission;"
+
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+                if [ "$attachment_count" -gt 0 ]; then
+                    echo "本提交的附件包括："
+                    $mysql_prefix -e "$query_attachment_submission;"
+                else
+                    echo "本提交还没有附件"
+                fi
                 break
                 ;;
             4)
-                echo "您选择了查看已发布的作业/实验提交"
+                echo "您选择了查询已发布的作业/实验提交"
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "您在本作业/实验下还没有提交"
                     break
                 fi
                 while :; do
-                    read -rp "请输入您想要查看的作业/实验ID：" subid
+                    read -rp "请输入您想要查询的作业/实验提交ID：" subid
                     [[ "${subids[@]}" =~ "${subid}" ]] && break
                     echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
                 done
+
+                echo "您选择查询的提交为："
+                query_course_submission="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id=$subid"
+                query_attachment_submission="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$subid"
+                $mysql_prefix -e "$query_course_submission;"
+                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$subid"
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+
+                if [ $attachment_count -gt 0 ]; then
+                    echo "本提交的附件包括："
+                    $mysql_prefix -e "$query_attachment_submission;"
+                else
+                    echo "本提交还没有附件"
+                fi
                 break
                 ;;
             0)
@@ -257,8 +353,8 @@ StudentManageSubmission() {
 
 TeacherUI() {
     # login informations
-    [ -z $1 ] && tid=1 || tid=$1
-    [ -z $2 ] && name="zy" || name=$2
+    [ -z "$1" ] && tid=1 || tid=$1
+    [ -z "$2" ] && name="zy" || name=$2
 
     while :; do
         query_id="select cid from teach where tid=$tid"
@@ -571,7 +667,7 @@ TeacherManageCourseInfo() {
                 echo "您刚刚对课程号为$cid的课程发布了如下的课程公告："
                 $mysql_prefix -e "$query_course_info;"
 
-                if [ $attachment_count -gt 0 ]; then
+                if [ "$attachment_count" -gt 0 ]; then
                     echo "本公告的附件包括："
                     $mysql_prefix -e "$query_attachment_info;"
                 else
@@ -819,7 +915,7 @@ TeacherManageHomework() {
 
                 query_get_start_time="select unix_timestamp(creation_time) from homework where id=$hid"
                 creation_time=$($mysql_prefix -se "$query_get_start_time;")
-                query_update_end_time="update homework set end_time=from_unixtime($(expr $creation_time + "$days" '*' 86400)) where id=$hid"
+                query_update_end_time="update homework set end_time=from_unixtime($(expr "$creation_time" + "$days" '*' 86400)) where id=$hid"
                 $mysql_prefix -e "$query_update_end_time;"
 
                 echo "您刚刚修改的课程课程作业/实验ID为：$hid"
@@ -847,7 +943,7 @@ TeacherManageHomework() {
                 echo "您刚刚对课程号为$cid的课程发布了如下的课程课程作业/实验："
                 $mysql_prefix -e "$query_course_homework;"
 
-                if [ $attachment_count -gt 0 ]; then
+                if [ "$attachment_count" -gt 0 ]; then
                     echo "本课程作业/实验的附件包括："
                     $mysql_prefix -e "$query_attachment_homework;"
                 else
@@ -942,7 +1038,7 @@ LoginInUI() {
         done
         while :; do
             read -rp "请输入您的登陆账号：" user_id
-            user_id=$(RemoveDanger $user_id)
+            user_id=$(RemoveDanger "$user_id")
             query_all_hash="select id, name, password_hash from $identity"
             query_right_hash="select password_hash from ($query_all_hash) all_hash where id=\"$user_id\""
             right_hash=$($mysql_prefix -se "$query_right_hash;")
