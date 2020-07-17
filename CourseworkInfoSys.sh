@@ -1,6 +1,7 @@
 #!/bin/bash
+# shellcheck disable=SC2076
 # 这是一个现代教务管理系统，主要面向作业管理
-# 我们通过编写Shell程序来管理作业数据库
+# 我们通过编写Shell程序，调用MySQL数据库来管理作业系统
 
 function DefineColor() {
     # 我们使用tput命令来定义颜色信息
@@ -19,8 +20,10 @@ function DefineColor() {
 
 function DefineMySQL() {
     # 我们通过mysql命令来直接执行数据库操作，这也是本实验的核心内容
-    # 我们通过设置文件的方式使得MySQL不会抱怨直接在命令行输入密码不安全
-    # * 注意：您可以修改程序运行目录下的.mysql.cnf文件来设置自己的数据库样式
+    # 我们通过设置文件的方式使得MySQL不会抱怨直接在命令行输入密码不安全：
+    # mysql: [Warning] Using a password on the command line interface can be insecure.
+    # * 注意：您可以修改程序运行目录下的.mysql.cnf文件来设置自己的数据库登陆信息
+
     # ! 请保证MySQL已经在本机正确安装，且.mysql.cnf已经被正确配置
     # 您需要在.mysql.cnf中设置您的登录名/密码/服务器，并设置数据库名称(和您在MySQL中使用的相同)
     # 例如您在MySQL中创建了ShellDesigner这个用户，密码为ShellDesigner，并打算使用ShellDesign这个数据库来管理本软件涉及到的内容
@@ -34,12 +37,16 @@ function DefineMySQL() {
     # ! 第一次使用本软件时请运行当前目录下的table.sql来初始化数据库中的表
     # 必须运行的部分是所有的create table
     # 后面的insert内容是可选的，但是至少要有一个管理员账户，否则本软件没有什么意义
-    
+    # 样例初始化语句（假设用户和密码如上所述）：mysql -uShellDesigner -pShellDesigner < tables.sql
+
+    # 下列是我们默认的一些设置
     mysql_u_default="ShellDesigner"
     mysql_p_default="ShellDesigner"
     mysql_h_default="localhost"
     mysql_d_default="ShellDesign"
     mysql_f=".mysql.cnf"
+
+    # 若.mysql.cnf在当前目录不存在，我们会创建一个并将默认内容写入
     if [ ! -f "$mysql_f" ]; then
         echo "Automatically generating configuration file..." >&2
         echo "[client]" >$mysql_f
@@ -49,13 +56,17 @@ function DefineMySQL() {
         echo "database=$mysql_d_default" >>$mysql_f
     fi
 
+    # 类似调用alias，我们在下面的Shell语句中执行MySQL调用时都会使用$mysql_prefix来开头
     mysql_prefix="mysql --defaults-extra-file=$mysql_f"
 }
 
+# 以下几个Print函数都是用于打印ASCII Art的
+# 同时，它们通过调用clear函数来进行假GUI的页面模拟功能
+# 我们使用ASCII Art的初衷是让用户能在程序的不同Section中更快的找到自己想要的信息
+# 后来我们发现通过调用clear函数可以达到模拟GUI的功能
 function PrintBanner() {
-    # line="##################################################################################################################################"
-    # echo "$Yellow$line"
-    # echo ""
+    # 程序的主横幅：CourseworkManger
+    # 会在初始登陆界面打印
     clear
     cat <<"EOF"
    _________                                                       __        _____                                                  
@@ -64,15 +75,13 @@ function PrintBanner() {
    \     \___(  <_> )  |  /|  | \/\___ \\  ___/\     (  <_> )  | \/    <  /    Y    \/ __ \|   |  \/ __ \_/ /_/  >  ___/|  | \/     
     \______  /\____/|____/ |__|  /____  >\___  >\/\_/ \____/|__|  |__|_ \ \____|__  (____  /___|  (____  /\___  / \___  >__|        
            \/                         \/     \/                        \/         \/     \/     \/     \//_____/      \/            
+                                                                                                                                    
 EOF
-    # echo ""
-    # echo "$line$NoColor"
 }
 
 function PrintDelimiter() {
+    # SECTION分隔符，会在无法确定用户身份但需要分隔的位置打印
     clear
-    line="###########################################################################"
-    echo "$line"
     cat <<"EOF"
    ______     ______     ______     ______   __     ______     __   __     
   /\  ___\   /\  ___\   /\  ___\   /\__  _\ /\ \   /\  __ \   /\ "-.\ \    
@@ -81,14 +90,11 @@ function PrintDelimiter() {
     \/_____/   \/_____/   \/_____/     \/_/   \/_/   \/_____/   \/_/ \/_/  
                                                                            
 EOF
-    echo "$line"
 }
 
 function PrintTeacher() {
+    # TEACHER分隔符，会在老师登陆后的管理界面打印
     clear
-
-    line="##############################################################################"
-    echo "$line"
     cat <<"EOF"
    ______   ______     ______     ______     __  __     ______     ______    
   /\__  _\ /\  ___\   /\  __ \   /\  ___\   /\ \_\ \   /\  ___\   /\  == \   
@@ -97,14 +103,11 @@ function PrintTeacher() {
       \/_/   \/_____/   \/_/\/_/   \/_____/   \/_/\/_/   \/_____/   \/_/ /_/ 
                                                                              
 EOF
-    echo "$line"
 }
 
 function PrintStudent() {
+    # STUDENT分隔符，会在学生登陆后的管理界面打印
     clear
-
-    line="#############################################################################"
-    echo "$line"
     cat <<"EOF"
    ______     ______   __  __     _____     ______     __   __     ______  
   /\  ___\   /\__  _\ /\ \/\ \   /\  __-.  /\  ___\   /\ "-.\ \   /\__  _\ 
@@ -113,14 +116,11 @@ function PrintStudent() {
     \/_____/     \/_/   \/_____/   \/____/   \/_____/   \/_/ \/_/     \/_/ 
                                                                            
 EOF
-    echo "$line"
 }
 
 function PrintAdmin() {
+    # ADMIN分隔符，会在管理员登陆后的管理界面打印
     clear
-
-    line="#########################################################"
-    echo "$line"
     cat <<"EOF"
    ______     _____     __    __     __     __   __    
   /\  __ \   /\  __-.  /\ "-./  \   /\ \   /\ "-.\ \   
@@ -129,19 +129,60 @@ function PrintAdmin() {
     \/_/\/_/   \/____/   \/_/  \/_/   \/_/   \/_/ \/_/ 
                                                        
 EOF
-    echo "$line"
 }
 
 function StudentUI() {
-    # login informations
-    [ -z $1 ] && sid=1 || sid=$1
-    [ -z $2 ] && name="st1" || name=$2
-    while :; do # student main UI event loop
-        PrintStudent
+    # 学生UI主界面，为了方便测试我们为sid, name变量加入了默认值
+    sid=${1:-"1"}
+    name=${2:-"st1"}
+    while :; do      # 学生主界面UI循环
+        PrintStudent # 打印Banner
 
+        # 为了方便复用和嵌套，我们将所有的SQL查询语句存储在字符串变量中（容易遭到SQL Injection攻击，后面会提到如何防御）
+        # 注意在每一次事件循环后我们都会尽量更新一次查询语句的变量内容（除非此语句是固定的）。
         query_id="select cid from take where sid=$sid"
         query_course="select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id in ($query_id)"
+
+        # 第一层括号将返回结果当作数组处理，第二层$()是执行了一个Bash语句，在此是执行了一个MySQL查询
+        # ! 在本程序中，我们将结果存入变量时基本都会采用这种调用MySQL的方式，我们会使用-se选项，其中-e代表执行，-s --slient，安静模式，在此的效果是去除列名
+        # ! 在直接执行MySQL并原封不动的打印信息时，我们会使用-e选项，代表执行
+
+        # * 值得注意的是，在命令行直接调用MySQL时，会打印列分隔符，而将结果存入变量则不会打印（列分隔符自动会得到删除）
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" > temp.txt; cat temp.txt
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # name    id      password_hash
+        # root    1       53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a
+        # admin   2       fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;"
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # +-------+----+------------------------------------------------------------------+
+        # | name  | id | password_hash                                                    |
+        # +-------+----+------------------------------------------------------------------+
+        # | root  |  1 | 53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a |
+        # | admin |  2 | fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7 |
+        # +-------+----+------------------------------------------------------------------+
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" > /dev/tty
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # +-------+----+------------------------------------------------------------------+
+        # | name  | id | password_hash                                                    |
+        # +-------+----+------------------------------------------------------------------+
+        # | root  |  1 | 53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a |
+        # | admin |  2 | fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7 |
+        # +-------+----+------------------------------------------------------------------+
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" | read temp; echo "$temp"
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # name    id      password_hash
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  temp=$(mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;");echo "$temp"
+        # mysql: [Warning] Using a password on the command line interface can be insecure.
+        # name    id      password_hash
+        # root    1       53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a
+        # admin   2       fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7
+        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ● 
+
+        # * 因此当我们想要让此变量获取打印的信息时，我们应直接将返回信息赋值到变量中
+        # * 当我们想直接使用MySQL的格式化功能时，我们应直接使用命令将输出导入到/dev/tty
         cids=($($mysql_prefix -se "$query_id;"))
+
         echo "$name同学您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
         echo "您可以进行的操作有："
         echo "1. 管理课程"
@@ -153,13 +194,19 @@ function StudentUI() {
                 echo "您选择了管理课程"
                 if [ ${#cids[@]} -eq 0 ]; then
                     echo "您本学期没有课程"
-                    exit 0
+                    # 调用return可以使当前的函数返回，而不退出程序
+                    return 0
                 fi
                 echo "您本学期共${#cids[@]}有门课程，它们分别为："
+
+                # 直接调用MySQL并输出到/dev/tty可以使MySQL用分割线打印各种信息
                 $mysql_prefix -e "$query_course;"
                 while :; do
                     read -rp "请输入您想要管理的课程号：" cid
-                    [[ "${cids[@]}" =~ "${cid}" ]] && break
+
+                    # 注意到我们使用正则表达式展开数组来进行元素检查
+                    # 因此表达式右侧的值应用引号括起以保证完全匹配
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
                     echo "您输入的课程号$cid有误，请输入上表中列举出的某个课程号"
                 done
 
@@ -172,6 +219,7 @@ function StudentUI() {
                 ;;
             *)
                 echo "您输入的操作$op有误，请输入上面列出的操作"
+                # 此时不进行Break而是继续请求用户的操作选择
                 ;;
             esac
         done
@@ -186,7 +234,7 @@ function StudentOPCourse() {
         query_tid="select tid from teach where cid=$cid"
         query_teacher="select id 教师工号, name 教师姓名 from teacher where id in ($query_tid)"
         echo "您选择的课程为："
-        $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id=$cid;"
+        $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course where id=$cid;"
 
         echo "教这门课的老师有："
         $mysql_prefix -e "$query_teacher;"
@@ -214,7 +262,7 @@ function StudentOPCourse() {
                 echo "您选择了管理${target}"
                 while :; do
                     read -rp "请输入您想要管理的${target}ID：" hid
-                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
 
@@ -337,7 +385,7 @@ function StudentManageSubmission() {
                 fi
                 while :; do
                     read -rp "请输入您想要删除的${target}ID：" subid
-                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    [[ "${subids[*]}" =~ "${subid}" ]] && break
                     echo "您输入的${target}ID$subid有误，请输入上表中列举出的某个${target}ID"
                 done
                 # query_delete_attach_to="delete from attach_to where uid=$subid"
@@ -355,7 +403,7 @@ function StudentManageSubmission() {
                 fi
                 while :; do
                     read -rp "请输入您想要修改的${target}ID：" subid
-                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    [[ "${subids[*]}" =~ "${subid}" ]] && break
                     echo "您输入的${target}ID$subid有误，请输入上表中列举出的某个${target}ID"
                 done
 
@@ -417,7 +465,7 @@ function StudentManageSubmission() {
                 fi
                 while :; do
                     read -rp "请输入您想要查询的作业/实验提交ID：" subid
-                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    [[ "${subids[*]}" =~ "${subid}" ]] && break
                     echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
                 done
 
@@ -445,8 +493,8 @@ function StudentManageSubmission() {
 
 function TeacherUI() {
     # login informations
-    [ -z "$1" ] && tid=1 || tid=$1
-    [ -z "$2" ] && name="zy" || name=$2
+    tid=${1:-"1"}
+    name=${2:-"zy"}
 
     while :; do
         PrintTeacher
@@ -474,7 +522,7 @@ function TeacherUI() {
                 $mysql_prefix -e "$query_course;"
                 while :; do
                     read -rp "请输入您想要管理的课程号：" cid
-                    [[ "${cids[@]}" =~ "${cid}" ]] && break
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
                     echo "您输入的课程号$cid有误，请输入上表中列举出的某个课程号"
                 done
 
@@ -502,7 +550,7 @@ function TeacherOPCourse() {
         query_teacher="select id 教师工号, name 教师姓名 from teacher where id in ($query_tid)"
 
         echo "您选择的${target}为："
-        $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id=$cid;"
+        $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course where id=$cid;"
 
         tids=($($mysql_prefix -e "$query_tid and tid <> $tid;"))
         if [ ${#tids[@]} -gt 0 ]; then
@@ -628,6 +676,7 @@ function TeacherManageCourseInfo() {
         echo "1. 发布新的${target}"
         echo "2. 删除已发布的${target}"
         echo "3. 修改已发布的${target}"
+        echo "4. 查询已发布的${target}"
         echo "0. 返回上一级"
 
         while :; do
@@ -691,7 +740,7 @@ function TeacherManageCourseInfo() {
                 fi
                 while :; do
                     read -rp "请输入您想要删除的${target}ID：" iid
-                    [[ "${iids[@]}" =~ "${iid}" ]] && break
+                    [[ "${iids[*]}" =~ "${iid}" ]] && break
                     echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
                 done
                 query_delete_content="delete from content where id=$iid"
@@ -706,7 +755,7 @@ function TeacherManageCourseInfo() {
                 fi
                 while :; do
                     read -rp "请输入您想要修改的${target}ID：" iid
-                    [[ "${iids[@]}" =~ "${iid}" ]] && break
+                    [[ "${iids[*]}" =~ "${iid}" ]] && break
                     echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
                 done
 
@@ -761,6 +810,26 @@ function TeacherManageCourseInfo() {
 
                 break
                 ;;
+            4)
+                echo "您选择了查询已发布的${target}"
+                if [ ${#iids[@]} -eq 0 ]; then
+                    echo "本门课程还没有已发布的${target}"
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要查询的${target}ID：" iid
+                    [[ "${iids[*]}" =~ "${iid}" ]] && break
+                    echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
+                done
+                echo "您选择了查询以下的${target}："
+                query_course_info="select I.id 公告ID, I.content 公告内容, I.release_time 公告发布时间 from (info I join course C on I.cid=C.id) where I.id=$iid;"
+                query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$iid"
+                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$iid"
+                $mysql_prefix -e "$query_course_info;"
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+                PrintAttachment
+                break
+                ;;
             0)
                 echo "您选择了返回上一级"
                 return 0
@@ -803,7 +872,7 @@ function TeacherManageStudent() {
                 $mysql_prefix -e "$query_all_students;"
                 while :; do
                     read -rp "请输入您想要添加的$target学号：" sid
-                    [[ "${all_sids[@]}" =~ "${sid}" ]] && break
+                    [[ "${all_sids[*]}" =~ "${sid}" ]] && break
                     echo "您输入的学号$sid有误，请输入上表中列举出的某个$target的学号"
                 done
                 echo "您选择了将下列$target添加进课程名单："
@@ -824,7 +893,7 @@ function TeacherManageStudent() {
                 fi
                 while :; do
                     read -rp "请输入您想要删除的$target学号：" sid
-                    [[ "${sids[@]}" =~ "${sid}" ]] && break
+                    [[ "${sids[*]}" =~ "${sid}" ]] && break
                     echo "您输入的学号$sid有误，请输入上表中列举出的某个$target的学号"
                 done
                 echo "您选择了将下列$target从课程名单中移除："
@@ -872,7 +941,7 @@ function TeacherManageHomework() {
         echo "1. 发布新的${target}"
         echo "2. 删除已发布的${target}"
         echo "3. 修改已发布的${target}"
-        echo "4. 查看已发布的${target}的完成情况"
+        echo "4. 查看已发布的${target}"
         echo "0. 返回上一级"
 
         while :; do
@@ -900,7 +969,7 @@ function TeacherManageHomework() {
 
                 # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
                 query_insert_content="insert into content value ()"
-                query_insert_hw="insert into homework(id, cid,tid,intro,creation_time,end_time) value (last_insert_id(),$cid,$tid,\"$full_string\",now(),from_unixtime($(expr $(date +%s) + "$days" '*' 86400)))"
+                query_insert_hw="insert into homework(id, cid,tid,intro,creation_time,end_time) value (last_insert_id(),$cid,$tid,\"$full_string\",now(),from_unixtime($(($(date +%s) + days * 86400))))"
 
                 hid=$($mysql_prefix -se "set autocommit=0;$query_insert_content;select last_insert_id();$query_insert_hw;commit;set autocommit=1;")
 
@@ -944,7 +1013,7 @@ function TeacherManageHomework() {
                 fi
                 while :; do
                     read -rp "请输入您想要删除的${target}ID：" hid
-                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
                 # query_delete_attach_to="delete from attach_to where uid=$hid"
@@ -964,7 +1033,7 @@ function TeacherManageHomework() {
                 fi
                 while :; do
                     read -rp "请输入您想要修改的${target}ID：" hid
-                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
 
@@ -997,7 +1066,7 @@ function TeacherManageHomework() {
 
                 query_get_start_time="select unix_timestamp(creation_time) from homework where id=$hid"
                 creation_time=$($mysql_prefix -se "$query_get_start_time;")
-                query_update_end_time="update homework set end_time=from_unixtime($(expr "$creation_time" + "$days" '*' 86400)) where id=$hid"
+                query_update_end_time="update homework set end_time=from_unixtime($((creation_time + days * 86400))) where id=$hid"
                 $mysql_prefix -e "$query_update_end_time;"
 
                 echo "您刚刚修改的课程${target}ID为：$hid"
@@ -1037,9 +1106,17 @@ function TeacherManageHomework() {
                 fi
                 while :; do
                     read -rp "请输入您想要查看的${target}ID：" hid
-                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
+
+                echo "您选择了查询以下的${target}："
+                query_course_homework="select id \`作业/实验ID\`, intro \`作业/实验简介\`, creation_time 创建时间, end_time 截止时间 from homework where id=$hid"
+                query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
+                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$hid"
+                $mysql_prefix -e "$query_course_homework;"
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+                PrintAttachment
 
                 query_sid="select sid from take where cid=$cid"
                 query_finish="select stu.id 学生学号, stu.name 学生姓名, if(count(sub.id)>0,\"是\",\"否\") 是否完成, count(sub.id) 创建的提交数目 from (select * from submission where hid=$hid) sub right join (select * from student where id in ($query_sid)) stu on sub.sid=stu.id group by stu.id"
@@ -1082,7 +1159,7 @@ function RemoveDanger() {
         thechar="${danger:$i-1:1}"
         if [[ "$thechar" =~ $danger_set ]]; then
             # echo "$thechar"
-            safe="$safe"'\'"$thechar"
+            safe="$safe""\\""$thechar"
         else
             safe="$safe$thechar"
         fi
@@ -1127,7 +1204,7 @@ function LoginInUI() {
         while :; do
             read -rp "请输入您的密码：" -s password
             echo ""
-            password_hash=$(echo "$password" | sha256sum - | tr -d "[ \-]")
+            password_hash=$(echo "$password" | sha256sum - | tr -d " -")
             [ "$password_hash" = "$right_hash" ] && break
             echo "验证失败，请重新输入"
         done
@@ -1148,6 +1225,8 @@ function LoginInUI() {
     done
 }
 
+# 主程序从这里开始，上面定义的都是可供调用的函数
+# 请查看对程序的注释来理解本软件的工作原理
 DefineColor
 DefineMySQL
 LoginInUI
