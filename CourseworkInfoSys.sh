@@ -2,55 +2,57 @@
 # 这是一个现代教务管理系统，主要面向作业管理
 # 我们通过编写Shell程序来管理作业数据库
 
-# colors
-# Num  Colour    #define         R G B
-#
-# 0    black     COLOR_BLACK     0,0,0
-# 1    red       COLOR_RED       1,0,0
-# 2    green     COLOR_GREEN     0,1,0
-# 3    yellow    COLOR_YELLOW    1,1,0
-# 4    blue      COLOR_BLUE      0,0,1
-# 5    magenta   COLOR_MAGENTA   1,0,1
-# 6    cyan      COLOR_CYAN      0,1,1
-# 7    white     COLOR_WHITE     1,1,1
-# tput bold    # Select bold mode
-# tput dim     # Select dim (half-bright) mode
-# tput smul    # Enable underline mode
-# tput rmul    # Disable underline mode
-# tput rev     # Turn on reverse video mode
-# tput smso    # Enter standout (bold) mode
-# tput rmso    # Exit standout mode
+function DefineColor() {
+    # 我们使用tput命令来定义颜色信息
+    # 各类颜色常数，通过echo调用可以改变Shell的输出样式
+    # 例如echo "${Red}Hello${NoColor}, world."会打印红色的Hello和原色的World
+    # 上述例子会展开成echo "$(tput setaf 1)Hello$(tput sgr0), world."
+    # ! consider more about this colorization
+    Red=$(tput setaf 1)
+    Green=$(tput setaf 2)
+    Yellow=$(tput setaf 3)
+    Blue=$(tput setaf 4)
+    Magenta=$(tput setaf 5)
+    Cyan=$(tput setaf 6)
+    NoColor=$(tput sgr0)
+}
 
-Bold=$(tput bold)
-Dim=$(tput dim)
-Red=$(tput setaf 1)
-#! consider more about this colorization
-Green=$(tput setaf 2)
-# Green=$(tput sgr0)
-Yellow=$(tput setaf 3)
-Blue=$(tput setaf 4)
-Magenta=$(tput setaf 5)
-Cyan=$(tput setaf 6)
-NoColor=$(tput sgr0)
+function DefineMySQL() {
+    # 我们通过mysql命令来直接执行数据库操作，这也是本实验的核心内容
+    # 我们通过设置文件的方式使得MySQL不会抱怨直接在命令行输入密码不安全
+    # * 注意：您可以修改程序运行目录下的.mysql.cnf文件来设置自己的数据库样式
+    # ! 请保证MySQL已经在本机正确安装，且.mysql.cnf已经被正确配置
+    # 您需要在.mysql.cnf中设置您的登录名/密码/服务器，并设置数据库名称(和您在MySQL中使用的相同)
+    # 例如您在MySQL中创建了ShellDesigner这个用户，密码为ShellDesigner，并打算使用ShellDesign这个数据库来管理本软件涉及到的内容
+    # .mysql.cnf就将有类似如下的内容
+    # [client]
+    # user=ShellDesigner
+    # password=ShellDesigner
+    # host=localhost
+    # database=ShellDesign
 
-mysql_u_default="ShellDesigner"
-mysql_p_default="ShellDesigner"
-mysql_h_default="localhost"
-mysql_d_default="ShellDesign"
-mysql_f=".mysql.cnf"
-# rm -rf $mysql_f
-if [ ! -f "$mysql_f" ]; then
-    echo "Automatically generating configuration file..." >&2
-    echo "[client]" >$mysql_f
-    echo "user=$mysql_u_default" >>$mysql_f
-    echo "password=$mysql_p_default" >>$mysql_f
-    echo "host=$mysql_h_default" >>$mysql_f
-    echo "database=$mysql_d_default" >>$mysql_f
-fi
+    # ! 第一次使用本软件时请运行当前目录下的table.sql来初始化数据库中的表
+    # 必须运行的部分是所有的create table
+    # 后面的insert内容是可选的，但是至少要有一个管理员账户，否则本软件没有什么意义
+    
+    mysql_u_default="ShellDesigner"
+    mysql_p_default="ShellDesigner"
+    mysql_h_default="localhost"
+    mysql_d_default="ShellDesign"
+    mysql_f=".mysql.cnf"
+    if [ ! -f "$mysql_f" ]; then
+        echo "Automatically generating configuration file..." >&2
+        echo "[client]" >$mysql_f
+        echo "user=$mysql_u_default" >>$mysql_f
+        echo "password=$mysql_p_default" >>$mysql_f
+        echo "host=$mysql_h_default" >>$mysql_f
+        echo "database=$mysql_d_default" >>$mysql_f
+    fi
 
-mysql_prefix="mysql --defaults-extra-file=$mysql_f"
+    mysql_prefix="mysql --defaults-extra-file=$mysql_f"
+}
 
-PrintBanner() {
+function PrintBanner() {
     # line="##################################################################################################################################"
     # echo "$Yellow$line"
     # echo ""
@@ -67,7 +69,7 @@ EOF
     # echo "$line$NoColor"
 }
 
-PrintDelimiter() {
+function PrintDelimiter() {
     clear
     line="###########################################################################"
     echo "$line"
@@ -82,7 +84,7 @@ EOF
     echo "$line"
 }
 
-PrintTeacher() {
+function PrintTeacher() {
     clear
 
     line="##############################################################################"
@@ -98,7 +100,7 @@ EOF
     echo "$line"
 }
 
-PrintStudent() {
+function PrintStudent() {
     clear
 
     line="#############################################################################"
@@ -114,7 +116,7 @@ EOF
     echo "$line"
 }
 
-PrintAdmin() {
+function PrintAdmin() {
     clear
 
     line="#########################################################"
@@ -130,7 +132,7 @@ EOF
     echo "$line"
 }
 
-StudentUI() {
+function StudentUI() {
     # login informations
     [ -z $1 ] && sid=1 || sid=$1
     [ -z $2 ] && name="st1" || name=$2
@@ -176,7 +178,7 @@ StudentUI() {
     done
 }
 
-StudentOPCourse() {
+function StudentOPCourse() {
     while :; do
         PrintStudent
 
@@ -195,8 +197,6 @@ StudentOPCourse() {
         echo "0. 返回上一级"
         while :; do
             read -rp "请输入您想要进行的操作：" op
-            # [[ "${ops[@]}" =~ "${op}" ]] && break
-            # echo "您选择了操作：$op"
             case $op in
             1)
                 echo "您选择了管理本课程的${target}"
@@ -234,7 +234,7 @@ StudentOPCourse() {
     done
 }
 
-PrintAttachment() {
+function PrintAttachment() {
     if [ "$attachment_count" -gt 0 ]; then
         echo "本${target}的附件包括："
         $mysql_prefix -e "$query_attachment;"
@@ -243,7 +243,7 @@ PrintAttachment() {
     fi
 }
 
-StudentManageSubmission() {
+function StudentManageSubmission() {
     while :; do
         PrintStudent
 
@@ -443,7 +443,7 @@ StudentManageSubmission() {
     done
 }
 
-TeacherUI() {
+function TeacherUI() {
     # login informations
     [ -z "$1" ] && tid=1 || tid=$1
     [ -z "$2" ] && name="zy" || name=$2
@@ -493,7 +493,7 @@ TeacherUI() {
     done
 }
 
-TeacherOPCourse() {
+function TeacherOPCourse() {
     while :; do
         PrintTeacher
 
@@ -550,7 +550,7 @@ TeacherOPCourse() {
     done
 }
 
-TeacherManageCourse() {
+function TeacherManageCourse() {
     # ops=(1 2)
     while :; do
         PrintTeacher
@@ -588,7 +588,7 @@ TeacherManageCourse() {
     done
 }
 
-TeacherManageCourseBrief() {
+function TeacherManageCourseBrief() {
     target="$Green课程简介$NoColor"
     echo "${target}的原内容为"
     $mysql_prefix -e "select brief 课程简介 from course where id=$cid"
@@ -608,7 +608,7 @@ TeacherManageCourseBrief() {
     $mysql_prefix -e "$query_brief_update;"
 }
 
-TeacherManageCourseInfo() {
+function TeacherManageCourseInfo() {
     while :; do
         PrintTeacher
 
@@ -694,12 +694,7 @@ TeacherManageCourseInfo() {
                     [[ "${iids[@]}" =~ "${iid}" ]] && break
                     echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
                 done
-                # query_delete_attach_to="delete from attach_to where uid=$iid"
-                # query_delete_info="delete from info where id=$iid"
                 query_delete_content="delete from content where id=$iid"
-                # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_info;$query_delete_content;commit;set autocommit=1;"
-                # $mysql_prefix -e "$query_delete_attach_to;"
-                # $mysql_prefix -e "$query_delete_info;"
                 $mysql_prefix -e "$query_delete_content;"
                 break
                 ;;
@@ -778,7 +773,7 @@ TeacherManageCourseInfo() {
     done
 }
 
-TeacherManageStudent() {
+function TeacherManageStudent() {
     while :; do
         target="$Green学生$NoColor"
         PrintTeacher
@@ -857,7 +852,7 @@ TeacherManageStudent() {
     done
 }
 
-TeacherManageHomework() {
+function TeacherManageHomework() {
     while :; do
         PrintTeacher
 
@@ -1078,7 +1073,7 @@ TeacherManageHomework() {
     done
 }
 
-RemoveDanger() {
+function RemoveDanger() {
     danger_set="[\"'\.\*;%]"
     [ ${#2} -gt 0 ] && danger_set=$2
     danger=$1
@@ -1095,13 +1090,9 @@ RemoveDanger() {
     echo "$safe"
 }
 
-LoginInUI() {
+function LoginInUI() {
     while :; do
         PrintBanner
-        # PrintDelimiter
-        # PrintTeacher
-        # PrintStudent
-        # PrintAdmin
         while :; do
             read -rp "请输入您的身份（T/S/A）或输入0退出系统：" identity
             case $identity in
@@ -1130,7 +1121,6 @@ LoginInUI() {
             query_all_hash="select id, name, password_hash from $identity"
             query_right_hash="select password_hash from ($query_all_hash) all_hash where id=\"$user_id\""
             right_hash=$($mysql_prefix -se "$query_right_hash;")
-            # [ -z $right_hash ] && echo "The right hash is zero length, user doesn't exist" || echo "right_hash is $right_hash"
             [ -z "$right_hash" ] || break
             echo "用户不存在，请重新输入"
         done
@@ -1157,6 +1147,7 @@ LoginInUI() {
         esac
     done
 }
-LoginInUI
 
-# rm -rf $mysql_f
+DefineColor
+DefineMySQL
+LoginInUI
