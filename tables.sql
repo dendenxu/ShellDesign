@@ -1,8 +1,10 @@
 # note: we should define the default charset of the database before creating the tables without explicitly
 # defining charset
 
-# drop database if exists ShellDesign;
-# ALTER DATABASE ShellDesign CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+drop database if exists ShellDesign;
+create database ShellDesign;
+alter database ShellDesign character set utf8mb4 collate utf8mb4_unicode_ci;
+use ShellDesign;
 
 drop table if exists `take`;
 drop table if exists `info`;
