@@ -28,6 +28,14 @@ function DefineMySQL() {
     # ! 请保证MySQL已经在本机正确安装，且.mysql.cnf已经被正确配置
     # 您需要在.mysql.cnf中设置您的登录名/密码/服务器，并设置数据库名称(和您在MySQL中使用的相同)
     # 例如您在MySQL中创建了ShellDesigner这个用户，密码为ShellDesigner，并打算使用ShellDesign这个数据库来管理本软件涉及到的内容
+
+    # 登陆root用户后，可使用如下操作修改密码
+    # ALTER USER 'user'@'hostname' IDENTIFIED BY 'newPass';
+    # 可以通过如下操作创建新用户
+    # create user ShellDesigner identified by 'ShellDesigner';
+    # create database ShellDesign;
+    # grant all on ShellDesign.* to ShellDesigner;
+
     # .mysql.cnf就将有类似如下的内容
     # [client]
     # user=ShellDesigner
