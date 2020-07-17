@@ -24,7 +24,9 @@
 Bold=$(tput bold)
 Dim=$(tput dim)
 Red=$(tput setaf 1)
+#! consider more about this colorization
 Green=$(tput setaf 2)
+# Green=$(tput sgr0)
 Yellow=$(tput setaf 3)
 Blue=$(tput setaf 4)
 Magenta=$(tput setaf 5)
@@ -48,6 +50,7 @@ PrintBanner() {
     # line="##################################################################################################################################"
     # echo "$Yellow$line"
     # echo ""
+    clear
     cat <<"EOF"
    _________                                                       __        _____                                                  
    \_   ___ \  ____  __ _________  ______ ______  _  _____________|  | __   /     \ _____    ____ _____     ____   ___________      
@@ -61,6 +64,7 @@ EOF
 }
 
 PrintDelimiter() {
+    clear
     line="###########################################################################"
     echo "$line"
     cat <<"EOF"
@@ -75,6 +79,8 @@ EOF
 }
 
 PrintTeacher() {
+    clear
+
     line="##############################################################################"
     echo "$line"
     cat <<"EOF"
@@ -89,6 +95,8 @@ EOF
 }
 
 PrintStudent() {
+    clear
+
     line="#############################################################################"
     echo "$line"
     cat <<"EOF"
@@ -103,6 +111,8 @@ EOF
 }
 
 PrintAdmin() {
+    clear
+
     line="#########################################################"
     echo "$line"
     cat <<"EOF"
@@ -765,37 +775,38 @@ TeacherManageCourseInfo() {
 
 TeacherManageStudent() {
     while :; do
+        target="$Green学生$NoColor"
         PrintTeacher
 
         query_sid="select sid from take where cid=$cid"
         query_student="select id 学生学号, name 学生姓名 from student where id in ($query_sid)"
         sids=($($mysql_prefix -e "$query_sid;"))
         if [ ${#sids[@]} -gt 0 ]; then
-            echo "选上这门课的同学们有："
+            echo "选上这门课的$target们有："
             $mysql_prefix -e "$query_student;"
         else
-            echo "没有同学选上这门课"
+            echo "没有$target选上这门课"
         fi
         echo "您可以进行的操作有："
-        echo "1. 向课程名单中添加学生"
-        echo "2. 从课程名单中移除学生"
+        echo "1. 向课程名单中添加$target"
+        echo "2. 从课程名单中移除$target"
         echo "0. 返回上一级"
         while :; do
             read -rp "请输入您想要进行的操作：" op
             case $op in
             1)
-                echo "您选择了对课程导入新的学生账户"
+                echo "您选择了对课程导入新的$target账户"
                 query_all_sids="select id from student where id not in ($query_sid)"
                 query_all_students="select id 学号, name 姓名 from student where id not in ($query_sid)"
                 all_sids=($($mysql_prefix -se "$query_all_sids;"))
-                echo "没有被导入该课程但是已经注册的学生有："
+                echo "没有被导入该课程但是已经注册的$target有："
                 $mysql_prefix -e "$query_all_students;"
                 while :; do
-                    read -rp "请输入您想要添加的学生学号：" sid
+                    read -rp "请输入您想要添加的$target学号：" sid
                     [[ "${all_sids[@]}" =~ "${sid}" ]] && break
-                    echo "您输入的学号$sid有误，请输入上表中列举出的某个学生的学号"
+                    echo "您输入的学号$sid有误，请输入上表中列举出的某个$target的学号"
                 done
-                echo "您选择了将下列学生添加进课程名单："
+                echo "您选择了将下列$target添加进课程名单："
                 query_student_info="select id 学号, name 姓名 from student where id=$sid"
                 $mysql_prefix -e "$query_student_info;"
                 read -rp "是否要添加（Y/n）：" need_insert_student_course
@@ -806,17 +817,17 @@ TeacherManageStudent() {
                 breaks
                 ;;
             2)
-                echo "您选择了从课程名单中移除学生"
+                echo "您选择了从课程名单中移除$target"
                 if [ ${#sids[@]} -eq 0 ]; then
-                    echo "本门课程还没有学生选上"
+                    echo "本门课程还没有$target选上"
                     break
                 fi
                 while :; do
-                    read -rp "请输入您想要删除的学生学号：" sid
+                    read -rp "请输入您想要删除的$target学号：" sid
                     [[ "${sids[@]}" =~ "${sid}" ]] && break
-                    echo "您输入的学号$sid有误，请输入上表中列举出的某个学生的学号"
+                    echo "您输入的学号$sid有误，请输入上表中列举出的某个$target的学号"
                 done
-                echo "您选择了将下列学生从课程名单中移除："
+                echo "您选择了将下列$target从课程名单中移除："
                 query_student_info="select id 学号, name 姓名 from student where id=$sid"
                 $mysql_prefix -e "$query_student_info;"
                 read -rp "是否要移除（Y/n）：" need_remove_student_course
@@ -853,7 +864,7 @@ TeacherManageHomework() {
             echo "本课程已有的${target}如下图所示"
             $mysql_prefix -e "$query_hw;"
         else
-            echo "本课程还没有已发布的作业/实验"
+            echo "本课程还没有已发布的$target"
         fi
 
         echo "您可以进行的操作有："
@@ -915,7 +926,7 @@ TeacherManageHomework() {
                     fi
                 done
 
-                echo "您刚刚对课程号为$cid的课程发布了如下的作业/实验："
+                echo "您刚刚对课程号为$cid的课程发布了如下的${target}："
                 query_course_homework="select H.id \`作业/实验ID\`, H.intro \`作业/实验简介\`, H.creation_time 创建时间, H.end_time 结束时间 from homework H where H.id=$hid"
                 query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
                 $mysql_prefix -e "$query_course_homework;"
@@ -927,11 +938,11 @@ TeacherManageHomework() {
             2)
                 echo "您选择了删除已发布的${target}"
                 if [ ${#hids[@]} -eq 0 ]; then
-                    echo "本门课程还没有已发布的作业/实验"
+                    echo "本门课程还没有已发布的${target}"
                     break
                 fi
                 while :; do
-                    read -rp "请输入您想要删除的作业/实验ID：" hid
+                    read -rp "请输入您想要删除的${target}ID：" hid
                     [[ "${hids[@]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
@@ -946,7 +957,7 @@ TeacherManageHomework() {
             3)
                 echo "您选择了修改已发布的${target}"
                 if [ ${#hids[@]} -eq 0 ]; then
-                    echo "本门课程还没有已发布的作业/实验"
+                    echo "本门课程还没有已发布的${target}"
                     break
                 fi
                 while :; do
@@ -1019,7 +1030,7 @@ TeacherManageHomework() {
             4)
                 echo "您选择了查看已发布的${target}的完成情况"
                 if [ ${#hids[@]} -eq 0 ]; then
-                    echo "本门课程还没有已发布的作业/实验"
+                    echo "本门课程还没有已发布的${target}"
                     break
                 fi
                 while :; do
