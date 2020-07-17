@@ -2,7 +2,10 @@
 # defining charset
 
 drop database if exists ShellDesign;
+drop user if exists ShellDesigner;
+create user ShellDesigner identified by 'ShellDesigner';
 create database ShellDesign;
+grant all on ShellDesign.* to ShellDesigner;
 alter database ShellDesign character set utf8mb4 collate utf8mb4_unicode_ci;
 use ShellDesign;
 
