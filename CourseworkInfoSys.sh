@@ -15,6 +15,246 @@ echo "host=$mysql_h" >>$mysql_f
 
 mysql_prefix="mysql --defaults-extra-file=$mysql_f $mysql_d"
 
+StudentUI() {
+    # login informations
+    [ -z $1 ] && sid=1 || sid=$1
+    [ -z $2 ] && name="st1" || name=$2
+    while :; do # student main UI event loop
+        query_id="select cid from take where sid=$sid"
+        query_course="select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id in ($query_id)"
+        cids=($($mysql_prefix -se "$query_id;"))
+        echo "$name同学您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
+        echo "您可以进行的操作有："
+        echo "1. 管理课程"
+        echo "0. 返回上一级"
+        while :; do # 操作循环UI，直到获得正确的输入
+            read -rp "请输入您想要进行的操作：" op
+            case $op in
+            1)
+                echo "您选择了管理课程"
+                if [ ${#cids[@]} -eq 0 ]; then
+                    echo "您本学期没有课程"
+                    exit 0
+                fi
+                echo "您本学期共${#cids[@]}有门课程，它们分别为："
+                $mysql_prefix -e "$query_course;"
+                while :; do
+                    read -rp "请输入您想要管理的课程号：" cid
+                    [[ "${cids[@]}" =~ "${cid}" ]] && break
+                    echo "您输入的课程号$cid有误，请输入上表中列举出的某个课程号"
+                done
+
+                StudentOPCourse
+                break
+                ;;
+            0)
+                echo "您选择了返回上一级"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+
+StudentOPCourse() {
+    while :; do
+        query_tid="select tid from teach where cid=$cid"
+        query_teacher="select id 教师工号, name 教师姓名 from teacher where id in ($query_tid)"
+
+        echo "您选择的课程为："
+        $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id=$cid;"
+
+        echo "教这门课的老师有："
+        $mysql_prefix -e "$query_teacher;"
+
+        # ops=(1 2 3)
+        echo "您可以进行的操作有："
+        echo "1. 管理课程作业/实验"
+        echo "0. 返回上一级"
+        while :; do
+            read -rp "请输入您想要进行的操作：" op
+            # [[ "${ops[@]}" =~ "${op}" ]] && break
+            # echo "您选择了操作：$op"
+            case $op in
+            1)
+                echo "您选择了管理本课程的实验和作业"
+                query_hid="select id from homework where cid=$cid"
+                query_hw="select id 作业ID, intro 作业简介, creation_time 作业发布时间, end_time 作业截止时间 from homework where cid=$cid"
+
+                hids=($($mysql_prefix -e "$query_hid;"))
+                if [ ${#hids[@]} -gt 0 ]; then
+                    echo "本课程已有的课程作业/实验如下图所示"
+                    $mysql_prefix -e "$query_hw;"
+                else
+                    echo "本课程还没有已发布的作业/实验"
+                    return 0
+                fi
+                echo "您选择了管理课程作业/实验"
+                while :; do
+                    read -rp "请输入您想要管理的课程作业/实验ID：" hid
+                    [[ "${hids[@]}" =~ "${hid}" ]] && break
+                    echo "您输入的课程作业/实验ID$hid有误，请输入上表中列举出的某个课程作业/实验ID"
+                done
+
+                StudentManageSubmission
+
+                break
+                ;;
+            0)
+                echo "您选择了返回上一级"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+
+StudentManageSubmission() {
+    while :; do
+        echo "您选择了修改以下的课程作业/实验："
+        query_course_homework="select id \`作业/实验ID\`, intro \`作业/实验简介\`, creation_time 创建时间, end_time 截止时间 from homework where id=$hid"
+        query_attachment_homework="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
+        query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$hid"
+        $mysql_prefix -e "$query_course_homework;"
+        attachment_count=$($mysql_prefix -se "$query_count_attachment")
+        if [ "$attachment_count" -gt 0 ]; then
+            echo "本课程作业/实验的附件包括："
+            $mysql_prefix -e "$query_attachment_homework;"
+        else
+            echo "本实验/作业还没有附件"
+        fi
+
+        query_subids="select id from submission where sid=$sid and hid=$hid"
+        subids=($($mysql_prefix -se "$query_subids;"))
+        query_subs="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id in ($query_subids)"
+
+        if [ ${#subids[@]} -gt 0 ]; then
+            echo "您在本作业/实验创建的提交如下所示"
+            $mysql_prefix -e "$query_subs;"
+        else
+            echo "您在本作业/实验下还没有提交"
+        fi
+
+        echo "您可以进行的操作有："
+        echo "1. 发布新的作业/实验提交"
+        echo "2. 删除已发布的作业/实验提交"
+        echo "3. 修改已发布的作业/实验提交"
+        echo "4. 查看已发布的作业/实验提交"
+        echo "0. 返回上一级"
+        while :; do
+            read -rp "请输入您想要进行的操作：" op
+            case $op in
+            1)
+                echo "您选择了发布新的作业提交"
+                echo "请输入提交的简介内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+
+                full_string=$(RemoveDanger "$full_string")
+
+                echo -e "您的提交的简介内容为\n$full_string"
+
+                # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
+                query_insert_content="insert into content value ()"
+                query_insert_submission="insert into submission value (last_insert_id(), $sid, $hid, \"$full_string\", now(), now())"
+
+                subid=$($mysql_prefix -se "set autocommit=0;$query_insert_content;select last_insert_id();$query_insert_submission;commit;set autocommit=1;")
+
+                echo "您刚刚添加的课程作业/实验提交ID为：$subid"
+                attachment_count=0
+                while :; do
+                    read -rp "请输入您是否需要为提交内容添加附件（Y/n）：" need_attach
+                    if [[ $need_attach =~ ^[1Yy] ]]; then
+                        attachment_count+=1
+                        echo "您选择了添加附件"
+                        read -rp "请输入您想要添加的附件名称：" attach_name
+                        attach_name=$(RemoveDanger "$attach_name")
+                        echo "您的附件名称为：$attach_name"
+                        read -rp "请输入您想要添加的附件URL：" attach_url
+                        # 对于URL，我们使用不同的转义策略
+                        attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
+                        echo "您的附件URL为：$attach_url"
+                        query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
+                        query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $subid)"
+                        attach_id=$($mysql_prefix -se "set autocommit=0;$query_insert_attach;select last_insert_id();$query_insert_attach_to;commit;set autocommit=1;")
+                        echo "您刚刚添加的附件ID为：$attach_id"
+                    else
+                        break
+                    fi
+                done
+
+                echo "您刚刚对课程号为$cid的课程的ID为$hid的作业/实验发布了如下的提交："
+                query_course_submission="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id=$subid"
+                query_attachment_submission="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$subid"
+                $mysql_prefix -e "$query_course_submission;"
+
+                if [ $attachment_count -gt 0 ]; then
+                    echo "本提交的附件包括："
+                    $mysql_prefix -e "$query_attachment_submission;"
+                else
+                    echo "本提交还没有附件"
+                fi
+                break
+                ;;
+            2)
+                echo "您选择了删除已发布的作业/实验提交"
+                if [ ${#subids[@]} -eq 0 ]; then
+                    echo "您在本作业/实验下还没有提交"
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要删除的作业/实验ID：" subid
+                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
+                done
+                break
+                ;;
+            3)
+                echo "您选择了修改已发布的作业/实验提交"
+                if [ ${#subids[@]} -eq 0 ]; then
+                    echo "您在本作业/实验下还没有提交"
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要修改的作业/实验ID：" subid
+                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
+                done
+                break
+                ;;
+            4)
+                echo "您选择了查看已发布的作业/实验提交"
+                if [ ${#subids[@]} -eq 0 ]; then
+                    echo "您在本作业/实验下还没有提交"
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要查看的作业/实验ID：" subid
+                    [[ "${subids[@]}" =~ "${subid}" ]] && break
+                    echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
+                done
+                break
+                ;;
+            0)
+                echo "您选择了返回上一级"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+
 TeacherUI() {
     # login informations
     [ -z $1 ] && tid=1 || tid=$1
@@ -38,7 +278,7 @@ TeacherUI() {
                 echo "您选择了管理课程"
                 if [ ${#cids[@]} -eq 0 ]; then
                     echo "您本学期没有课程"
-                    exit 0
+                    break
                 fi
                 echo "您本学期共${#cids[@]}有门课程，它们分别为："
                 $mysql_prefix -e "$query_course;"
@@ -248,11 +488,11 @@ TeacherManageCourseInfo() {
                 break
                 ;;
             2)
+                echo "您选择了删除已发布的课程公告"
                 if [ ${#iids[@]} -eq 0 ]; then
                     echo "本门课程还没有已发布的公告"
                     break
                 fi
-                echo "您选择了删除已发布的课程公告"
                 while :; do
                     read -rp "请输入您想要删除的公告ID：" iid
                     [[ "${iids[@]}" =~ "${iid}" ]] && break
@@ -268,11 +508,11 @@ TeacherManageCourseInfo() {
                 break
                 ;;
             3)
+                echo "您选择了修改已发布的课程公告"
                 if [ ${#iids[@]} -eq 0 ]; then
                     echo "本门课程还没有已发布的公告"
                     break
                 fi
-                echo "您选择了修改已发布的课程公告"
                 while :; do
                     read -rp "请输入您想要修改的公告ID：" iid
                     [[ "${iids[@]}" =~ "${iid}" ]] && break
@@ -394,11 +634,11 @@ TeacherManageStudent() {
                 breaks
                 ;;
             2)
+                echo "您选择了从课程名单中移除学生"
                 if [ ${#sids[@]} -eq 0 ]; then
                     echo "本门课程还没有学生选上"
                     break
                 fi
-                echo "您选择了从课程名单中移除学生"
                 while :; do
                     read -rp "请输入您想要删除的学生学号：" sid
                     [[ "${sids[@]}" =~ "${sid}" ]] && break
@@ -501,7 +741,7 @@ TeacherManageHomework() {
                 done
 
                 echo "您刚刚对课程号为$cid的课程发布了如下的作业/实验："
-                query_course_homework="select H.id \`作业/实验ID\`, H.intro \`作业/实验简介\`, H.creation_time 创建时间, H.end_time 结束时间 from homework H where H.id=$hid;"
+                query_course_homework="select H.id \`作业/实验ID\`, H.intro \`作业/实验简介\`, H.creation_time 创建时间, H.end_time 结束时间 from homework H where H.id=$hid"
                 query_attachment_homework="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
                 $mysql_prefix -e "$query_course_homework;"
 
@@ -509,17 +749,17 @@ TeacherManageHomework() {
                     echo "本作业/实验的附件包括："
                     $mysql_prefix -e "$query_attachment_homework;"
                 else
-                    echo "本课程还没有已发布的作业/实验"
+                    echo "本课程作业/实验还没有附件"
                 fi
 
                 break
                 ;;
             2)
+                echo "您选择了删除已发布的课程作业/实验"
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "本门课程还没有已发布的作业/实验"
                     break
                 fi
-                echo "您选择了删除已发布的课程作业/实验"
                 while :; do
                     read -rp "请输入您想要删除的作业/实验ID：" hid
                     [[ "${hids[@]}" =~ "${hid}" ]] && break
@@ -534,11 +774,11 @@ TeacherManageHomework() {
                 break
                 ;;
             3)
+                echo "您选择了修改已发布的课程作业/实验"
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "本门课程还没有已发布的作业/实验"
                     break
                 fi
-                echo "您选择了修改已发布的课程作业/实验"
                 while :; do
                     read -rp "请输入您想要修改的课程作业/实验ID：" hid
                     [[ "${hids[@]}" =~ "${hid}" ]] && break
@@ -617,13 +857,13 @@ TeacherManageHomework() {
                 break
                 ;;
             4)
+                echo "您选择了查看已发布的课程作业/实验的完成情况"
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "本门课程还没有已发布的作业/实验"
                     break
                 fi
-                echo "您选择了查看已发布的课程作业/实验的完成情况"
                 while :; do
-                    read -rp "请输入您想要修改的课程作业/实验ID：" hid
+                    read -rp "请输入您想要查看的课程作业/实验ID：" hid
                     [[ "${hids[@]}" =~ "${hid}" ]] && break
                     echo "您输入的课程作业/实验ID$hid有误，请输入上表中列举出的某个课程作业/实验ID"
                 done
@@ -701,7 +941,7 @@ LoginInUI() {
             esac
         done
         while :; do
-            read -rp "请输入您的工号/学号/管理员账号：" user_id
+            read -rp "请输入您的登陆账号：" user_id
             user_id=$(RemoveDanger $user_id)
             query_all_hash="select id, name, password_hash from $identity"
             query_right_hash="select password_hash from ($query_all_hash) all_hash where id=\"$user_id\""
@@ -724,7 +964,9 @@ LoginInUI() {
         "teacher")
             TeacherUI "$user_id" "$name"
             ;;
-        "student") ;;
+        "student")
+            StudentUI "$user_id" "$name"
+            ;;
 
         "admin") ;;
 
