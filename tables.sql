@@ -53,16 +53,16 @@ create table `teach`
 (
     tid bigint,
     cid bigint,
-    foreign key (`tid`) references teacher (`id`),
-    foreign key (`cid`) references course (`id`)
+    foreign key (`tid`) references teacher (`id`) on delete cascade on update cascade,
+    foreign key (`cid`) references course (`id`) on delete cascade on update cascade
 );
 
 create table `take`
 (
     cid bigint,
     sid bigint,
-    foreign key (`sid`) references student (`id`),
-    foreign key (`cid`) references course (`id`)
+    foreign key (`sid`) references student (`id`) on delete cascade on update cascade,
+    foreign key (`cid`) references course (`id`) on delete cascade on update cascade
 );
 
 # this is a dummy class so that we can ensure foreign key references from attachments to both submissions and homework
@@ -77,8 +77,8 @@ create table `info`
     content      varchar(2000),
     cid          bigint,
     release_time datetime,
-    foreign key (`cid`) references course (`id`),
-    foreign key (`id`) references content (`id`)
+    foreign key (`cid`) references course (`id`) on delete cascade on update cascade,
+    foreign key (`id`) references content (`id`) on delete cascade on update cascade
 );
 
 create table `homework`
@@ -91,9 +91,9 @@ create table `homework`
     end_time      datetime,
     type          char(1) default 'H',
     check (type in ('H', 'E')), # H for regular homework, E for experiments
-    foreign key (`id`) references content (`id`),
-    foreign key (`tid`) references teacher (`id`),
-    foreign key (`cid`) references course (`id`)
+    foreign key (`id`) references content (`id`) on delete cascade on update cascade,
+    foreign key (`tid`) references teacher (`id`) on delete cascade on update cascade,
+    foreign key (`cid`) references course (`id`) on delete cascade on update cascade
 );
 
 create table `submission`
@@ -104,9 +104,9 @@ create table `submission`
     submission_text          varchar(2000),
     creation_time            datetime,
     latest_modification_time datetime,
-    foreign key (`id`) references content (`id`),
-    foreign key (`sid`) references student (`id`),
-    foreign key (`hid`) references homework (`id`)
+    foreign key (`id`) references content (`id`) on delete cascade on update cascade,
+    foreign key (`sid`) references student (`id`) on delete cascade on update cascade,
+    foreign key (`hid`) references homework (`id`) on delete cascade on update cascade
 );
 
 create table `attachment`
@@ -121,8 +121,8 @@ create table `attach_to`
 (
     aid bigint,
     uid bigint,
-    foreign key (`aid`) references attachment (`id`),
-    foreign key (`uid`) references content (`id`)
+    foreign key (`aid`) references attachment (`id`) on delete cascade on update cascade,
+    foreign key (`uid`) references content (`id`) on delete cascade on update cascade
 );
 
 insert into `course`(id, name_zh, name_en)
