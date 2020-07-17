@@ -9,8 +9,8 @@ drop table if exists `info`;
 drop table if exists `teach`;
 drop table if exists `attach_to`;
 drop table if exists `attachment`;
-drop table if exists `homework`;
 drop table if exists `submission`;
+drop table if exists `homework`;
 drop table if exists `content`;
 drop table if exists `teacher`;
 drop table if exists `student`;
@@ -83,13 +83,13 @@ create table `info`
 
 create table `homework`
 (
-    id            bigint primary key,
+    id            bigint primary key auto_increment,
     cid           bigint,
     tid           bigint,
     intro         varchar(2000),
     creation_time datetime,
     end_time      datetime,
-    type          char(1),
+    type          char(1) default 'H',
     check (type in ('H', 'E')), # H for regular homework, E for experiments
     foreign key (`id`) references content (`id`),
     foreign key (`tid`) references teacher (`id`),
@@ -98,15 +98,15 @@ create table `homework`
 
 create table `submission`
 (
-    id              bigint primary key,
-    cid             bigint,
-    sid             bigint,
-    submission_text varchar(2000),
-    creation_time   datetime,
-    submission_time datetime,
+    id                       bigint primary key auto_increment,
+    sid                      bigint,
+    hid                      bigint,
+    submission_text          varchar(2000),
+    creation_time            datetime,
+    latest_modification_time datetime,
     foreign key (`id`) references content (`id`),
     foreign key (`sid`) references student (`id`),
-    foreign key (`cid`) references course (`id`)
+    foreign key (`hid`) references homework (`id`)
 );
 
 create table `attachment`
@@ -186,16 +186,35 @@ insert into content(id)
 values (1),
        (2),
        (3),
-       (4);
+       (4),
+       (5),
+       (6),
+       (7);
+
+insert into homework(id, cid, tid, intro, creation_time, end_time, type)
+values (5, 1, 1, '实验4 JDBC系统的编写和使用', now(), now() + interval 7 day, 'E'),
+       (6, 1, 1, '第五周数据库系统作业', now(), now() + interval 10 day, 'H'),
+       (7, 1, 2, '课程大作业 MiniSQL的编写与使用', now(), now() + interval 20 day, 'H');
 
 insert into attachment(id, name, url)
-values (1, 'Linux Shell Program Design 3rd Edition.pdf', 'https://raw.githubusercontent.com/dendenxu/miniSQL/master/miniSQL.tex'),
+values (1, 'Linux Shell Program Design 3rd Edition.pdf',
+        'https://raw.githubusercontent.com/dendenxu/miniSQL/master/miniSQL.tex'),
        (2, '数据库系统实验报告', 'https://raw.githubusercontent.com/dendenxu/miniSQL/master/xz.tex'),
-       (3, '蒙特卡洛树搜索实现', 'https://raw.githubusercontent.com/dendenxu/DeepOthello/master/MCTS.py');
+       (3, '蒙特卡洛树搜索实现', 'https://raw.githubusercontent.com/dendenxu/DeepOthello/master/MCTS.py'),
+       (4, 'JDBC接口调用参考与举例', 'https://raw.githubusercontent.com/dendenxu/DeepOthello/master/MCTS.py');
 
 insert into info(id, content, cid, release_time)
-values
-(1,'作业1的提交就要截止啦！请大家及时关注。',1,NOW()),
-(2,'实验5的验收将在本周六下午4点开始，请需要验收的组长搜索"数据库系统"钉钉群并加入，钉钉群二维码详见附件',1,NOW()),
-(3,'ADS考试将在6月24日以线上/机房同时考试的形式进行，YDS老师的复习视频已上传到学在浙大系统，详见附件',3,NOW()),
-(4,'明天的实验内容为样条插值（Spline）以及贝塞尔曲线的拟合（Bezier Path），请同学们提前预习相关内容，PPT已上传附件并开放下载',4,NOW());
+values (1, '作业1的提交就要截止啦！请大家及时关注。', 1, NOW()),
+       (2, '实验5的验收将在本周六下午4点开始，请需要验收的组长搜索"数据库系统"钉钉群并加入，钉钉群二维码详见附件', 1, NOW()),
+       (3, 'ADS考试将在6月24日以线上/机房同时考试的形式进行，YDS老师的复习视频已上传到学在浙大系统，详见附件', 3, NOW()),
+       (4, '明天的实验内容为样条插值（Spline）以及贝塞尔曲线的拟合（Bezier Path），请同学们提前预习相关内容，PPT已上传附件并开放下载', 4, NOW());
+
+insert into attach_to(aid, uid)
+values (1, 1),
+       (1, 2),
+       (1, 3),
+       (2, 1),
+       (2, 5),
+       (2, 6),
+       (4, 5),
+       (3, 1);
