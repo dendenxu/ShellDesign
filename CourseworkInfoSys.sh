@@ -33,18 +33,22 @@ Magenta=$(tput setaf 5)
 Cyan=$(tput setaf 6)
 NoColor=$(tput sgr0)
 
-mysql_u="ShellDesigner"
-mysql_p="ShellDesigner"
-mysql_h="localhost"
-mysql_d="ShellDesign"
+mysql_u_default="ShellDesigner"
+mysql_p_default="ShellDesigner"
+mysql_h_default="localhost"
+mysql_d_default="ShellDesign"
 mysql_f=".mysql.cnf"
 # rm -rf $mysql_f
-echo "[client]" >$mysql_f
-echo "user=$mysql_u" >>$mysql_f
-echo "password=$mysql_p" >>$mysql_f
-echo "host=$mysql_h" >>$mysql_f
+if [ ! -f "$mysql_f" ]; then
+    echo "Automatically generating configuration file..." >&2
+    echo "[client]" >$mysql_f
+    echo "user=$mysql_u_default" >>$mysql_f
+    echo "password=$mysql_p_default" >>$mysql_f
+    echo "host=$mysql_h_default" >>$mysql_f
+    echo "database=$mysql_d_default" >>$mysql_f
+fi
 
-mysql_prefix="mysql --defaults-extra-file=$mysql_f $mysql_d"
+mysql_prefix="mysql --defaults-extra-file=$mysql_f"
 
 PrintBanner() {
     # line="##################################################################################################################################"
@@ -815,7 +819,7 @@ TeacherManageStudent() {
                     query_insert_student_course="insert into take(sid, cid) value ($sid, $cid)"
                     $mysql_prefix -e "$query_insert_student_course;"
                 fi
-                breaks
+                break
                 ;;
             2)
                 echo "您选择了从课程名单中移除$target"
@@ -833,9 +837,10 @@ TeacherManageStudent() {
                 $mysql_prefix -e "$query_student_info;"
                 read -rp "是否要移除（Y/n）：" need_delete_student_course
                 if [[ $need_delete_student_course =~ ^[1Yy] ]]; then
+                    echo "正在删除...$sid from $cid"
                     query_delete_student_course="delete from take where sid=$sid and cid=$cid"
-                    query_delete_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and cid=$cid)"
-                    query_delete_student_submission="delete from submission where sid=$sid and cid=$cid"
+                    query_delete_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and hid in (select id from homework where cid=$cid))"
+                    query_delete_student_submission="delete from submission where sid=$sid and hid in (select id from homework where cid=$cid)"
                     $mysql_prefix -e "set autocommit=0;$query_delete_student_course;$query_delete_student_attach_to;$query_delete_student_submission;commit;set autocommit=1;"
                 fi
                 break
@@ -1154,4 +1159,4 @@ LoginInUI() {
 }
 LoginInUI
 
-rm -rf $mysql_f
+# rm -rf $mysql_f
