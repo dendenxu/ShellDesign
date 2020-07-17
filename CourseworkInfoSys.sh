@@ -336,10 +336,11 @@ StudentManageSubmission() {
                     [[ "${subids[@]}" =~ "${subid}" ]] && break
                     echo "您输入的${target}ID$subid有误，请输入上表中列举出的某个${target}ID"
                 done
-                query_remove_attach_to="delete from attach_to where uid=$subid"
-                query_remove_submission="delete from submission where id=$subid"
-                query_remove_content="delete from content where id=$subid"
-                $mysql_prefix -e "set autocommit=0;$query_remove_attach_to;$query_remove_submission;$query_remove_content;commit;set autocommit=1;"
+                # query_delete_attach_to="delete from attach_to where uid=$subid"
+                # query_delete_submission="delete from submission where id=$subid"
+                query_delete_content="delete from content where id=$subid"
+                # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_submission;$query_delete_content;commit;set autocommit=1;"
+                $mysql_prefix -e "$query_delete_content;"
                 break
                 ;;
             3)
@@ -689,13 +690,13 @@ TeacherManageCourseInfo() {
                     [[ "${iids[@]}" =~ "${iid}" ]] && break
                     echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
                 done
-                query_delete_attach_to="delete from attach_to where uid=$iid"
-                query_delete_info="delete from info where id=$iid"
+                # query_delete_attach_to="delete from attach_to where uid=$iid"
+                # query_delete_info="delete from info where id=$iid"
                 query_delete_content="delete from content where id=$iid"
-                $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_info;$query_delete_content;commit;set autocommit=1;"
+                # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_info;$query_delete_content;commit;set autocommit=1;"
                 # $mysql_prefix -e "$query_delete_attach_to;"
                 # $mysql_prefix -e "$query_delete_info;"
-                # $mysql_prefix -e "$query_delete_content;"
+                $mysql_prefix -e "$query_delete_content;"
                 break
                 ;;
             3)
@@ -830,12 +831,12 @@ TeacherManageStudent() {
                 echo "您选择了将下列$target从课程名单中移除："
                 query_student_info="select id 学号, name 姓名 from student where id=$sid"
                 $mysql_prefix -e "$query_student_info;"
-                read -rp "是否要移除（Y/n）：" need_remove_student_course
-                if [[ $need_remove_student_course =~ ^[1Yy] ]]; then
-                    query_remove_student_course="delete from take where sid=$sid and cid=$cid"
-                    query_remove_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and cid=$cid)"
-                    query_remove_student_submission="delete from submission where sid=$sid and cid=$cid"
-                    $mysql_prefix -e "set autocommit=0;$query_remove_student_course;$query_remove_student_attach_to;$query_remove_student_submission;commit;set autocommit=1;"
+                read -rp "是否要移除（Y/n）：" need_delete_student_course
+                if [[ $need_delete_student_course =~ ^[1Yy] ]]; then
+                    query_delete_student_course="delete from take where sid=$sid and cid=$cid"
+                    query_delete_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and cid=$cid)"
+                    query_delete_student_submission="delete from submission where sid=$sid and cid=$cid"
+                    $mysql_prefix -e "set autocommit=0;$query_delete_student_course;$query_delete_student_attach_to;$query_delete_student_submission;commit;set autocommit=1;"
                 fi
                 break
                 ;;
@@ -946,11 +947,12 @@ TeacherManageHomework() {
                     [[ "${hids[@]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
-                query_delete_attach_to="delete from attach_to where uid=$hid"
-                query_delete_submission="delete from submission where hid=$hid"
-                query_delete_homework="delete from homework where id=$hid"
+                # query_delete_attach_to="delete from attach_to where uid=$hid"
+                # query_delete_submission="delete from submission where hid=$hid"
+                # query_delete_homework="delete from homework where id=$hid"
                 query_delete_content="delete from content where id=$hid"
-                $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_submission;$query_delete_homework;$query_delete_content;commit;set autocommit=1;"
+                # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_submission;$query_delete_homework;$query_delete_content;commit;set autocommit=1;"
+                $mysql_prefix -e "$query_delete_content;"
 
                 break
                 ;;
