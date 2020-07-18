@@ -2,7 +2,8 @@
 # shellcheck disable=SC2076
 # 这是一个现代教务管理系统，主要面向作业管理
 # 我们通过编写Shell程序，调用MySQL数据库来管理作业系统
-# 您的MySQL版本要至少为5.7
+# ! 您的MySQL版本要至少为5.7
+# 5.6.* 版本的MySQL会在执行tables.sql中的语句时出现问题
 # * 由于许多管理逻辑都是重复的，但将代码集合为一个函数又会显得过于刻意/不灵活，我们会将注释主要写在第一次遇到相关逻辑的部分
 # * 阅读源码的最好方式是从头开始，因为我们将主要函数都放在了开头(StudentUI, StudentManageSubmission)
 
@@ -76,7 +77,7 @@ function DefineMySQL() {
 function LoginInUI() {
     while :; do
         PrintBanner # 打印一个好看的小Banner: CourseworkManger
-        
+
         # 获取用户的身份/因为我们使用了有可能会重复的ID
         # todo: 可以通过构建一个Dummy Table来储存所有用户的相关信息来提供统一认证接口
         # 当然，这种方式给了用户手动退出系统的接口，否则我们很难定义一个什么特殊值来表示用户希望退出系统
@@ -308,7 +309,8 @@ function StudentUI() {
             echo "您本学期共${#cids[@]}有门课程，它们分别为："
         fi
         echo "您可以进行的操作有："
-        echo "1. 管理课程"
+        echo "1. 管理课程（提交/修改/删除作业）"
+        echo "2. 查看所有的作业/实验"
         echo "0. ${ReturnPrev}"
         while :; do # 操作循环UI，直到获得正确的输入
             read -rp "请输入您想要进行的操作：" op
@@ -337,6 +339,14 @@ function StudentUI() {
                 # 每次调用新的函数代表我们将要进入一个新的页面，我们不想让用户在下一页面刷新时每次都重复选择某一门课程的过程
                 # 因此我们将选择好的课程号存储到cid变量中，隐式传递到函数StudentOPCourse中
                 StudentOPCourse
+                break
+                ;;
+            2)
+                echo "您选择了查看所有的作业和实验"
+                query_all_hw="select sub.hid 作业ID, sub.intro 作业简介, sub.creation_time 发布时间, sub.end_time 截止时间,if(unix_timestamp(sub.end_time)<$(date +%s),\"是\",\"否\") 是否截止, if(count(sub.id)>0,\"是\",\"否\") 是否完成, count(sub.id) 创建的提交数目 from (select S.sid, S.id, H.id hid, H.intro, H.creation_time, H.end_time from (select * from submission where sid=$sid) S right join homework H on S.hid=H.id where H.cid in (select cid from take where sid=$sid)) sub group by sub.hid"
+
+                $mysql_prefix -e "$query_all_hw;"
+                ContinueWithKey
                 break
                 ;;
             0)
@@ -482,6 +492,14 @@ function StudentManageSubmission() {
             # 这里不可调用break，会直接退出此界面
         fi
 
+        query_end_time="select unix_timestamp(end_time) from homework where id=$hid"
+        end_time=$($mysql_prefix -se "$query_end_time;")
+        if [ "$end_time" -lt "$(date +%s)" ]; then
+            echo "$Red本作业已经截止提交$NoColor"
+            # ContinueWithKey
+            # break
+        fi
+
         echo "您可以进行的操作有："
         echo "1. 发布新的${target}"
         echo "2. 删除已发布的${target}"
@@ -493,6 +511,11 @@ function StudentManageSubmission() {
             case $op in
             1)
                 echo "您选择了发布新的${target}"
+                if [ "$end_time" -lt "$(date +%s)" ]; then
+                    echo "$Red本作业已经截止提交$NoColor"
+                    ContinueWithKey
+                    break
+                fi
                 echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
 
                 # 我们通过连续读取内容直到遇到EOF，也就是Ctrl+D来获取可换行的简介/描述
@@ -517,6 +540,7 @@ function StudentManageSubmission() {
                 query_insert_submission="insert into submission value (last_insert_id(), $sid, $hid, \"$full_string\", now(), now())"
 
                 # 我们可以通过;串联SQL语句来让它们在同一个MySQL Connection中执行
+                # 注意到我们调用了select last_insert_id()这一语句，这也是这一连串执行中唯一有打印内容的一个（返回上次插入的信息）
                 subid=$($mysql_prefix -se "set autocommit=0;$query_insert_content;select last_insert_id();$query_insert_submission;commit;set autocommit=1;")
 
                 echo "您刚刚添加的${target}ID为：$subid"
@@ -540,15 +564,16 @@ function StudentManageSubmission() {
                         # 对于URL，我们使用不同的转义策略
                         attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
                         echo "您的附件URL为：$attach_url"
-                        
+
                         # 添加附件到附件相关表，并修改attach_to表来对应附件和Content的关系
                         # 我们暂时只使用了attach_to表格的一部分功能，在日后的开发中我们可以将一个附件分配给多个不同的Content
+                        # todo: 可以重用已经上传过的附件，建立多对多的附加/带附件内容的对应
                         query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
                         query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $subid)"
-                        
+
                         # 同样的，我们利用了Transaction功能
                         attach_id=$($mysql_prefix -se "set autocommit=0;$query_insert_attach;select last_insert_id();$query_insert_attach_to;commit;set autocommit=1;")
-                        
+
                         echo "您刚刚添加的附件ID为：$attach_id"
                     else
                         break
@@ -569,7 +594,11 @@ function StudentManageSubmission() {
                 ;;
             2)
                 echo "您选择了删除已发布的${target}"
-
+                if [ "$end_time" -lt "$(date +%s)" ]; then
+                    echo "$Red本作业已经截止提交$NoColor"
+                    ContinueWithKey
+                    break
+                fi
                 # 若根本没有发布内容，删除就是完全无用的
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "$no_publication"
@@ -593,7 +622,11 @@ function StudentManageSubmission() {
                 ;;
             3)
                 echo "您选择了修改已发布的${target}"
-
+                if [ "$end_time" -lt "$(date +%s)" ]; then
+                    echo "$Red本作业已经截止提交$NoColor"
+                    ContinueWithKey
+                    break
+                fi
                 # 若根本没有发布内容，修改就是完全无用的
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "$no_publication"
@@ -624,9 +657,7 @@ function StudentManageSubmission() {
                 while read -r temp; do
                     full_string+="$temp"$'\n'
                 done
-
                 full_string=$(RemoveDanger "$full_string")
-
                 echo -e "您的${target}的简介内容为\n$full_string"
 
                 # 同上
@@ -663,11 +694,14 @@ function StudentManageSubmission() {
                 ;;
             4)
                 echo "您选择了查询已发布的${target}"
+
+                # 几乎相同的逻辑
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "$no_publication"
                     ContinueWithKey
                     break
                 fi
+
                 while :; do
                     read -rp "请输入您想要查询的作业/实验提交ID：" subid
                     [[ "${subids[*]}" =~ "${subid}" ]] && break
@@ -678,11 +712,16 @@ function StudentManageSubmission() {
                 query_course_submission="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id=$subid"
                 query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$subid"
                 $mysql_prefix -e "$query_course_submission;"
+
+                # 没有了添加附件的过程，我们通过调用MySQL接口来进行手动计数
                 query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$subid"
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
-
                 PrintAttachment
+
+                # 同样的，打印信息后不直接返回而是继续进行调用
                 ContinueWithKey
+
+                # 这里使用了break，因为我们有一个检测命令是否正确的指令
                 break
                 ;;
             0)
@@ -698,16 +737,18 @@ function StudentManageSubmission() {
 }
 
 function TeacherUI() {
-    # login informations
+    # 同样的，我们使用默认值以方便调试
     tid=${1:-"1"}
     name=${2:-"zy"}
 
-    while :; do
-        PrintTeacher
-        no_publication="$Red您本学期没有课程$NoColor"
+    while :; do      # 页面主循环
+        PrintTeacher # 打印TEACHER BANNER提示用户
 
+        no_publication="$Red您本学期没有课程$NoColor"
         query_id="select cid from teach where tid=$tid"
         query_course="select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id in ($query_id)"
+
+        # 所有课程数目
         cids=($($mysql_prefix -se "$query_id;"))
 
         echo "$name老师您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
@@ -717,13 +758,13 @@ function TeacherUI() {
             echo "您本学期共${#cids[@]}有门课程，它们分别为："
             $mysql_prefix -e "$query_course;"
         fi
+
+        # 虽然只有一个有效选项，但这样处理可以让用户有返回上一级的机会
         echo "您可以进行的操作有："
         echo "1. 管理课程"
         echo "0. ${ReturnPrev}"
-        while :; do
+        while :; do # 错误输入的处理循环，这里只能输入0或者1
             read -rp "请输入您想要进行的操作：" op
-            # [[ "${ops[@]}" =~ "${op}" ]] && break
-            # echo "您选择了操作：$op"
             case $op in
             1)
                 echo "您选择了管理课程"
@@ -739,6 +780,7 @@ function TeacherUI() {
                 done
 
                 TeacherOPCourse
+                # 若操作过程中没有显式的打印+清屏操作，我们不会让用户按任意键继续
                 break
                 ;;
             0)
@@ -754,16 +796,19 @@ function TeacherUI() {
 }
 
 function TeacherOPCourse() {
-    while :; do
-        PrintTeacher
+    while :; do      # 课程操作UI主循环
+        PrintTeacher # 打印Banner
 
-        target="$Green课程$NoColor"
+        target="$Green课程$NoColor" # 此时的目标字符串为：课程，用绿色显示以方便辨认
         query_tid="select tid from teach where cid=$cid"
         query_teacher="select id 教师工号, name 教师姓名 from teacher where id in ($query_tid)"
 
         echo "您选择的${target}为："
+
+        # 此时我们打印课程简介信息，方便用户在后续使用过程中决定是否要修改课程简介信息
         $mysql_prefix -e "select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course where id=$cid;"
 
+        # 打印除了当前老师外一同教这门课的老师一共用户参考
         tids=($($mysql_prefix -e "$query_tid and tid <> $tid;"))
         if [ ${#tids[@]} -gt 0 ]; then
             echo "与您一同教这门课的老师有："
@@ -772,16 +817,15 @@ function TeacherOPCourse() {
             echo "这门${target}只有您自己在教"
         fi
 
-        # ops=(1 2 3)
         echo "您可以进行的操作有："
         echo "1. 管理修读${target}的学生"
         echo "2. 管理${target}作业/实验"
         echo "3. 管理本${target}信息（管理公告/简介等）"
         echo "0. ${ReturnPrev}"
         while :; do
+            # 输入处理循环，这里比较tidy，因为我们将三个子操作都封装成了函数
+            # 且这里无论选择那种操作都没有直接清屏返回的必要
             read -rp "请输入您想要进行的操作：" op
-            # [[ "${ops[@]}" =~ "${op}" ]] && break
-            # echo "您选择了操作：$op"
             case $op in
             1)
                 echo "您选择了管理修读该${target}的学生"
@@ -811,7 +855,7 @@ function TeacherOPCourse() {
 }
 
 function TeacherManageCourse() {
-    # ops=(1 2)
+    # 和上一个函数有些类似，基本不涉及MySQL操作，因此只是嵌套了一层子菜单
     while :; do
         PrintTeacher
 
@@ -849,15 +893,19 @@ function TeacherManageCourse() {
 }
 
 function TeacherManageCourseBrief() {
+    # 管理课程简介内容
+    # 因为课程简介只有一个，用户进入这一阶段就一定是为了修改它，因此这一界面没有任何重复性的提示信息
     target="$Green课程简介$NoColor"
     echo "${target}的原内容为"
     $mysql_prefix -e "select brief 课程简介 from course where id=$cid"
+
+    # 类似的，我们会通过转义危险字符来减少受到MySQL攻击的可能性
     echo "请输入${target}的新内容，以EOF结尾（换行后Ctrl+D）"
+    # 这种读取方式在前面已经介绍过
     full_string=""
     while read -r temp; do
         full_string+="$temp"$'\n'
     done
-
     full_string=$(RemoveDanger "$full_string")
 
     echo -e "您的新${target}内容为\n$full_string"
@@ -866,10 +914,14 @@ function TeacherManageCourseBrief() {
     # we can easily perfomr SQL injection if the string is not carefully treated
     # update course set brief = "Hello, world.";select * from admin;\" where id=$cid
     $mysql_prefix -e "$query_brief_update;"
+
+    # 但值得注意的是，课程简介的管理会打印信息，且函数返回后将直接清屏，我们会让用户有机会再看一眼
     ContinueWithKey
 }
 
 function TeacherManageCourseInfo() {
+    # 管理公告的逻辑和学生管理作业提交的逻辑十分类似
+    # 但细节处又有不少不一样的地方，提取为一个单独的General Purpose函数会显得很Messy
     while :; do
         PrintTeacher
 
@@ -880,6 +932,8 @@ function TeacherManageCourseInfo() {
         query_info="select id 公告ID, release_time 公告发布时间, content 公告内容 from info where cid=$cid"
 
         iids=($($mysql_prefix -e "$query_iid;"))
+
+        # 惯例：打印一下已有的公告来供用户参考
         if [ ${#iids[@]} -gt 0 ]; then
             echo "本课程已有的${target}如下图所示"
             $mysql_prefix -e "$query_info;"
@@ -899,16 +953,17 @@ function TeacherManageCourseInfo() {
             case $op in
             1)
                 echo "您选择了发布新的${target}"
+
+                # todo: 这一段操作可以考虑封装成函数
                 echo "请输入${target}的新内容，以EOF结尾（换行后Ctrl+D）"
                 full_string=""
                 while read -r temp; do
                     full_string+="$temp"$'\n'
                 done
-
                 full_string=$(RemoveDanger "$full_string")
-
                 echo -e "您的新${target}内容为\n$full_string"
 
+                # 这里的逻辑在上面也有体现
                 # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
                 query_insert_content="insert into content value ()"
                 query_insert_info="insert into info(id, content, cid, release_time) value (last_insert_id(), \"$full_string\", $cid, now())"
@@ -949,6 +1004,7 @@ function TeacherManageCourseInfo() {
                 break
                 ;;
             2)
+                # 完全类似的逻辑
                 echo "您选择了删除已发布的${target}"
                 if [ ${#iids[@]} -eq 0 ]; then
                     echo "$no_publication"
@@ -967,6 +1023,7 @@ function TeacherManageCourseInfo() {
                 break
                 ;;
             3)
+                # 同上
                 echo "您选择了修改已发布的${target}"
                 if [ ${#iids[@]} -eq 0 ]; then
                     echo "$no_publication"
@@ -979,6 +1036,7 @@ function TeacherManageCourseInfo() {
                     echo "您输入的${target}ID$iid有误，请输入上表中列举出的某个${target}ID"
                 done
 
+                # 修改内容前让用户有确认的机会
                 echo "您选择了修改以下的${target}："
                 query_course_info="select I.id 公告ID, I.content 公告内容, I.release_time 公告发布时间 from (info I join course C on I.cid=C.id) where I.id=$iid;"
                 query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$iid"
@@ -987,14 +1045,13 @@ function TeacherManageCourseInfo() {
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
                 PrintAttachment
 
+                # 同上
                 echo "请输入${target}的新内容，以EOF结尾（换行后Ctrl+D）"
                 full_string=""
                 while read -r temp; do
                     full_string+="$temp"$'\n'
                 done
-
                 full_string=$(RemoveDanger "$full_string")
-
                 echo -e "您的新${target}内容为\n$full_string"
 
                 query_insert_info="update info set content=\"$full_string\" where id=$iid"
@@ -1002,7 +1059,8 @@ function TeacherManageCourseInfo() {
                 $mysql_prefix -se "$query_insert_info;"
 
                 echo "您刚刚修改的${target}ID为：$iid"
-                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+
+                # 同上
                 while :; do
                     read -rp "请输入您是否需要为${target}添加新的附件（Y/n）：" need_attach
                     if [[ $need_attach =~ ^[1Yy] ]]; then
@@ -1026,6 +1084,7 @@ function TeacherManageCourseInfo() {
                 echo "您刚刚对课程号为$cid的课程发布了如下的${target}："
                 $mysql_prefix -e "$query_course_info;"
 
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
                 PrintAttachment
                 ContinueWithKey
 
@@ -1066,6 +1125,8 @@ function TeacherManageCourseInfo() {
 }
 
 function TeacherManageStudent() {
+    # 老师管理学生账户
+    # 添加/删除到课程等
     while :; do
         PrintTeacher
         target="$Green学生$NoColor"
@@ -1387,6 +1448,8 @@ function TeacherManageHomework() {
     done
 }
 
+# ! 我们通过函数来设计程序：原因是Bash会在读入整个函数的所有内容后运行，这意味着修改脚本的同时运行脚本是可以进行的（原函数已经在内存中了）
+# https://www.shellscript.sh/tips/change-running-script/
 # 主程序从这里开始，上面定义的都是可供调用的函数
 # 请查看对程序的注释来理解本软件的工作原理
 DefineColor
