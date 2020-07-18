@@ -144,7 +144,9 @@ function LoginInUI() {
         "student")
             StudentUI "$user_id" "$name"
             ;;
-        "admin") ;;
+        "admin")
+            AdminUI "$user_id" "$name"
+            ;;
 
         esac
     done
@@ -1200,10 +1202,13 @@ function TeacherManageStudent() {
                 read -rp "是否要移除（Y/n）：" need_delete_student_course
 
                 if [[ $need_delete_student_course =~ ^[1Yy] ]]; then
+
                     # * 值得注意的是，虽然我们已经使用了on delete cascade功能来方便MySQL中的外键管理，但此时的删除并不是删除整个学生账户
                     # * 而是调整账户使其不再在课程内
                     # 这里如果处理不当会出现数据不一致的错误
                     # todo: 想出一种可以从设计上避免数据不一致的数据库定义范式
+                    # ! 但这里有一个Paradox：若一个学生被移出课程名单，是否需要清除其已有的提交呢？
+                    # * 我们现在选择的是移除，也就是说若学生曾经提交过作业，但老师将其从名单中移除了，后又添加回来了，他的所有提交都会消失
                     query_delete_student_course="delete from take where sid=$sid and cid=$cid"
                     query_delete_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and hid in (select id from homework where cid=$cid))"
                     query_delete_student_submission="delete from submission where sid=$sid and hid in (select id from homework where cid=$cid)"
@@ -1461,6 +1466,152 @@ function TeacherManageHomework() {
             esac
         done
     done
+}
+
+function AdminUI() {
+    # 同样的，我们使用默认值以方便调试
+    me_admin_id=${1:-"1"}
+    name=${2:-"root"}
+
+    no_course="$Red系统中没有课程$NoColor"
+    no_teacher="$Red系统中没有教师$NoColor"
+    no_student="$Red系统中没有学生$NoColor"
+
+    query_sid="select id from student"
+    query_tid="select id from teacher"
+    query_cid="select id from course"
+
+    query_student="select id 学生学号, name 学生姓名, if(gender='F', \"女\", \"男\") 性别, enroll_time 录取时间 from student"
+    query_teacher="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称 from teacher"
+    query_course="select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course"
+
+    while :; do    # 页面主循环
+        PrintAdmin # 打印ADMIN BANNER提示用户
+
+        echo "$name管理员您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
+
+        sids=($($mysql_prefix -se "$query_sid;"))
+        tids=($($mysql_prefix -se "$query_tid;"))
+        cids=($($mysql_prefix -se "$query_cid;"))
+        admids=($($mysql_prefix -se "$query_admid;"))
+
+        if [ ${#sids[@]} -gt 0 ]; then
+            echo "系统中已有的学生账户如下所示："
+            $mysql_prefix -e "$query_student;"
+        else
+            echo "$no_student"
+        fi
+        if [ ${#tids[@]} -gt 0 ]; then
+            echo "系统中已有的教师账户如下所示："
+            $mysql_prefix -e "$query_teacher;"
+        else
+            echo "$no_teacher"
+        fi
+        if [ ${#cids[@]} -gt 0 ]; then
+            echo "系统中已有的课程如下所示："
+            $mysql_prefix -e "$query_course;"
+        else
+            echo "$no_course"
+        fi
+
+        echo "您可以进行的操作有："
+        echo "1. 管理管理员账户"
+        echo "2. 管理教师账户"
+        echo "3. 管理学生账户"
+        echo "4. 管理课程"
+        echo "0. ${ReturnPrev}"
+        while :; do # 错误输入的处理循环，这里只能输入0或者1
+            read -rp "请输入您想要进行的操作：" op
+            case $op in
+            1)
+                echo "您选择了管理管理员账户"
+                break
+                ;;
+            2)
+                echo "您选择了管理教师账户"
+                break
+                ;;
+            3)
+                echo "您选择了管理学生账户"
+                break
+                ;;
+            4)
+                echo "您选择了管理课程教师"
+                break
+                ;;
+            0)
+                echo "您选择了${ReturnPrev}"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+
+function AdminManageAdmin() {
+    while :; do
+        PrintAdmin
+        target="$Green管理员账户$NoColor"
+        no_admin="$Red系统中没有管理员$NoColor"
+
+        query_admid="select id from admin"
+        query_admin="select id 管理员账号, name 管理员姓名 from admin"
+
+        if [ ${#admids[@]} -gt 0 ]; then
+            echo "系统中已有的${target}如下所示："
+            $mysql_prefix -e "$query_admin;"
+        else
+            echo "$no_admin"
+        fi
+        echo "您可以进行的操作有："
+        echo "1. 添加${target}"
+        echo "2. 删除${target}"
+        echo "2. 修改${target}"
+        echo "0. ${ReturnPrev}"
+        while :; do
+            read -rp "请输入您想要进行的操作：" op
+            case $op in
+            1)
+                echo "您选择了添加${target}"
+                break
+                ;;
+            2)
+                echo "您选择了删除${target}"
+                if [ ${#admids[@]} -eq 0 ]; then
+                    echo "$no_admin"
+                    ContinueWithKey
+                    break
+                fi
+                break
+                ;;
+            3)
+                echo "您选择了修改${target}"
+                if [ ${#admids[@]} -eq 0 ]; then
+                    echo "$no_admin"
+                    ContinueWithKey
+                    break
+                fi
+                break
+                ;;
+            0)
+                echo "您选择了${ReturnPrev}"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+function AdminManageAdmin() {
+    echo "Placeholder."
+}
+function AdminManageAdmin() {
+    echo "Placeholder."
 }
 
 # ! 我们通过函数来设计程序：原因是Bash会在读入整个函数的所有内容后运行，这意味着修改脚本的同时运行脚本是可以进行的（原函数已经在内存中了）
