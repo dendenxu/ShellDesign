@@ -3,6 +3,8 @@
 # 这是一个现代教务管理系统，主要面向作业管理
 # 我们通过编写Shell程序，调用MySQL数据库来管理作业系统
 # 您的MySQL版本要至少为5.7
+# * 由于许多管理逻辑都是重复的，但将代码集合为一个函数又会显得过于刻意/不灵活，我们会将注释主要写在第一次遇到相关逻辑的部分
+# * 阅读源码的最好方式是从头开始，因为我们将主要函数都放在了开头(StudentUI, StudentManageSubmission)
 
 function DefineColor() {
     # 我们使用tput命令来定义颜色信息
@@ -68,6 +70,99 @@ function DefineMySQL() {
 
     # 类似调用alias，我们在下面的Shell语句中执行MySQL调用时都会使用$mysql_prefix来开头
     mysql_prefix="mysql --defaults-extra-file=$mysql_f"
+}
+
+# 初始界面登陆逻辑
+function LoginInUI() {
+    while :; do
+        PrintBanner # 打印一个好看的小Banner: CourseworkManger
+        
+        # 获取用户的身份/因为我们使用了有可能会重复的ID
+        # todo: 可以通过构建一个Dummy Table来储存所有用户的相关信息来提供统一认证接口
+        # 当然，这种方式给了用户手动退出系统的接口，否则我们很难定义一个什么特殊值来表示用户希望退出系统
+        while :; do
+            read -rp "请输入您的身份（T/S/A）或输入0退出系统：" identity
+            case $identity in
+            [Tt])
+                identity="teacher"
+                break
+                ;;
+            [Ss])
+                identity="student"
+                break
+                ;;
+            [Aa])
+                identity="admin"
+                break
+                ;;
+            0)
+                echo "再见！"
+                exit 0
+                ;;
+            *) echo "请输入T, S, A或0" ;;
+            esac
+        done
+
+        # 我们会在密码判断前进行账号检测
+        while :; do
+            read -rp "请输入您的登陆账号：" user_id
+
+            # * 防止SQL注入攻击，转义危险字符，详见StudentManageSubmission逻辑
+            user_id=$(RemoveDanger "$user_id")
+
+            # * MySQL调用方式详见StudentUI逻辑
+            query_all_hash="select id, name, password_hash from $identity"
+            query_right_hash="select password_hash from ($query_all_hash) all_hash where id=\"$user_id\""
+            right_hash=$($mysql_prefix -se "$query_right_hash;")
+            [ -z "$right_hash" ] || break
+            echo "用户不存在，请重新输入"
+        done
+
+        # 我们不会在数据库中储存明文密码
+        # 我们将用户密码进行sha256 hash后储存
+        # 并在登陆时将用户输入的内容进行sha256 hash，与数据库内部的hash值进行比较，若相等则认为密码正确
+        # * 这种方式可以提高系统的安全性
+        # 即使数据库内容被泄露，sha256的加密也会让数据偷盗者很难猜出正确的密码
+        # https://www.youtube.com/watch?v=7U-RbOKanYs
+        while :; do
+            read -rp "请输入您的密码：" -s password
+            echo ""
+            password_hash=$(echo "$password" | sha256sum - | tr -d " -")
+            [ "$password_hash" = "$right_hash" ] && break
+            echo "验证失败，请重新输入"
+        done
+        echo "验证成功"
+        query_name="select name from $identity where id=$user_id"
+        name=$($mysql_prefix -se "$query_name")
+        case $identity in
+        "teacher")
+            TeacherUI "$user_id" "$name"
+            # 这里没有选项循环，因此不需要调用break命令
+            # * 详见StudentUI中的逻辑描述
+            ;;
+        "student")
+            StudentUI "$user_id" "$name"
+            ;;
+        "admin") ;;
+
+        esac
+    done
+}
+
+function RemoveDanger() {
+    danger_set=${2:-"[\"'\.\*;%]"}
+    danger=$1
+    safe=""
+    for i in $(seq ${#danger}); do
+        thechar="${danger:$i-1:1}"
+        if [[ "$thechar" =~ $danger_set ]]; then
+            # echo "$thechar"
+            safe="$safe""\\""$thechar"
+        else
+            safe="$safe$thechar"
+        fi
+    done
+    echo "$safe"
 }
 
 # 以下几个Print函数都是用于打印ASCII Art的
@@ -142,8 +237,9 @@ EOF
 }
 
 function ContinueWithKey() {
-    read -n 1 -rp "按任意键继续..." -s
-
+    # 按任意键继续...
+    # 有的时候我们会在清空屏幕之前打印一些信息，我们决定给用户一些时间来看看这些信息是什么
+    read -n 1 -rp "$Blue按任意键继续...$NoColor" -s
 }
 
 function StudentUI() {
@@ -383,6 +479,7 @@ function StudentManageSubmission() {
             $mysql_prefix -e "$query_subs;"
         else
             echo "$no_publication"
+            # 这里不可调用break，会直接退出此界面
         fi
 
         echo "您可以进行的操作有："
@@ -397,69 +494,98 @@ function StudentManageSubmission() {
             1)
                 echo "您选择了发布新的${target}"
                 echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
+
+                # 我们通过连续读取内容直到遇到EOF，也就是Ctrl+D来获取可换行的简介/描述
+                # 注意EOF必须在NewLine后直接输入才有效
+                # 注意到read函数只会读入除了换行符以外的部分，因此换行符需要手动加入
+                # read在遇到EOF后会返回非True值
                 full_string=""
                 while read -r temp; do
                     full_string+="$temp"$'\n'
                 done
 
+                # 我们设计了RemoveDanger函数来减少受到SQL注入攻击的可能性
+                # 简单来讲这一函数的作用就是找到可疑的字符，例如.;*"'等，并对他们进行手动转义
+                # MySQL在处理Query时候会重新解释读入的字符串，原本已经被转义的字符在重新解释后很可能不再得到转义，也就给了不法分子可乘之机。
                 full_string=$(RemoveDanger "$full_string")
 
                 echo -e "您的${target}的简介内容为\n$full_string"
 
-                # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
+                # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用数据库的Transaction功能
+                # 通过构建事务，我们保证在Content中添加内容后，submission会获取到相同的ID值，以保证数据完整性和对应性
                 query_insert_content="insert into content value ()"
                 query_insert_submission="insert into submission value (last_insert_id(), $sid, $hid, \"$full_string\", now(), now())"
 
+                # 我们可以通过;串联SQL语句来让它们在同一个MySQL Connection中执行
                 subid=$($mysql_prefix -se "set autocommit=0;$query_insert_content;select last_insert_id();$query_insert_submission;commit;set autocommit=1;")
 
                 echo "您刚刚添加的${target}ID为：$subid"
+
+                # 这里我们通过Bash内部计数来减少一次MySQL链接
                 attachment_count=0
                 while :; do
+                    # 我们根据用户回答来修改程序运行流程
+                    # 用户无需提前知道需要添加的附件数量
+                    # 他/她只需要不断输入Y并添加内容
                     read -rp "请输入您是否需要为${target}添加附件（Y/n）：" need_attach
-                    if [[ $need_attach =~ ^[1Yy] ]]; then
+                    if [[ $need_attach =~ ^[1Yy] ]]; then # 正则表达式匹配
                         attachment_count+=1
+
                         echo "您选择了添加附件"
                         read -rp "请输入您想要添加的附件名称：" attach_name
-                        attach_name=$(RemoveDanger "$attach_name")
+                        attach_name=$(RemoveDanger "$attach_name") # 可能包含危险字符
                         echo "您的附件名称为：$attach_name"
+
                         read -rp "请输入您想要添加的附件URL：" attach_url
                         # 对于URL，我们使用不同的转义策略
                         attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
                         echo "您的附件URL为：$attach_url"
+                        
+                        # 添加附件到附件相关表，并修改attach_to表来对应附件和Content的关系
+                        # 我们暂时只使用了attach_to表格的一部分功能，在日后的开发中我们可以将一个附件分配给多个不同的Content
                         query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
                         query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $subid)"
+                        
+                        # 同样的，我们利用了Transaction功能
                         attach_id=$($mysql_prefix -se "set autocommit=0;$query_insert_attach;select last_insert_id();$query_insert_attach_to;commit;set autocommit=1;")
+                        
                         echo "您刚刚添加的附件ID为：$attach_id"
                     else
                         break
                     fi
                 done
 
+                # 打印一些信息，让用户得到应有的反馈
                 echo "您刚刚对课程号为$cid的课程的ID为$hid的$upper发布了如下的${target}："
                 query_course_submission="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id=$subid"
                 query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$subid"
                 $mysql_prefix -e "$query_course_submission;"
-
                 PrintAttachment
+
+                # 下面调用break后就会清空屏幕，因此我们给用户一个回顾当下的机会
                 ContinueWithKey
+                # 清空屏幕
                 break
                 ;;
             2)
                 echo "您选择了删除已发布的${target}"
+
+                # 若根本没有发布内容，删除就是完全无用的
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "$no_publication"
                     ContinueWithKey
                     break
                 fi
+
+                # 逻辑同上述的while read 循环
                 while :; do
                     read -rp "请输入您想要删除的${target}ID：" subid
                     [[ "${subids[*]}" =~ "${subid}" ]] && break
                     echo "您输入的${target}ID$subid有误，请输入上表中列举出的某个${target}ID"
                 done
-                # query_delete_attach_to="delete from attach_to where uid=$subid"
-                # query_delete_submission="delete from submission where id=$subid"
+
+                # 我们对各类Foreign Key使用了on update cascade on delete cascade 功能，就无需显式的删除其他有可能引用到相关内容的东西
                 query_delete_content="delete from content where id=$subid"
-                # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_submission;$query_delete_content;commit;set autocommit=1;"
                 $mysql_prefix -e "$query_delete_content;"
                 ContinueWithKey
 
@@ -467,11 +593,15 @@ function StudentManageSubmission() {
                 ;;
             3)
                 echo "您选择了修改已发布的${target}"
+
+                # 若根本没有发布内容，修改就是完全无用的
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "$no_publication"
                     ContinueWithKey
                     break
                 fi
+
+                # 逻辑同上述的while read 循环
                 while :; do
                     read -rp "请输入您想要修改的${target}ID：" subid
                     [[ "${subids[*]}" =~ "${subid}" ]] && break
@@ -479,14 +609,16 @@ function StudentManageSubmission() {
                 done
 
                 echo "您选择修改的${target}为："
+
+                # 让用户观察自己选择修改的内容
                 query_course_submission="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id=$subid"
                 query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$subid"
                 $mysql_prefix -e "$query_course_submission;"
                 query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$subid"
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
-
                 PrintAttachment
 
+                # 对于full_string的处理同上
                 echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
                 full_string=""
                 while read -r temp; do
@@ -497,7 +629,7 @@ function StudentManageSubmission() {
 
                 echo -e "您的${target}的简介内容为\n$full_string"
 
-                # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
+                # 同上
                 query_modify_submission="update submission set submission_text=\"$full_string\", latest_modification_time=now() where id=$subid"
                 $mysql_prefix -e "$query_modify_submission;"
                 echo "您刚刚修改的${target}ID为：$subid"
@@ -1252,81 +1384,6 @@ function TeacherManageHomework() {
                 ;;
             esac
         done
-    done
-}
-
-function RemoveDanger() {
-    danger_set="[\"'\.\*;%]"
-    [ ${#2} -gt 0 ] && danger_set=$2
-    danger=$1
-    safe=""
-    for i in $(seq ${#danger}); do
-        thechar="${danger:$i-1:1}"
-        if [[ "$thechar" =~ $danger_set ]]; then
-            # echo "$thechar"
-            safe="$safe""\\""$thechar"
-        else
-            safe="$safe$thechar"
-        fi
-    done
-    echo "$safe"
-}
-
-function LoginInUI() {
-    while :; do
-        PrintBanner
-        while :; do
-            read -rp "请输入您的身份（T/S/A）或输入0退出系统：" identity
-            case $identity in
-            [Tt])
-                identity="teacher"
-                break
-                ;;
-            [Ss])
-                identity="student"
-                break
-                ;;
-            [Aa])
-                identity="admin"
-                break
-                ;;
-            0)
-                echo "再见！"
-                exit 0
-                ;;
-            *) echo "请输入T, S, A或0" ;;
-            esac
-        done
-        while :; do
-            read -rp "请输入您的登陆账号：" user_id
-            user_id=$(RemoveDanger "$user_id")
-            query_all_hash="select id, name, password_hash from $identity"
-            query_right_hash="select password_hash from ($query_all_hash) all_hash where id=\"$user_id\""
-            right_hash=$($mysql_prefix -se "$query_right_hash;")
-            [ -z "$right_hash" ] || break
-            echo "用户不存在，请重新输入"
-        done
-        while :; do
-            read -rp "请输入您的密码：" -s password
-            echo ""
-            password_hash=$(echo "$password" | sha256sum - | tr -d " -")
-            [ "$password_hash" = "$right_hash" ] && break
-            echo "验证失败，请重新输入"
-        done
-        echo "验证成功"
-        query_name="select name from $identity where id=$user_id"
-        name=$($mysql_prefix -se "$query_name")
-        case $identity in
-        "teacher")
-            TeacherUI "$user_id" "$name"
-            ;;
-        "student")
-            StudentUI "$user_id" "$name"
-            ;;
-
-        "admin") ;;
-
-        esac
     done
 }
 
