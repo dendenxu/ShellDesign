@@ -342,10 +342,16 @@ function StudentUI() {
                 break
                 ;;
             2)
+                # 查看所有作业及其完成情况
+                # 这波，这波是个SQL题，这种长长的还不能格式化的SQL Query也是让人头大
+                # 我们调用了许多MySQL内置功能，例如UNIX_TIMESTAMP还有IF语句等，还嵌套了Linux的命令以及变量
+                # 值得注意的是，对于双引号需要加上转移符号，防止Bash解释它们
                 echo "您选择了查看所有的作业和实验"
                 query_all_hw="select sub.hid 作业ID, sub.intro 作业简介, sub.creation_time 发布时间, sub.end_time 截止时间,if(unix_timestamp(sub.end_time)<$(date +%s),\"是\",\"否\") 是否截止, if(count(sub.id)>0,\"是\",\"否\") 是否完成, count(sub.id) 创建的提交数目 from (select S.sid, S.id, H.id hid, H.intro, H.creation_time, H.end_time from (select * from submission where sid=$sid) S right join homework H on S.hid=H.id where H.cid in (select cid from take where sid=$sid)) sub group by sub.hid"
 
                 $mysql_prefix -e "$query_all_hw;"
+
+                # 我们打印了一些信息，让用户确认一下
                 ContinueWithKey
                 break
                 ;;
@@ -616,7 +622,6 @@ function StudentManageSubmission() {
                 # 我们对各类Foreign Key使用了on update cascade on delete cascade 功能，就无需显式的删除其他有可能引用到相关内容的东西
                 query_delete_content="delete from content where id=$subid"
                 $mysql_prefix -e "$query_delete_content;"
-                ContinueWithKey
 
                 break
                 ;;
@@ -867,8 +872,6 @@ function TeacherManageCourse() {
         echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
-            # [[ "${ops[@]}" =~ "${op}" ]] && break
-            # echo "您选择了操作：$op"
             case $op in
             1)
                 echo "您选择了管理$target1"
@@ -1018,8 +1021,6 @@ function TeacherManageCourseInfo() {
                 done
                 query_delete_content="delete from content where id=$iid"
                 $mysql_prefix -e "$query_delete_content;"
-                echo "已删除..."
-                ContinueWithKey
                 break
                 ;;
             3)
@@ -1128,10 +1129,11 @@ function TeacherManageStudent() {
     # 老师管理学生账户
     # 添加/删除到课程等
     while :; do
-        PrintTeacher
+        PrintTeacher # 打印Banner
         target="$Green学生$NoColor"
         no_publication="$Red没有$NoColor$target$Red选上这门课$NoColor"
 
+        # 查询已经选上课的同学们
         query_sid="select sid from take where cid=$cid"
         query_student="select id 学生学号, name 学生姓名 from student where id in ($query_sid)"
         sids=($($mysql_prefix -e "$query_sid;"))
@@ -1141,6 +1143,8 @@ function TeacherManageStudent() {
         else
             echo "$no_publication"
         fi
+
+        # 操作
         echo "您可以进行的操作有："
         echo "1. 向课程名单中添加$target"
         echo "2. 从课程名单中移除$target"
@@ -1150,6 +1154,8 @@ function TeacherManageStudent() {
             case $op in
             1)
                 echo "您选择了对课程导入新的$target账户"
+
+                # 列举没有导入到课程下，但是已经在管理系统注册了账户的学生方便老师导入
                 query_all_sids="select id from student where id not in ($query_sid)"
                 query_all_students="select id 学号, name 姓名 from student where id not in ($query_sid)"
                 all_sids=($($mysql_prefix -se "$query_all_sids;"))
@@ -1160,9 +1166,13 @@ function TeacherManageStudent() {
                     [[ "${all_sids[*]}" =~ "${sid}" ]] && break
                     echo "您输入的学号$sid有误，请输入上表中列举出的某个$target的学号"
                 done
+
+                # 打印下老师选择的同学
                 echo "您选择了将下列$target添加进课程名单："
                 query_student_info="select id 学号, name 姓名 from student where id=$sid"
                 $mysql_prefix -e "$query_student_info;"
+
+                # 给老师一个确认是否添加的机会
                 read -rp "是否要添加（Y/n）：" need_insert_student_course
                 if [[ $need_insert_student_course =~ ^[1Yy] ]]; then
                     query_insert_student_course="insert into take(sid, cid) value ($sid, $cid)"
@@ -1185,16 +1195,22 @@ function TeacherManageStudent() {
                 echo "您选择了将下列$target从课程名单中移除："
                 query_student_info="select id 学号, name 姓名 from student where id=$sid"
                 $mysql_prefix -e "$query_student_info;"
+
+                # 类似的，给老师一个确认的机会
                 read -rp "是否要移除（Y/n）：" need_delete_student_course
+
                 if [[ $need_delete_student_course =~ ^[1Yy] ]]; then
-                    echo "正在删除...$sid from $cid"
+                    # * 值得注意的是，虽然我们已经使用了on delete cascade功能来方便MySQL中的外键管理，但此时的删除并不是删除整个学生账户
+                    # * 而是调整账户使其不再在课程内
+                    # 这里如果处理不当会出现数据不一致的错误
+                    # todo: 想出一种可以从设计上避免数据不一致的数据库定义范式
                     query_delete_student_course="delete from take where sid=$sid and cid=$cid"
                     query_delete_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and hid in (select id from homework where cid=$cid))"
                     query_delete_student_submission="delete from submission where sid=$sid and hid in (select id from homework where cid=$cid)"
+
+                    # 我们使用了commit来尽量保证操作的完整性
                     $mysql_prefix -e "set autocommit=0;$query_delete_student_course;$query_delete_student_attach_to;$query_delete_student_submission;commit;set autocommit=1;"
-                    echo "已删除..."
                 fi
-                ContinueWithKey
                 break
                 ;;
             0)
@@ -1210,6 +1226,8 @@ function TeacherManageStudent() {
 }
 
 function TeacherManageHomework() {
+    # * 老师管理作业的逻辑和学生管理作业提交的逻辑十分相似
+    # 详细注释内容请参考：StudentManageSubmission函数
     while :; do
         PrintTeacher
 
@@ -1258,6 +1276,9 @@ function TeacherManageHomework() {
                 done
 
                 # 由于我们需要保证在Content中与其他具体类型中的标号相同，我们使用Commit
+                # 一天有86400秒
+                # 数学运算需要用符号$(())进行，且运算内部的变量不需要使用$符号，*等也不需要转义
+                # 当然，我们也可以通过调用expr来进行数学运算，不同于上面描述的是，使用expr需要转义和$
                 query_insert_content="insert into content value ()"
                 query_insert_hw="insert into homework(id, cid,tid,intro,creation_time,end_time) value (last_insert_id(),$cid,$tid,\"$full_string\",now(),from_unixtime($(($(date +%s) + days * 86400))))"
 
@@ -1274,7 +1295,7 @@ function TeacherManageHomework() {
                         attach_name=$(RemoveDanger "$attach_name")
                         echo "您的附件名称为：$attach_name"
                         read -rp "请输入您想要添加的附件URL：" attach_url
-                        # 对于URL，我们使用不同的转义策略
+                        # 对于URL，我们使用不同的转义策略（对百分号需要进行特殊处理）
                         attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
                         echo "您的附件URL为：$attach_url"
                         query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
@@ -1286,17 +1307,19 @@ function TeacherManageHomework() {
                     fi
                 done
 
+                # 打印全部信息
                 echo "您刚刚对课程号为$cid的课程发布了如下的${target}："
                 query_course_homework="select H.id \`作业/实验ID\`, H.intro \`作业/实验简介\`, H.creation_time 创建时间, H.end_time 结束时间 from homework H where H.id=$hid"
                 query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
                 $mysql_prefix -e "$query_course_homework;"
-
                 PrintAttachment
+
                 ContinueWithKey
 
                 break
                 ;;
             2)
+                # 同上
                 echo "您选择了删除已发布的${target}"
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "$no_publication"
@@ -1308,18 +1331,13 @@ function TeacherManageHomework() {
                     [[ "${hids[*]}" =~ "${hid}" ]] && break
                     echo "您输入的${target}ID$hid有误，请输入上表中列举出的某个${target}ID"
                 done
-                # query_delete_attach_to="delete from attach_to where uid=$hid"
-                # query_delete_submission="delete from submission where hid=$hid"
-                # query_delete_homework="delete from homework where id=$hid"
                 query_delete_content="delete from content where id=$hid"
-                # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_submission;$query_delete_homework;$query_delete_content;commit;set autocommit=1;"
                 $mysql_prefix -e "$query_delete_content;"
-                echo "已删除..."
-                ContinueWithKey
 
                 break
                 ;;
             3)
+                # 同上
                 echo "您选择了修改已发布的${target}"
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "$no_publication"
@@ -1388,7 +1406,6 @@ function TeacherManageHomework() {
 
                 echo "您刚刚对课程号为$cid的课程发布了如下的课程${target}："
                 $mysql_prefix -e "$query_course_homework;"
-
                 PrintAttachment
                 ContinueWithKey
 
@@ -1420,8 +1437,7 @@ function TeacherManageHomework() {
 
                 $mysql_prefix -e "$query_finish"
 
-                # insert into submission value (null,1,1,6,"就是一个测试辣",now(),now());
-
+                # 当学习某门课的学生过多，我们可以单独检查他们的作业完成情况
                 while :; do
                     read -rp "请输入您是否需要查询完成情况（Y/n）：" check_finish
                     if [[ $check_finish =~ ^[1Yy] ]]; then
@@ -1432,7 +1448,6 @@ function TeacherManageHomework() {
                         break
                     fi
                 done
-                ContinueWithKey
 
                 break
                 ;;
