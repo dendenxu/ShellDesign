@@ -2,6 +2,7 @@
 # shellcheck disable=SC2076
 # 这是一个现代教务管理系统，主要面向作业管理
 # 我们通过编写Shell程序，调用MySQL数据库来管理作业系统
+# 您的MySQL版本要至少为5.7
 
 function DefineColor() {
     # 我们使用tput命令来定义颜色信息
@@ -25,6 +26,11 @@ function DefineMySQL() {
     # mysql: [Warning] Using a password on the command line interface can be insecure.
     # * 注意：您可以修改程序运行目录下的.mysql.cnf文件来设置自己的数据库登陆信息
 
+    # ! 第一次使用本软件时请运行当前目录下的table.sql来初始化数据库中的表
+    # 必须运行的部分是所有的create table
+    # 后面的insert内容是可选的，但是至少要有一个管理员账户，否则本软件没有什么意义
+    # 样例初始化语句（假设您知道root密码）：mysql -uroot -p < tables.sql
+
     # ! 请保证MySQL已经在本机正确安装，且.mysql.cnf已经被正确配置
     # 您需要在.mysql.cnf中设置您的登录名/密码/服务器，并设置数据库名称(和您在MySQL中使用的相同)
     # 例如您在MySQL中创建了ShellDesigner这个用户，密码为ShellDesigner，并打算使用ShellDesign这个数据库来管理本软件涉及到的内容
@@ -42,11 +48,6 @@ function DefineMySQL() {
     # password=ShellDesigner
     # host=localhost
     # database=ShellDesign
-
-    # ! 第一次使用本软件时请运行当前目录下的table.sql来初始化数据库中的表
-    # 必须运行的部分是所有的create table
-    # 后面的insert内容是可选的，但是至少要有一个管理员账户，否则本软件没有什么意义
-    # 样例初始化语句（假设用户和密码如上所述）：mysql -uShellDesigner -pShellDesigner < tables.sql
 
     # 下列是我们默认的一些设置
     mysql_u_default="ShellDesigner"
@@ -140,13 +141,17 @@ function PrintAdmin() {
 EOF
 }
 
+function ContinueWithKey() {
+    read -n 1 -rp "按任意键继续..." -s
+
+}
+
 function StudentUI() {
     # 学生UI主界面，为了方便测试我们为sid, name变量加入了默认值
     sid=${1:-"1"}
     name=${2:-"st1"}
     while :; do      # 学生主界面UI循环
         PrintStudent # 打印Banner
-
 
         # 无内容提示信息
         no_publication="$Red您本学期没有课程$NoColor"
@@ -161,11 +166,15 @@ function StudentUI() {
         # ! 在直接执行MySQL并原封不动的打印信息时，我们会使用-e选项，代表执行
 
         # * 值得注意的是，在命令行直接调用MySQL时，会打印列分隔符，而将结果存入变量则不会打印（列分隔符自动会得到删除）
+
+        # 重定向标准输出的到文件并打印文件
         #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" > temp.txt; cat temp.txt
         # mysql: [Warning] Using a password on the command line interface can be insecure.
         # name    id      password_hash
         # root    1       53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a
         # admin   2       fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7
+
+        # 直接执行语句，打印到标准输出
         #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;"
         # mysql: [Warning] Using a password on the command line interface can be insecure.
         # +-------+----+------------------------------------------------------------------+
@@ -174,6 +183,8 @@ function StudentUI() {
         # | root  |  1 | 53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a |
         # | admin |  2 | fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7 |
         # +-------+----+------------------------------------------------------------------+
+
+        # 将标准输出重定向到Terminal标准输出
         #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" > /dev/tty
         # mysql: [Warning] Using a password on the command line interface can be insecure.
         # +-------+----+------------------------------------------------------------------+
@@ -182,15 +193,13 @@ function StudentUI() {
         # | root  |  1 | 53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a |
         # | admin |  2 | fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7 |
         # +-------+----+------------------------------------------------------------------+
-        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;" | read temp; echo "$temp"
-        # mysql: [Warning] Using a password on the command line interface can be insecure.
-        # name    id      password_hash
+
+        # 重定向到变量并打印标准输出
         #  xuzh@ubuntu  ~/Projects/ShellDesign   master ●  temp=$(mysql -uShellDesigner -pShellDesigner ShellDesign -e "select * from admin;");echo "$temp"
         # mysql: [Warning] Using a password on the command line interface can be insecure.
         # name    id      password_hash
         # root    1       53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a
         # admin   2       fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7
-        #  xuzh@ubuntu  ~/Projects/ShellDesign   master ● 
 
         # * 因此当我们想要让此变量获取打印的信息时，我们应直接将返回信息赋值到变量中
         # * 当我们想直接使用MySQL的格式化功能时，我们应直接使用命令将输出导入到/dev/tty
@@ -199,7 +208,6 @@ function StudentUI() {
         echo "$name同学您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
         if [ ${#cids[@]} -eq 0 ]; then
             echo "$no_publication"
-            break
         else
             echo "您本学期共${#cids[@]}有门课程，它们分别为："
         fi
@@ -213,6 +221,7 @@ function StudentUI() {
                 echo "您选择了管理课程"
                 if [ ${#cids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 # 直接调用MySQL并输出到/dev/tty可以使MySQL用分割线打印各种信息
@@ -284,7 +293,6 @@ function StudentOPCourse() {
             $mysql_prefix -e "$query_hw;"
         else
             echo "$no_publication"
-            break
         fi
 
         echo "您可以进行的操作有："
@@ -298,6 +306,7 @@ function StudentOPCourse() {
                 # 根据数量显示不同的提示
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -325,20 +334,28 @@ function StudentOPCourse() {
 
 function PrintAttachment() {
     # 用于打印附件信息的小函数，可以提高代码可读性
+    # 这个函数认为：
+    # 1. $attachment_count可以用于判断是否有附件需要打印（不一定要是精确的附件数目
+    # 2. $target是目标内容的字符串描述，例如"课程作业/实验"
+    # 3. $mysql_prefix可以正确执行MySQL命令，$query_attachment可以正确打印相关附件
     if [ "$attachment_count" -gt 0 ]; then
         echo "本${target}的附件包括："
         $mysql_prefix -e "$query_attachment;"
     else
+        # 我们是用红色显示来让用户快速定位这一提示
         echo "$Red本${target}$Red还没有附件$NoColor"
     fi
 }
 
 function StudentManageSubmission() {
-    while :; do
+    while :; do # 管理作业提交的UI界面主循环，每次重新运行这一循环都会清空界面，退出循环后会回到上一级
         PrintStudent
 
+        # "提交"的上一级为："课程作业/实验"
         upper="$Green课程作业/实验$NoColor"
         target="$upper$Green提交$NoColor"
+
+        # 用红色显示的没有提交的信息，方便用户定位
         no_publication="$Red您在本$NoColor$upper$Red下还没有$NoColor${target}"
 
         echo "您选择了修改以下的$upper："
@@ -346,16 +363,21 @@ function StudentManageSubmission() {
         query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$hid"
         query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$hid"
         $mysql_prefix -e "$query_course_homework;"
+
+        # 我们通过MySQL Query直接确定相关附件数量的值
         attachment_count=$($mysql_prefix -se "$query_count_attachment")
+
+        # 暂时替换$target和$upper
         temp=${target}
         target=$upper
-        PrintAttachment
+        PrintAttachment # 这里我们打印的是upper的附件，但PrintAttachment会通过$target打印名称
         target=$temp
 
+        # subid: submission_id：提交ID
         query_subids="select id from submission where sid=$sid and hid=$hid"
-        subids=($($mysql_prefix -se "$query_subids;"))
         query_subs="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id in ($query_subids)"
 
+        subids=($($mysql_prefix -se "$query_subids;"))
         if [ ${#subids[@]} -gt 0 ]; then
             echo "您在本$upper创建的${target}如下所示"
             $mysql_prefix -e "$query_subs;"
@@ -369,7 +391,7 @@ function StudentManageSubmission() {
         echo "3. 修改已发布的${target}"
         echo "4. 查看已发布的${target}"
         echo "0. ${ReturnPrev}"
-        while :; do
+        while :; do # 操作循环
             read -rp "请输入您想要进行的操作：" op
             case $op in
             1)
@@ -419,12 +441,14 @@ function StudentManageSubmission() {
                 $mysql_prefix -e "$query_course_submission;"
 
                 PrintAttachment
+                ContinueWithKey
                 break
                 ;;
             2)
                 echo "您选择了删除已发布的${target}"
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -437,12 +461,15 @@ function StudentManageSubmission() {
                 query_delete_content="delete from content where id=$subid"
                 # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_submission;$query_delete_content;commit;set autocommit=1;"
                 $mysql_prefix -e "$query_delete_content;"
+                ContinueWithKey
+
                 break
                 ;;
             3)
                 echo "您选择了修改已发布的${target}"
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -499,12 +526,14 @@ function StudentManageSubmission() {
 
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
                 PrintAttachment
+                ContinueWithKey
                 break
                 ;;
             4)
                 echo "您选择了查询已发布的${target}"
                 if [ ${#subids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -521,6 +550,7 @@ function StudentManageSubmission() {
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
 
                 PrintAttachment
+                ContinueWithKey
                 break
                 ;;
             0)
@@ -551,7 +581,6 @@ function TeacherUI() {
         echo "$name老师您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
         if [ ${#cids[@]} -eq 0 ]; then
             echo "您本学期没有课程"
-            break
         else
             echo "您本学期共${#cids[@]}有门课程，它们分别为："
             $mysql_prefix -e "$query_course;"
@@ -568,6 +597,7 @@ function TeacherUI() {
                 echo "您选择了管理课程"
                 if [ ${#cids[@]} -eq 0 ]; then
                     echo "您本学期没有课程"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -704,6 +734,7 @@ function TeacherManageCourseBrief() {
     # we can easily perfomr SQL injection if the string is not carefully treated
     # update course set brief = "Hello, world.";select * from admin;\" where id=$cid
     $mysql_prefix -e "$query_brief_update;"
+    ContinueWithKey
 }
 
 function TeacherManageCourseInfo() {
@@ -781,6 +812,7 @@ function TeacherManageCourseInfo() {
                 $mysql_prefix -e "$query_course_info;"
 
                 PrintAttachment
+                ContinueWithKey
 
                 break
                 ;;
@@ -788,6 +820,7 @@ function TeacherManageCourseInfo() {
                 echo "您选择了删除已发布的${target}"
                 if [ ${#iids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -797,12 +830,15 @@ function TeacherManageCourseInfo() {
                 done
                 query_delete_content="delete from content where id=$iid"
                 $mysql_prefix -e "$query_delete_content;"
+                echo "已删除..."
+                ContinueWithKey
                 break
                 ;;
             3)
                 echo "您选择了修改已发布的${target}"
                 if [ ${#iids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -859,6 +895,7 @@ function TeacherManageCourseInfo() {
                 $mysql_prefix -e "$query_course_info;"
 
                 PrintAttachment
+                ContinueWithKey
 
                 break
                 ;;
@@ -866,6 +903,7 @@ function TeacherManageCourseInfo() {
                 echo "您选择了查询已发布的${target}"
                 if [ ${#iids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -880,7 +918,7 @@ function TeacherManageCourseInfo() {
                 $mysql_prefix -e "$query_course_info;"
                 attachment_count=$($mysql_prefix -se "$query_count_attachment")
                 PrintAttachment
-                read -n 1 -rp "按任意键继续..." -s
+                ContinueWithKey
                 break
                 ;;
             0)
@@ -943,6 +981,7 @@ function TeacherManageStudent() {
                 echo "您选择了从课程名单中移除$target"
                 if [ ${#sids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -960,7 +999,9 @@ function TeacherManageStudent() {
                     query_delete_student_attach_to="delete from attach_to where uid in (select id from submission where sid=$sid and hid in (select id from homework where cid=$cid))"
                     query_delete_student_submission="delete from submission where sid=$sid and hid in (select id from homework where cid=$cid)"
                     $mysql_prefix -e "set autocommit=0;$query_delete_student_course;$query_delete_student_attach_to;$query_delete_student_submission;commit;set autocommit=1;"
+                    echo "已删除..."
                 fi
+                ContinueWithKey
                 break
                 ;;
             0)
@@ -1058,6 +1099,7 @@ function TeacherManageHomework() {
                 $mysql_prefix -e "$query_course_homework;"
 
                 PrintAttachment
+                ContinueWithKey
 
                 break
                 ;;
@@ -1065,6 +1107,7 @@ function TeacherManageHomework() {
                 echo "您选择了删除已发布的${target}"
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -1078,6 +1121,8 @@ function TeacherManageHomework() {
                 query_delete_content="delete from content where id=$hid"
                 # $mysql_prefix -e "set autocommit=0;$query_delete_attach_to;$query_delete_submission;$query_delete_homework;$query_delete_content;commit;set autocommit=1;"
                 $mysql_prefix -e "$query_delete_content;"
+                echo "已删除..."
+                ContinueWithKey
 
                 break
                 ;;
@@ -1085,6 +1130,7 @@ function TeacherManageHomework() {
                 echo "您选择了修改已发布的${target}"
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -1151,6 +1197,7 @@ function TeacherManageHomework() {
                 $mysql_prefix -e "$query_course_homework;"
 
                 PrintAttachment
+                ContinueWithKey
 
                 break
                 ;;
@@ -1158,6 +1205,7 @@ function TeacherManageHomework() {
                 echo "您选择了查看已发布的${target}的完成情况"
                 if [ ${#hids[@]} -eq 0 ]; then
                     echo "$no_publication"
+                    ContinueWithKey
                     break
                 fi
                 while :; do
@@ -1191,6 +1239,7 @@ function TeacherManageHomework() {
                         break
                     fi
                 done
+                ContinueWithKey
 
                 break
                 ;;
