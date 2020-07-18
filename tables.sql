@@ -24,10 +24,13 @@ drop table if exists `course`;
 
 create table `teacher`
 (
-    name          varchar(100),
-    id            bigint primary key auto_increment,
-    brief         varchar(2000),
-    password_hash varchar(64)
+    name              varchar(100),
+    id                bigint primary key auto_increment,
+    brief             varchar(2000),
+    gender            enum ('F', 'M') default 'F', # F for female and M for male
+    registration_time datetime,
+    title             varchar(500)    default 'Professor',
+    password_hash     varchar(64)
 );
 
 create table `student`
@@ -35,6 +38,8 @@ create table `student`
     name          varchar(100),
     id            bigint primary key auto_increment,
     brief         varchar(2000),
+    gender        enum ('F', 'M') default 'F', # F for female and M for male
+    enroll_time   datetime,
     password_hash char(64)
 );
 
@@ -94,8 +99,7 @@ create table `homework`
     intro         varchar(2000),
     creation_time datetime,
     end_time      datetime,
-    type          char(1) default 'H',
-    check (type in ('H', 'E')), # H for regular homework, E for experiments
+    type          enum ('H', 'E') default 'H', # H for homework and e for experiment
     foreign key (`id`) references content (`id`) on delete cascade on update cascade,
     foreign key (`tid`) references teacher (`id`) on delete cascade on update cascade,
     foreign key (`cid`) references course (`id`) on delete cascade on update cascade
@@ -138,23 +142,23 @@ values (1, '数据库系统', 'Database System'),
        (5, '视觉识别中的深度卷积神经网络', 'Convolutional Neural Network for Visual Recognition'),
        (6, 'iOS开发', 'iOS Software Development');
 
-insert into `teacher`(id, name, password_hash)
-values (1, 'zy', '49aabdaa1b0f6c3506f54521ef81fe5b5fe835d268f1f86e1021a342b59d43bc'), # password is zy
-       (2, 'xz', 'b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1'); # password is xz
+insert into `teacher`(id, name, password_hash, registration_time)
+values (1, 'zy', '49aabdaa1b0f6c3506f54521ef81fe5b5fe835d268f1f86e1021a342b59d43bc', now()), # password is zy
+       (2, 'xz', 'b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1', now()); # password is xz
 
 insert into `admin`(id, name, password_hash)
 values (1, 'root', '53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a'), # password is root
        (2, 'admin', 'fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7'); # password is admin
 
-insert into `student`(id, name, password_hash)
-values (1, 'st1', '2238ead9c048f351712c34d22b41f6eec218ea9a9e03e48fad829986b0dafc11'), # password is same as name
-       (2, 'st2', '5e61d026a7889d9fc72e17f1b25f4d6d48bfe17046fea845aa8c5651ec89c333'),
-       (3, 'st3', 'bbb977f8e93feb5dbd79e0688b822115b5acf774dd8a1fe6964e03d6b9579384'),
-       (4, 'st4', '6133396ebcd382b137088d2ea91d60637744e404b4376e4635b45784b718db72'),
-       (5, 'st5', 'd691a62aa63f1be970582902d0ff78df29899f09c5dd540b1447cdd051dcfc8d'),
-       (6, 'st6', 'a7a287ffc9cb27131b9dc54199ba96cef87e753968bc620d714af212ef0f7a8c'),
-       (7, 'st7', '73d0daf13c6159a1fbdeb37b6972325b6e29c312371a0f3d427bd35c0c87b928'),
-       (8, 'st8', '4ce70fc1eef7303879a2ef33996db2f85058ae06e8590521267ae8d46ec59793');
+insert into `student`(id, name, password_hash, enroll_time)
+values (1, 'st1', '2238ead9c048f351712c34d22b41f6eec218ea9a9e03e48fad829986b0dafc11', now()), # password is same as name
+       (2, 'st2', '5e61d026a7889d9fc72e17f1b25f4d6d48bfe17046fea845aa8c5651ec89c333', now()),
+       (3, 'st3', 'bbb977f8e93feb5dbd79e0688b822115b5acf774dd8a1fe6964e03d6b9579384', now()),
+       (4, 'st4', '6133396ebcd382b137088d2ea91d60637744e404b4376e4635b45784b718db72', now()),
+       (5, 'st5', 'd691a62aa63f1be970582902d0ff78df29899f09c5dd540b1447cdd051dcfc8d', now()),
+       (6, 'st6', 'a7a287ffc9cb27131b9dc54199ba96cef87e753968bc620d714af212ef0f7a8c', now()),
+       (7, 'st7', '73d0daf13c6159a1fbdeb37b6972325b6e29c312371a0f3d427bd35c0c87b928', now()),
+       (8, 'st8', '4ce70fc1eef7303879a2ef33996db2f85058ae06e8590521267ae8d46ec59793', now());
 
 insert into `teach`(cid, tid)
 values (1, 1),
