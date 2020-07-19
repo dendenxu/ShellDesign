@@ -126,6 +126,8 @@ function LoginInUI() {
         # 即使数据库内容被泄露，sha256的加密也会让数据偷盗者很难猜出正确的密码
         # https://www.youtube.com/watch?v=7U-RbOKanYs
         while :; do
+            # todo: 使用cat命令可以清楚密码变量，提高安全性，但是我们还没发现该如何换行
+            # 所以暂时使用了变量来存储密码
             read -rp "请输入您的密码：" -s password
             echo ""
             password_hash=$(echo "$password" | sha256sum - | tr -d " -")
@@ -1468,21 +1470,19 @@ function TeacherManageHomework() {
     done
 }
 
+# todo: fuck it.
 function AdminUI() {
     # 同样的，我们使用默认值以方便调试
-    me_admin_id=${1:-"1"}
+    # me_admin_id=${1:-"1"}
     name=${2:-"root"}
 
     no_course="$Red系统中没有课程$NoColor"
-    no_teacher="$Red系统中没有教师$NoColor"
     no_student="$Red系统中没有学生$NoColor"
 
     query_sid="select id from student"
-    query_tid="select id from teacher"
     query_cid="select id from course"
 
     query_student="select id 学生学号, name 学生姓名, if(gender='F', \"女\", \"男\") 性别, enroll_time 录取时间 from student"
-    query_teacher="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称 from teacher"
     query_course="select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course"
 
     while :; do    # 页面主循环
@@ -1491,9 +1491,7 @@ function AdminUI() {
         echo "$name管理员您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
 
         sids=($($mysql_prefix -se "$query_sid;"))
-        tids=($($mysql_prefix -se "$query_tid;"))
         cids=($($mysql_prefix -se "$query_cid;"))
-        admids=($($mysql_prefix -se "$query_admid;"))
 
         if [ ${#sids[@]} -gt 0 ]; then
             echo "系统中已有的学生账户如下所示："
@@ -1518,25 +1516,188 @@ function AdminUI() {
         echo "1. 管理管理员账户"
         echo "2. 管理教师账户"
         echo "3. 管理学生账户"
-        echo "4. 管理课程"
+        echo "4. 管理课程列表"
+        echo "5. 管理课程讲师"
         echo "0. ${ReturnPrev}"
         while :; do # 错误输入的处理循环，这里只能输入0或者1
             read -rp "请输入您想要进行的操作：" op
             case $op in
             1)
                 echo "您选择了管理管理员账户"
+                AdminManageAdmin
                 break
                 ;;
             2)
                 echo "您选择了管理教师账户"
+                AdminManageTeacher
                 break
                 ;;
             3)
                 echo "您选择了管理学生账户"
+                AdminManageStudent
                 break
                 ;;
             4)
-                echo "您选择了管理课程教师"
+                echo "您选择了管理课程列表"
+                break
+                ;;
+            5)
+                echo "您选择了管理课程讲师"
+                break
+                ;;
+            0)
+                echo "您选择了${ReturnPrev}"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+
+function AdminManageTeacher() {
+    while :; do
+        PrintAdmin
+        target="$Green教师账户$NoColor"
+        no_teacher="$Red系统中没有教师$NoColor"
+
+        query_tid="select id from teacher"
+        query_teacher="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称 from teacher"
+        tids=($($mysql_prefix -se "$query_tid;"))
+
+        if [ ${#tids[@]} -gt 0 ]; then
+            echo "系统中已有的${target}如下所示："
+            $mysql_prefix -e "$query_teacher;"
+        else
+            echo "$no_teacher"
+        fi
+        echo "您可以进行的操作有："
+        echo "1. 添加${target}"
+        echo "2. 删除${target}"
+        echo "3. 修改${target}"
+        echo "0. ${ReturnPrev}"
+        while :; do
+            read -rp "请输入您想要进行的操作：" op
+            case $op in
+            1)
+                echo "您选择了添加${target}"
+
+                read -rp "请输入您想要的新${target}名称：" t_name
+                t_name=$(RemoveDanger "$t_name")
+                echo "您的${target}名称为：$t_name"
+
+                read -rp "请输入新的${target}对应的性别（M/F）：" t_gender
+                [[ $t_gender =~ ^[Mm] ]] && t_gender="M" || t_gender="F"
+                echo "您选择的性别为：$t_gender"
+
+                read -rp "请输入您的${target}的职称：" t_title
+                t_title=$(RemoveDanger "$t_title")
+                echo "您的${target}职称为：$t_title"
+
+                echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+
+                full_string=$(RemoveDanger "$full_string")
+
+                echo -e "您的${target}的简介内容为\n$full_string"
+
+                while :; do
+                    read -rp "请输入您的密码：" -s password
+                    echo ""
+                    password_hash_ori=$(echo "$password" | sha256sum - | tr -d " -")
+                    read -rp "请确认您的密码：" -s password
+                    echo ""
+                    password_hash_fi=$(echo "$password" | sha256sum - | tr -d " -")
+                    if [ "$password_hash_ori" = "$password_hash_fi" ]; then
+                        echo "密码设置成功...."
+                        break
+                    fi
+                    echo "您两次输入的密码不一致，请重新输入"
+                done
+                query_insert_teacher="insert into teacher(name, brief, title, gender, password_hash, registration_time) value (\"$t_name\",\"$full_string\",\"$t_title\",\"$t_gender\", \"$password_hash\", now())"
+                query_last_insert_id="select last_insert_id()"
+
+                tid=$($mysql_prefix -se "$query_insert_teacher;$query_last_insert_id;")
+
+                query_teacher_new="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称 from teacher where id=$tid"
+                echo "您新添加的$target如下所示"
+                $mysql_prefix -e "$query_teacher_new;"
+                ContinueWithKey
+                break
+                ;;
+            2)
+                echo "您选择了删除${target}"
+                if [ ${#tids[@]} -eq 0 ]; then
+                    echo "$no_teacher"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要删除的${target}ID：" tid
+                    [[ "${tids[*]}" =~ "${tid}" ]] && break
+                    echo "您输入的${target}ID$tid有误，请输入上表中列举出的某个${target}ID"
+                done
+                echo "您选择了将下列$target从课程名单中移除："
+                query_teacher_info="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称 from teacher where id=$tid"
+                $mysql_prefix -e "$query_teacher_info;"
+
+                # 类似的，给老师一个确认的机会
+                read -rp "是否要移除（Y/n）：" need_delete
+                if [[ $need_delete =~ ^[1Yy] ]]; then
+                    query_delete_teacher="delete from teacher where id=$tid"
+                    $mysql_prefix -e "$query_delete_teacher"
+                fi
+                break
+                ;;
+            3)
+                echo "您选择了修改${target}"
+                if [ ${#admids[@]} -eq 0 ]; then
+                    echo "$no_admin"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要修改的${target}ID：" admid
+                    [[ "${admids[*]}" =~ "${admid}" ]] && break
+                    echo "您输入的${target}ID$admid有误，请输入上表中列举出的某个${target}ID"
+                done
+
+                read -rp "请输入您想要的新${target}名称：" admin_name
+                admin_name=$(RemoveDanger "$admin_name")
+                echo "您的${target}名称为：$admin_name"
+
+                query_change_admin_name="update admin set name=\"$admin_name\" where id=$admid"
+                $mysql_prefix -e "$query_change_admin_name;"
+
+                read -rp "是否要修改${target}密码（Y/n）：" need_change_pw
+                if [[ $need_change_pw =~ ^[1Yy] ]]; then
+                    while :; do
+                        read -rp "请输入您的密码：" -s password
+                        echo ""
+                        password_hash_ori=$(echo "$password" | sha256sum - | tr -d " -")
+                        read -rp "请确认您的密码：" -s password
+                        echo ""
+                        password_hash_fi=$(echo "$password" | sha256sum - | tr -d " -")
+                        if [ "$password_hash_ori" = "$password_has+h_fi" ]; then
+                            query_change_pw="update admin set password_hash=\"$password_hash_ori\" where id=$admid"
+                            $mysql_prefix -e "$query_change_pw;"
+                            echo "密码修改成功...."
+                            break
+                        fi
+                        echo "您两次输入的密码不一致，请重新输入"
+                    done
+                fi
+                echo "管理员账户修改成功...."
+                query_admin_new="select id 管理员账号, name 管理员姓名 from admin where id=$admid"
+                echo "您新修改的$target如下所示"
+                $mysql_prefix -e "$query_admin_new;"
+                ContinueWithKey
+
                 break
                 ;;
             0)
@@ -1559,6 +1720,7 @@ function AdminManageAdmin() {
 
         query_admid="select id from admin"
         query_admin="select id 管理员账号, name 管理员姓名 from admin"
+        admids=($($mysql_prefix -se "$query_admid;"))
 
         if [ ${#admids[@]} -gt 0 ]; then
             echo "系统中已有的${target}如下所示："
@@ -1569,13 +1731,38 @@ function AdminManageAdmin() {
         echo "您可以进行的操作有："
         echo "1. 添加${target}"
         echo "2. 删除${target}"
-        echo "2. 修改${target}"
+        echo "3. 修改${target}"
         echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
             case $op in
             1)
                 echo "您选择了添加${target}"
+
+                read -rp "请输入您想要的新${target}名称：" admin_name
+                admin_name=$(RemoveDanger "$admin_name")
+                echo "您的${target}名称为：$admin_name"
+
+                while :; do
+                    read -rp "请输入您的密码：" -s password
+                    echo ""
+                    password_hash_ori=$(echo "$password" | sha256sum - | tr -d " -")
+                    read -rp "请确认您的密码：" -s password
+                    echo ""
+                    password_hash_fi=$(echo "$password" | sha256sum - | tr -d " -")
+                    if [ "$password_hash_ori" = "$password_hash_fi" ]; then
+                        echo "密码设置成功...."
+                        break
+                    fi
+                    echo "您两次输入的密码不一致，请重新输入"
+                done
+                query_insert_admin="insert into admin(name, password_hash) value (\"$admin_name\", \"$password_hash\")"
+                query_last_insert_id="select last_insert_id()"
+                admid=$($mysql_prefix -se "$query_insert_admin;$query_last_insert_id;")
+                query_admin_new="select id 管理员账号, name 管理员姓名 from admin where id=$admid"
+                echo "您新添加的$target如下所示"
+                $mysql_prefix -e "$query_admin_new;"
+                ContinueWithKey
                 break
                 ;;
             2)
@@ -1584,6 +1771,21 @@ function AdminManageAdmin() {
                     echo "$no_admin"
                     ContinueWithKey
                     break
+                fi
+                while :; do
+                    read -rp "请输入您想要删除的${target}ID：" admid
+                    [[ "${admids[*]}" =~ "${admid}" ]] && break
+                    echo "您输入的${target}ID$admid有误，请输入上表中列举出的某个${target}ID"
+                done
+                echo "您选择了将下列$target从课程名单中移除："
+                query_admin_info="select id 管理员账号, name 管理员姓名 from admin where id=$admid"
+                $mysql_prefix -e "$query_admin_info;"
+
+                # 类似的，给老师一个确认的机会
+                read -rp "是否要移除（Y/n）：" need_delete
+                if [[ $need_delete =~ ^[1Yy] ]]; then
+                    query_delete_admin="delete from admin where id=$admid"
+                    $mysql_prefix -e "$query_delete_admin"
                 fi
                 break
                 ;;
@@ -1594,6 +1796,43 @@ function AdminManageAdmin() {
                     ContinueWithKey
                     break
                 fi
+                while :; do
+                    read -rp "请输入您想要修改的${target}ID：" admid
+                    [[ "${admids[*]}" =~ "${admid}" ]] && break
+                    echo "您输入的${target}ID$admid有误，请输入上表中列举出的某个${target}ID"
+                done
+
+                read -rp "请输入您想要的新${target}名称：" admin_name
+                admin_name=$(RemoveDanger "$admin_name")
+                echo "您的${target}名称为：$admin_name"
+
+                query_change_admin_name="update admin set name=\"$admin_name\" where id=$admid"
+                $mysql_prefix -e "$query_change_admin_name;"
+
+                read -rp "是否要修改${target}密码（Y/n）：" need_change_pw
+                if [[ $need_change_pw =~ ^[1Yy] ]]; then
+                    while :; do
+                        read -rp "请输入您的密码：" -s password
+                        echo ""
+                        password_hash_ori=$(echo "$password" | sha256sum - | tr -d " -")
+                        read -rp "请确认您的密码：" -s password
+                        echo ""
+                        password_hash_fi=$(echo "$password" | sha256sum - | tr -d " -")
+                        if [ "$password_hash_ori" = "$password_has+h_fi" ]; then
+                            query_change_pw="update admin set password_hash=\"$password_hash_ori\" where id=$admid"
+                            $mysql_prefix -e "$query_change_pw;"
+                            echo "密码修改成功...."
+                            break
+                        fi
+                        echo "您两次输入的密码不一致，请重新输入"
+                    done
+                fi
+                echo "管理员账户修改成功...."
+                query_admin_new="select id 管理员账号, name 管理员姓名 from admin where id=$admid"
+                echo "您新修改的$target如下所示"
+                $mysql_prefix -e "$query_admin_new;"
+                ContinueWithKey
+
                 break
                 ;;
             0)
@@ -1607,10 +1846,8 @@ function AdminManageAdmin() {
         done
     done
 }
-function AdminManageAdmin() {
-    echo "Placeholder."
-}
-function AdminManageAdmin() {
+
+function AdminManageStudent() {
     echo "Placeholder."
 }
 
