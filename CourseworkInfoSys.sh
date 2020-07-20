@@ -1481,31 +1481,12 @@ function AdminUI() {
 
         echo "$name管理员您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
 
-        if [ ${#sids[@]} -gt 0 ]; then
-            echo "系统中已有的学生账户如下所示："
-            $mysql_prefix -e "$query_student;"
-        else
-            echo "$no_student"
-        fi
-        if [ ${#tids[@]} -gt 0 ]; then
-            echo "系统中已有的教师账户如下所示："
-            $mysql_prefix -e "$query_teacher;"
-        else
-            echo "$no_teacher"
-        fi
-        if [ ${#cids[@]} -gt 0 ]; then
-            echo "系统中已有的课程如下所示："
-            $mysql_prefix -e "$query_course;"
-        else
-            echo "$no_course"
-        fi
 
         echo "您可以进行的操作有："
         echo "1. 管理管理员账户"
         echo "2. 管理教师账户"
         echo "3. 管理学生账户"
         echo "4. 管理课程列表"
-        echo "5. 管理课程讲师"
         echo "0. ${ReturnPrev}"
         while :; do # 错误输入的处理循环，这里只能输入0或者1
             read -rp "请输入您想要进行的操作：" op
@@ -1530,8 +1511,100 @@ function AdminUI() {
                 AdminManageCourse
                 break
                 ;;
-            5)
-                echo "您选择了管理课程讲师"
+            0)
+                echo "您选择了${ReturnPrev}"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+
+function AdminManageTeaching() {
+    while :; do
+        PrintAdmin
+        target="$Green教师$NoColor"
+        no_teacher="$Red没有教师教授这门课$NoColor"
+
+        query_tid="select tid from teach where cid=$cid"
+        query_teacher_basic="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称, brief 简介 from teacher"
+        query_teacher="$query_teacher_basic where id in ($query_tid)"
+        tids=($($mysql_prefix -se "$query_tid;"))
+
+        if [ ${#tids[@]} -gt 0 ]; then
+            echo "系统中已有的教这门课的${target}如下所示："
+            $mysql_prefix -e "$query_teacher;"
+        else
+            echo "$no_teacher"
+        fi
+        # 操作
+        echo "您可以进行的操作有："
+        echo "1. 向课程名单中添加$target"
+        echo "2. 从课程名单中移除$target"
+        echo "0. ${ReturnPrev}"
+        while :; do
+            read -rp "请输入您想要进行的操作：" op
+            case $op in
+            1)
+                echo "您选择了对课程导入新的$target账户"
+
+                # 列举没有导入到课程下，但是已经在管理系统注册了账户的学生方便老师导入
+                query_all_tids="select id from teacher where id not in ($query_tid)"
+                query_all_teachers="$query_teacher_basic where id not in ($query_tid)"
+                all_tids=($($mysql_prefix -se "$query_all_tids;"))
+                echo "没有被导入该课程但是已经注册的$target有："
+                $mysql_prefix -e "$query_all_teachers;"
+                while :; do
+                    read -rp "请输入您想要添加的${target}ID：" tid
+                    [[ "${all_tids[*]}" =~ "${tid}" ]] && break
+                    echo "您输入的ID$tid有误，请输入上表中列举出的某个$target的ID"
+                done
+
+                # 打印下老师选择的同学
+                echo "您选择了将下列$target添加进课程名单："
+                query_teacher_info="$query_teacher_basic where id=$tid"
+                $mysql_prefix -e "$query_teacher_info;"
+
+                # 给老师一个确认是否添加的机会
+                read -rp "是否要添加（Y/n）：" need_insert_teacher_course
+                if [[ $need_insert_teacher_course =~ ^[1Yy] ]]; then
+                    query_insert_teacher_course="insert into teach(tid, cid) value ($tid, $cid)"
+                    $mysql_prefix -e "$query_insert_teacher_course;"
+                fi
+                break
+                ;;
+            2)
+                echo "您选择了从课程名单中移除$target"
+                if [ ${#tids[@]} -eq 0 ]; then
+                    echo "$no_teacher"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要移除的${target}ID：" tid
+                    [[ "${all_tids[*]}" =~ "${tid}" ]] && break
+                    echo "您输入的ID$tid有误，请输入上表中列举出的某个$target的ID"
+                done
+                echo "您选择了将下列$target从课程名单中移除"
+                query_teacher_info="$query_teacher_basic where id=$tid"
+                $mysql_prefix -e "$query_teacher_info;"
+
+                # 类似的，给老师一个确认的机会
+                read -rp "是否要移除（Y/n）：" need_delete_teacher_course
+
+                if [[ $need_delete_teacher_course =~ ^[1Yy] ]]; then
+                    # * 我们现在选择的是移除，也就是说若老师曾经发布过作业，但管理员将其从名单中移除了，后又添加回来了，他的所有作业都会消失
+                    # * 类似的，对应作业的提交也会消失，对应提交的附件关系也会消失
+                    # todo: 实现附件attachment和带附件内容content的多对多管理能力
+                    query_delete_teacher_course="delete from teach where tid=$tid and cid=$cid"
+                    query_delete_teacher_hw="delete from homework where tid=$tid"
+
+                    # 我们使用了commit来尽量保证操作的完整性
+                    $mysql_prefix -e "set autocommit=0;$query_delete_teacher_course;$query_delete_teacher_hw;commit;set autocommit=1;"
+                fi
                 break
                 ;;
             0)
@@ -1565,6 +1638,7 @@ function AdminManageCourse() {
         echo "1. 添加${target}"
         echo "2. 删除${target}"
         echo "3. 修改${target}"
+        echo "4. 管理${target}讲师"
         echo "0. ${ReturnPrev}"
         while :; do
             read -rp "请输入您想要进行的操作：" op
@@ -1591,9 +1665,9 @@ function AdminManageCourse() {
                 query_insert_course="insert into course(name_zh, name_en, brief) value (\"$c_name_zh\",\"$c_name_en\",\"$full_string\")"
                 query_last_insert_id="select last_insert_id()"
 
-                sid=$($mysql_prefix -se "$query_insert_course;$query_last_insert_id;")
+                cid=$($mysql_prefix -se "$query_insert_course;$query_last_insert_id;")
 
-                query_course_new="$query_course where id=$sid"
+                query_course_new="$query_course where id=$cid"
                 echo "您新添加的$target如下所示"
                 $mysql_prefix -e "$query_course_new;"
                 ContinueWithKey
@@ -1664,6 +1738,23 @@ function AdminManageCourse() {
 
                 break
                 ;;
+            4)
+                echo "您选择了管理${target}讲师"
+                if [ ${#cids[@]} -eq 0 ]; then
+                    echo "$no_course"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要管理的${target}ID：" cid
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
+                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
+                done
+
+                AdminManageTeaching
+                break
+                ;;
+
             0)
                 echo "您选择了${ReturnPrev}"
                 return 0
