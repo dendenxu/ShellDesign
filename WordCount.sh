@@ -1,5 +1,6 @@
 #!/bin/bash
 # WordCount
+# Author: Xu Zhen 徐震 3180105504
 
 # 统计目录文件个数
 dir_num="$(ls -l $1|grep ^d|wc -l|xargs)"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # PalindromeSmall
-# Author: Xu Zhen
+# Author: Xu Zhen 徐震 3180105504
 # 在本实现中，我们直接调用了tr命令来剔除不合要求的字符串
 
 # 本语句读入一行用户输入内容并删除非字母内容，复制给word变量
