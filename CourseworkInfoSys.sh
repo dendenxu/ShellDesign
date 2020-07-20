@@ -3,6 +3,7 @@
 # 这是一个现代教务管理系统，主要面向作业管理
 # 我们通过编写Shell程序，调用MySQL数据库来管理作业系统
 # ! 您的MySQL版本要至少为5.7
+# ! 您的运行环境最好要有至少150列的字符宽度，因为我们使用了ASCII ART，且很多查询语句的宽度会较大
 # 5.6.* 版本的MySQL会在执行tables.sql中的语句时出现问题
 # * 由于许多管理逻辑都是重复的，但将代码集合为一个函数又会显得过于刻意/不灵活，我们会将注释主要写在第一次遇到相关逻辑的部分
 # * 阅读源码的最好方式是从头开始，因为我们将主要函数都放在了开头(StudentUI, StudentManageSubmission)
@@ -98,8 +99,8 @@ function LoginInUI() {
                 break
                 ;;
             0)
-                echo "再见！"
-                exit 0
+                echo "Bye"
+                return 0
                 ;;
             *) echo "请输入T, S, A或0" ;;
             esac
@@ -132,7 +133,9 @@ function LoginInUI() {
             read -rp "请输入您的密码：" -s password
             echo ""
             password_hash=$(echo "$password" | sha256sum - | tr -d " -")
+            echo "验证中……"
             [ "$password_hash" = "$right_hash" ] && break
+            sleep 1s # 为了防止暴力登录攻击，每次密码错误都要得到1s的时间惩罚
             echo "验证失败，请重新输入"
         done
         echo "验证成功"
@@ -1481,7 +1484,8 @@ function AdminUI() {
 
         echo "$name管理员您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
 
-
+        # 此处仅仅是一个菜单
+        # 为了方便查询和利用屏幕空间，我们仅仅在选定操作类型后才打印相关信息
         echo "您可以进行的操作有："
         echo "1. 管理管理员账户"
         echo "2. 管理教师账户"
@@ -1511,6 +1515,168 @@ function AdminUI() {
                 AdminManageCourse
                 break
                 ;;
+            0)
+                echo "您选择了${ReturnPrev}"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+
+function AdminManageCourse() {
+    # 课程管理逻辑
+    # 很多操作已经在前面详细描述过了
+    # * 我们意识到，很多逻辑都是重复的，但又有很多小细节难以抹平
+    # * 我们考虑过将许多大量重复的小段代码抽象成单独函数，但这些小代码中往往有break等控制逻辑，很难实现
+    # * 我们也考虑过直接抽象所有管理逻辑到一个函数中，但那样要处理的细节过多，难以调试，很难定位到底是哪里出错
+    # 因此现在采用了较为直接的方法，每种逻辑都使用了不同的函数以方便排查错误和提供模块化功能（一个模块宕机其他模块也能暂时正常使用）
+    # todo: 重构重复性高的内容到一个大函数中
+    # mark: 没有C++等语言的面向对象特性，这种复杂逻辑的设计其实是极为困难的，或许Shell语言的目的本身就不是如此吧
+    while :; do
+        PrintAdmin
+        target="$Green课程$NoColor"
+        no_course="$Red系统中没有课程$NoColor"
+        query_cid="select id from course"
+        query_course="select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course"
+        cids=($($mysql_prefix -se "$query_cid;"))
+
+        # 打印已有的课程信息
+        if [ ${#cids[@]} -gt 0 ]; then
+            echo "系统中已有的${target}如下所示："
+            $mysql_prefix -e "$query_course;"
+        else
+            echo "$no_course"
+        fi
+        echo "您可以进行的操作有："
+        echo "1. 添加${target}"
+        echo "2. 删除${target}"
+        echo "3. 修改${target}"
+        echo "4. 管理${target}讲师" # 就是管理哪个老师可以讲什么课的逻辑
+        echo "0. ${ReturnPrev}"
+        while :; do
+            read -rp "请输入您想要进行的操作：" op
+            case $op in
+            1)
+                echo "您选择了添加${target}"
+
+                # 值得注意的是，我们没有对用户输入的是中文还是英文作出严格的判断
+                # 因此用户可以根据自己的喜好来调整名称的结果，中文名称中也可以有拉丁字母出现
+                # 获取并确认中文内容
+                read -rp "请输入您想要的新${target}中文名称：" c_name_zh
+                c_name_zh=$(RemoveDanger "$c_name_zh")
+                echo "您的${target}名称为：$c_name_zh"
+
+                # 获取并确认英文内容
+                read -rp "请输入您想要的新${target}英文名称：" c_name_en
+                c_name_en=$(RemoveDanger "$c_name_en")
+                echo "您的${target}名称为：$c_name_en"
+
+                # 获取并确认简介内容
+                echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+                full_string=$(RemoveDanger "$full_string")
+                echo -e "您的${target}的简介内容为\n$full_string"
+
+                query_insert_course="insert into course(name_zh, name_en, brief) value (\"$c_name_zh\",\"$c_name_en\",\"$full_string\")"
+                query_last_insert_id="select last_insert_id()"
+
+                cid=$($mysql_prefix -se "$query_insert_course;$query_last_insert_id;")
+                echo "添加成功……"
+                query_course_new="$query_course where id=$cid"
+                echo "您新添加的$target如下所示"
+                $mysql_prefix -e "$query_course_new;"
+                ContinueWithKey
+                break
+                ;;
+            2)
+                echo "您选择了删除${target}"
+                if [ ${#cids[@]} -eq 0 ]; then
+                    echo "$no_course"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要删除的${target}ID：" cid
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
+                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
+                done
+                echo "您选择了将下列$target从课程名单中移除，$Red注意：其所有相关信息都会丢失：$NoColor："
+                query_course_info="$query_course where id=$cid"
+                $mysql_prefix -e "$query_course_info;"
+
+                # 类似的，给老师一个确认的机会
+                read -rp "是否要移除（Y/n）：" need_delete
+                if [[ $need_delete =~ ^[1Yy] ]]; then
+                    query_delete_course="delete from course where id=$cid"
+                    $mysql_prefix -e "$query_delete_course"
+                fi
+                break
+                ;;
+            3)
+                echo "您选择了修改${target}"
+                if [ ${#cids[@]} -eq 0 ]; then
+                    echo "$no_course"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要修改的${target}ID：" cid
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
+                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
+                done
+
+                read -rp "请输入您想要的新${target}中文名称：" c_name_zh
+                c_name_zh=$(RemoveDanger "$c_name_zh")
+                echo "您的${target}名称为：$c_name_zh"
+
+                read -rp "请输入您想要的新${target}英文名称：" c_name_en
+                c_name_en=$(RemoveDanger "$c_name_en")
+                echo "您的${target}名称为：$c_name_en"
+
+                echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+                full_string=$(RemoveDanger "$full_string")
+                echo -e "您的${target}的简介内容为\n$full_string"
+
+                query_change_course="update course set name_zh=\"$c_name_zh\", name_en=\"$c_name_en\", brief=\"$full_string\" where id=$cid"
+
+                $mysql_prefix -e "$query_change_course;"
+
+                echo "$target修改成功..."
+                query_course_new="$query_course where id=$cid"
+                echo "您新添加的$target如下所示"
+                $mysql_prefix -e "$query_course_new;"
+                ContinueWithKey
+
+                break
+                ;;
+            4)
+                echo "您选择了管理${target}讲师"
+                if [ ${#cids[@]} -eq 0 ]; then
+                    echo "$no_course"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要管理的${target}ID：" cid
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
+                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
+                done
+
+                AdminManageTeaching
+                break
+                ;;
+
             0)
                 echo "您选择了${ReturnPrev}"
                 return 0
@@ -1619,155 +1785,8 @@ function AdminManageTeaching() {
     done
 }
 
-function AdminManageCourse() {
-    while :; do
-        PrintAdmin
-        target="$Green课程$NoColor"
-        no_course="$Red系统中没有课程$NoColor"
-        query_cid="select id from course"
-        query_course="select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course"
-        cids=($($mysql_prefix -se "$query_cid;"))
-
-        if [ ${#cids[@]} -gt 0 ]; then
-            echo "系统中已有的${target}如下所示："
-            $mysql_prefix -e "$query_course;"
-        else
-            echo "$no_course"
-        fi
-        echo "您可以进行的操作有："
-        echo "1. 添加${target}"
-        echo "2. 删除${target}"
-        echo "3. 修改${target}"
-        echo "4. 管理${target}讲师"
-        echo "0. ${ReturnPrev}"
-        while :; do
-            read -rp "请输入您想要进行的操作：" op
-            case $op in
-            1)
-                echo "您选择了添加${target}"
-
-                read -rp "请输入您想要的新${target}中文名称：" c_name_zh
-                c_name_zh=$(RemoveDanger "$c_name_zh")
-                echo "您的${target}名称为：$c_name_zh"
-
-                read -rp "请输入您想要的新${target}英文名称：" c_name_en
-                c_name_en=$(RemoveDanger "$c_name_en")
-                echo "您的${target}名称为：$c_name_en"
-
-                echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
-                full_string=""
-                while read -r temp; do
-                    full_string+="$temp"$'\n'
-                done
-                full_string=$(RemoveDanger "$full_string")
-                echo -e "您的${target}的简介内容为\n$full_string"
-
-                query_insert_course="insert into course(name_zh, name_en, brief) value (\"$c_name_zh\",\"$c_name_en\",\"$full_string\")"
-                query_last_insert_id="select last_insert_id()"
-
-                cid=$($mysql_prefix -se "$query_insert_course;$query_last_insert_id;")
-
-                query_course_new="$query_course where id=$cid"
-                echo "您新添加的$target如下所示"
-                $mysql_prefix -e "$query_course_new;"
-                ContinueWithKey
-                break
-                ;;
-            2)
-                echo "您选择了删除${target}"
-                if [ ${#cids[@]} -eq 0 ]; then
-                    echo "$no_course"
-                    ContinueWithKey
-                    break
-                fi
-                while :; do
-                    read -rp "请输入您想要删除的${target}ID：" cid
-                    [[ "${cids[*]}" =~ "${cid}" ]] && break
-                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
-                done
-                echo "您选择了将下列$target从课程名单中移除，$Red注意：其所有相关信息都会丢失：$NoColor："
-                query_course_info="$query_course where id=$cid"
-                $mysql_prefix -e "$query_course_info;"
-
-                # 类似的，给老师一个确认的机会
-                read -rp "是否要移除（Y/n）：" need_delete
-                if [[ $need_delete =~ ^[1Yy] ]]; then
-                    query_delete_course="delete from course where id=$cid"
-                    $mysql_prefix -e "$query_delete_course"
-                fi
-                break
-                ;;
-            3)
-                echo "您选择了修改${target}"
-                if [ ${#cids[@]} -eq 0 ]; then
-                    echo "$no_course"
-                    ContinueWithKey
-                    break
-                fi
-                while :; do
-                    read -rp "请输入您想要修改的${target}ID：" cid
-                    [[ "${cids[*]}" =~ "${cid}" ]] && break
-                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
-                done
-
-                read -rp "请输入您想要的新${target}中文名称：" c_name_zh
-                c_name_zh=$(RemoveDanger "$c_name_zh")
-                echo "您的${target}名称为：$c_name_zh"
-
-                read -rp "请输入您想要的新${target}英文名称：" c_name_en
-                c_name_en=$(RemoveDanger "$c_name_en")
-                echo "您的${target}名称为：$c_name_en"
-
-                echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
-                full_string=""
-                while read -r temp; do
-                    full_string+="$temp"$'\n'
-                done
-                full_string=$(RemoveDanger "$full_string")
-                echo -e "您的${target}的简介内容为\n$full_string"
-
-                query_change_course="update course set name_zh=\"$c_name_zh\", name_en=\"$c_name_en\", brief=\"$full_string\" where id=$cid"
-
-                $mysql_prefix -e "$query_change_course;"
-
-                echo "$target修改成功..."
-                query_course_new="$query_course where id=$cid"
-                echo "您新添加的$target如下所示"
-                $mysql_prefix -e "$query_course_new;"
-                ContinueWithKey
-
-                break
-                ;;
-            4)
-                echo "您选择了管理${target}讲师"
-                if [ ${#cids[@]} -eq 0 ]; then
-                    echo "$no_course"
-                    ContinueWithKey
-                    break
-                fi
-                while :; do
-                    read -rp "请输入您想要管理的${target}ID：" cid
-                    [[ "${cids[*]}" =~ "${cid}" ]] && break
-                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
-                done
-
-                AdminManageTeaching
-                break
-                ;;
-
-            0)
-                echo "您选择了${ReturnPrev}"
-                return 0
-                ;;
-            *)
-                echo "您输入的操作$op有误，请输入上面列出的操作"
-                ;;
-            esac
-        done
-    done
-}
-
 function AdminManageStudent() {
+    # 和课程管理逻辑十分相似
     while :; do
         PrintAdmin
         target="$Green学生账户$NoColor"
@@ -1797,6 +1816,7 @@ function AdminManageStudent() {
                 s_name=$(RemoveDanger "$s_name")
                 echo "您的${target}名称为：$s_name"
 
+                # 为了表示对女性的尊重，我们将无法判断为男性的任何情况都设定为女性教师/学生
                 read -rp "请输入新的${target}对应的性别（M/F）：" s_gender
                 [[ $s_gender =~ ^[Mm] ]] && s_gender="M" || s_gender="F"
                 echo "您选择的性别为：$s_gender"
@@ -1830,6 +1850,8 @@ function AdminManageStudent() {
                 sid=$($mysql_prefix -se "$query_insert_student;$query_last_insert_id;")
 
                 query_student_new="$query_student where id=$sid"
+                echo "添加成功……"
+
                 echo "您新添加的$target如下所示"
                 $mysql_prefix -e "$query_student_new;"
                 ContinueWithKey
@@ -1890,6 +1912,9 @@ function AdminManageStudent() {
 
                 echo -e "您的${target}的简介内容为\n$full_string"
 
+                # 由于密码比较敏感，我们会首先询问用户是否需要真的修改
+                # 这里我们与先前提到的内容对应，使用sha256sum来储存密码以提高安全性
+                # 即使数据库遭到泄露，用户也无法直接获得密码
                 read -rp "是否要修改${target}密码（Y/n）：" need_change_pw
                 if [[ $need_change_pw =~ ^[1Yy] ]]; then
                     while :; do
@@ -1913,7 +1938,7 @@ function AdminManageStudent() {
 
                 $mysql_prefix -e "$query_change_student;"
 
-                echo "$target修改成功..."
+                echo "修改成功..."
                 query_student_new="$query_student where id=$sid"
                 echo "您新添加的$target如下所示"
                 $mysql_prefix -e "$query_student_new;"
@@ -1934,6 +1959,7 @@ function AdminManageStudent() {
 }
 
 function AdminManageTeacher() {
+    # 与管理同学的逻辑十分相似
     while :; do
         PrintAdmin
         target="$Green教师账户$NoColor"
@@ -1999,6 +2025,7 @@ function AdminManageTeacher() {
                 query_last_insert_id="select last_insert_id()"
 
                 tid=$($mysql_prefix -se "$query_insert_teacher;$query_last_insert_id;")
+                echo "添加成功……"
 
                 query_teacher_new="$query_teacher where id=$tid"
                 echo "您新添加的$target如下所示"
@@ -2047,6 +2074,7 @@ function AdminManageTeacher() {
                 t_name=$(RemoveDanger "$t_name")
                 echo "您的${target}名称为：$t_name"
 
+                # 为了表示对女性的尊重，我们将无法判断为男性的任何情况都设定为女性教师/学生
                 read -rp "请输入新的${target}对应的性别（M/F）：" t_gender
                 [[ $t_gender =~ ^[Mm] ]] && t_gender="M" || t_gender="F"
                 echo "您选择的性别为：$t_gender"
@@ -2155,6 +2183,9 @@ function AdminManageAdmin() {
                 query_insert_admin="insert into admin(name, password_hash) value (\"$admin_name\", \"$password_hash\")"
                 query_last_insert_id="select last_insert_id()"
                 admid=$($mysql_prefix -se "$query_insert_admin;$query_last_insert_id;")
+
+                echo "添加成功……"
+
                 query_admin_new="select id 管理员账号, name 管理员姓名 from admin where id=$admid"
                 echo "您新添加的$target如下所示"
                 $mysql_prefix -e "$query_admin_new;"
@@ -2162,6 +2193,7 @@ function AdminManageAdmin() {
                 break
                 ;;
             2)
+                # 各类小操作的逻辑都十分相似
                 echo "您选择了删除${target}"
                 if [ ${#admids[@]} -eq 0 ]; then
                     echo "$no_admin"
