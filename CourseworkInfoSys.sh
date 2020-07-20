@@ -19,8 +19,9 @@ function DefineColor() {
     Blue=$(tput setaf 4)
     Magenta=$(tput setaf 5)
     Cyan=$(tput setaf 6)
+    Bold=$(tput bold)
     NoColor=$(tput sgr0)
-    ReturnPrev="$Yellow返回上一级$NoColor"
+    ReturnPrev="$Yellow$Bold返回上一级$NoColor"
 }
 
 function DefineMySQL() {
@@ -244,7 +245,7 @@ EOF
 function ContinueWithKey() {
     # 按任意键继续...
     # 有的时候我们会在清空屏幕之前打印一些信息，我们决定给用户一些时间来看看这些信息是什么
-    read -n 1 -rp "$Blue按任意键继续...$NoColor" -s
+    read -n 1 -rp "$Blue$Bold按任意键继续...$NoColor" -s
 }
 
 function StudentUI() {
@@ -1470,23 +1471,15 @@ function TeacherManageHomework() {
     done
 }
 
-# todo: fuck it.
 function AdminUI() {
     # 同样的，我们使用默认值以方便调试
     # me_admin_id=${1:-"1"}
     name=${2:-"root"}
 
-    no_course="$Red系统中没有课程$NoColor"
-    query_cid="select id from course"
-
-    query_course="select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course"
-
     while :; do    # 页面主循环
         PrintAdmin # 打印ADMIN BANNER提示用户
 
         echo "$name管理员您好，欢迎来到现代作业管理系统（Modern Coursework Manage System）"
-
-        cids=($($mysql_prefix -se "$query_cid;"))
 
         if [ ${#sids[@]} -gt 0 ]; then
             echo "系统中已有的学生账户如下所示："
@@ -1534,10 +1527,141 @@ function AdminUI() {
                 ;;
             4)
                 echo "您选择了管理课程列表"
+                AdminManageCourse
                 break
                 ;;
             5)
                 echo "您选择了管理课程讲师"
+                break
+                ;;
+            0)
+                echo "您选择了${ReturnPrev}"
+                return 0
+                ;;
+            *)
+                echo "您输入的操作$op有误，请输入上面列出的操作"
+                ;;
+            esac
+        done
+    done
+}
+
+function AdminManageCourse() {
+    while :; do
+        PrintAdmin
+        target="$Green课程$NoColor"
+        no_course="$Red系统中没有课程$NoColor"
+        query_cid="select id from course"
+        query_course="select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course"
+        cids=($($mysql_prefix -se "$query_cid;"))
+
+        if [ ${#cids[@]} -gt 0 ]; then
+            echo "系统中已有的${target}如下所示："
+            $mysql_prefix -e "$query_course;"
+        else
+            echo "$no_course"
+        fi
+        echo "您可以进行的操作有："
+        echo "1. 添加${target}"
+        echo "2. 删除${target}"
+        echo "3. 修改${target}"
+        echo "0. ${ReturnPrev}"
+        while :; do
+            read -rp "请输入您想要进行的操作：" op
+            case $op in
+            1)
+                echo "您选择了添加${target}"
+
+                read -rp "请输入您想要的新${target}中文名称：" c_name_zh
+                c_name_zh=$(RemoveDanger "$c_name_zh")
+                echo "您的${target}名称为：$c_name_zh"
+
+                read -rp "请输入您想要的新${target}英文名称：" c_name_en
+                c_name_en=$(RemoveDanger "$c_name_en")
+                echo "您的${target}名称为：$c_name_en"
+
+                echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+                full_string=$(RemoveDanger "$full_string")
+                echo -e "您的${target}的简介内容为\n$full_string"
+
+                query_insert_course="insert into course(name_zh, name_en, brief) value (\"$c_name_zh\",\"$c_name_en\",\"$full_string\")"
+                query_last_insert_id="select last_insert_id()"
+
+                sid=$($mysql_prefix -se "$query_insert_course;$query_last_insert_id;")
+
+                query_course_new="$query_course where id=$sid"
+                echo "您新添加的$target如下所示"
+                $mysql_prefix -e "$query_course_new;"
+                ContinueWithKey
+                break
+                ;;
+            2)
+                echo "您选择了删除${target}"
+                if [ ${#cids[@]} -eq 0 ]; then
+                    echo "$no_course"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要删除的${target}ID：" cid
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
+                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
+                done
+                echo "您选择了将下列$target从课程名单中移除，$Red注意：其所有相关信息都会丢失：$NoColor："
+                query_course_info="$query_course where id=$cid"
+                $mysql_prefix -e "$query_course_info;"
+
+                # 类似的，给老师一个确认的机会
+                read -rp "是否要移除（Y/n）：" need_delete
+                if [[ $need_delete =~ ^[1Yy] ]]; then
+                    query_delete_course="delete from course where id=$cid"
+                    $mysql_prefix -e "$query_delete_course"
+                fi
+                break
+                ;;
+            3)
+                echo "您选择了修改${target}"
+                if [ ${#cids[@]} -eq 0 ]; then
+                    echo "$no_course"
+                    ContinueWithKey
+                    break
+                fi
+                while :; do
+                    read -rp "请输入您想要修改的${target}ID：" cid
+                    [[ "${cids[*]}" =~ "${cid}" ]] && break
+                    echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
+                done
+
+                read -rp "请输入您想要的新${target}中文名称：" c_name_zh
+                c_name_zh=$(RemoveDanger "$c_name_zh")
+                echo "您的${target}名称为：$c_name_zh"
+
+                read -rp "请输入您想要的新${target}英文名称：" c_name_en
+                c_name_en=$(RemoveDanger "$c_name_en")
+                echo "您的${target}名称为：$c_name_en"
+
+                echo "请输入${target}的简介内容，以EOF结尾（换行后Ctrl+D）"
+                full_string=""
+                while read -r temp; do
+                    full_string+="$temp"$'\n'
+                done
+                full_string=$(RemoveDanger "$full_string")
+                echo -e "您的${target}的简介内容为\n$full_string"
+
+                query_change_course="update course set name_zh=\"$c_name_zh\", name_en=\"$c_name_en\", brief=\"$full_string\" where id=$cid"
+
+                $mysql_prefix -e "$query_change_course;"
+
+                echo "$target修改成功..."
+                query_course_new="$query_course where id=$cid"
+                echo "您新添加的$target如下所示"
+                $mysql_prefix -e "$query_course_new;"
+                ContinueWithKey
+
                 break
                 ;;
             0)
@@ -1632,7 +1756,7 @@ function AdminManageStudent() {
                     [[ "${sids[*]}" =~ "${sid}" ]] && break
                     echo "您输入的${target}ID$sid有误，请输入上表中列举出的某个${target}ID"
                 done
-                echo "您选择了将下列$target从课程名单中移除："
+                echo "您选择了将下列$target从系统中中移除，$Red注意：其所有相关信息都会丢失：$NoColor"
                 query_student_info="$query_student where id=$sid"
                 $mysql_prefix -e "$query_student_info;"
 
@@ -1698,7 +1822,7 @@ function AdminManageStudent() {
 
                 $mysql_prefix -e "$query_change_student;"
 
-                echo "教师账户修改成功..."
+                echo "$target修改成功..."
                 query_student_new="$query_student where id=$sid"
                 echo "您新添加的$target如下所示"
                 $mysql_prefix -e "$query_student_new;"
@@ -1803,7 +1927,7 @@ function AdminManageTeacher() {
                     [[ "${tids[*]}" =~ "${tid}" ]] && break
                     echo "您输入的${target}ID$tid有误，请输入上表中列举出的某个${target}ID"
                 done
-                echo "您选择了将下列$target从课程名单中移除："
+                echo "您选择了将下列$target从课程名单中移除，$Red注意：其所有相关信息都会丢失：$NoColor："
                 query_teacher_info="$query_teacher where id=$tid"
                 $mysql_prefix -e "$query_teacher_info;"
 
