@@ -1449,62 +1449,10 @@ function TeacherManageHomework() {
                 query_finish="select stu.id 学生学号, stu.name 学生姓名, if(count(sub.id)>0,\"是\",\"否\") 是否完成, count(sub.id) 创建的提交数目 from (select * from submission where hid=$hid) sub right join (select * from student where id in ($query_sid)) stu on sub.sid=stu.id group by stu.id"
 
                 $mysql_prefix -e "$query_finish"
-
-                # 当学习某门课的学生过多，我们可以单独检查他们的作业完成情况
-                while :; do
-                    read -rp "请输入您是否需要查询完成情况（Y/n）：" check_finish
-                    if [[ $check_finish =~ ^[1Yy] ]]; then
-                        read -rp "请输入您要查询完成情况的学号：" sid
-                        query_finish_sid="$query_finish having stu.id=$sid"
-                        $mysql_prefix -e "$query_finish_sid"
-
-                        # subid: submission_id：提交ID
-                        query_subids="select id from submission where sid=$sid and hid=$hid"
-                        query_subs="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id in ($query_subids)"
-
-                        subids=($($mysql_prefix -se "$query_subids;"))
-                        if [ ${#subids[@]} -gt 0 ]; then
-                            echo "本学生在本作业/实验下创建的提交如下所示"
-                            $mysql_prefix -e "$query_subs;"
-                        else
-                            echo "$Red本学生还没有在该作业上发布提交$NoColor"
-                            continue
-                            # 这里不可调用break，会直接退出此界面
-                        fi
-
-                        while : ;do
-                            # 几乎相同的逻辑
-                            if [ ${#subids[@]} -eq 0 ]; then
-                                echo "$Red本学生还没有在该作业上发布提交$NoColor"
-                                ContinueWithKey
-                                break
-                            fi
-
-                            while :; do
-                                read -rp "请输入您想要查询的作业/实验提交ID：" subid
-                                [[ "${subids[*]}" =~ "${subid}" ]] && break
-                                echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
-                            done
-
-                            echo "您选择查询的提交为："
-                            query_course_submission="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id=$subid"
-                            query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$subid"
-                            $mysql_prefix -e "$query_course_submission;"
-
-                            # 没有了添加附件的过程，我们通过调用MySQL接口来进行手动计数
-                            query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$subid"
-                            attachment_count=$($mysql_prefix -se "$query_count_attachment")
-                            PrintAttachment
-
-                            # 同样的，打印信息后不直接返回而是继续进行调用
-                            ContinueWithKey
-                            break
-                        done
-                    else
-                        break
-                    fi
-                done
-
+                read -rp "请输入您是否单独查询完成情况（Y/n）：" check_finish
+                if [[ $check_finish =~ ^[1Yy] ]]; then
+                    CheckFinishYet
+                fi
                 break
                 ;;
             0)
@@ -1515,6 +1463,64 @@ function TeacherManageHomework() {
                 echo "您输入的操作$op有误，请输入上面列出的操作"
                 ;;
             esac
+        done
+    done
+}
+
+function CheckFinishYet() {
+    # 当学习某门课的学生过多，我们可以单独检查他们的作业完成情况
+    while :; do
+        PrintTeacher
+        query_sid="select sid from take where cid=$cid"
+        query_finish="select stu.id 学生学号, stu.name 学生姓名, if(count(sub.id)>0,\"是\",\"否\") 是否完成, count(sub.id) 创建的提交数目 from (select * from submission where hid=$hid) sub right join (select * from student where id in ($query_sid)) stu on sub.sid=stu.id group by stu.id"
+        sids=($($mysql_prefix -se "$query_sid;"))
+        $mysql_prefix -e "$query_finish"
+        while :; do
+            if [[ $check_finish =~ ^[1Yy] ]]; then
+                while :; do
+                    read -rp "请输入您想要查询完成情况的学号：" sid
+                    [[ "${sids[*]}" =~ "${sid}" ]] && break
+                    echo "您输入的学号$sid有误，请输入上表中列举出的某个$target的学号"
+                done
+                query_finish_sid="$query_finish having stu.id=$sid"
+                $mysql_prefix -e "$query_finish_sid"
+
+                # subid: submission_id：提交ID
+                query_subids="select id from submission where sid=$sid and hid=$hid"
+                query_subs="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id in ($query_subids)"
+
+                subids=($($mysql_prefix -se "$query_subids;"))
+                if [ ${#subids[@]} -gt 0 ]; then
+                    echo "本学生在本作业/实验下创建的提交如下所示"
+                    $mysql_prefix -e "$query_subs;"
+                else
+                    echo "$Red本学生还没有在该作业上发布提交$NoColor"
+                    read -rp "请输入您是否单独查询完成情况（Y/n）：" check_finish
+                    break
+                    # 这里不可调用break，会直接退出此界面
+                fi
+
+                while :; do
+                    read -rp "请输入您想要查询的作业/实验提交ID：" subid
+                    [[ "${subids[*]}" =~ "${subid}" ]] && break
+                    echo "您输入的提交ID$subid有误，请输入上表中列举出的某个提交ID"
+                done
+
+                echo "您选择查询的提交为："
+                query_course_submission="select id 提交ID, submission_text 提交内容, creation_time 创建时间, latest_modification_time 最近修改时间 from submission where id=$subid"
+                query_attachment="select A.id 附件ID, A.name 附件名称, A.url 附件URL from attachment A join attach_to T on A.id=T.aid where T.uid=$subid"
+                $mysql_prefix -e "$query_course_submission;"
+
+                # 没有了添加附件的过程，我们通过调用MySQL接口来进行手动计数
+                query_count_attachment="select count(1) from attachment join attach_to on id=aid where uid=$subid"
+                attachment_count=$($mysql_prefix -se "$query_count_attachment")
+                PrintAttachment
+            else
+                return 0
+            fi
+
+            read -rp "请输入您是否单独查询完成情况（Y/n）：" check_finish
+            break
         done
     done
 }
