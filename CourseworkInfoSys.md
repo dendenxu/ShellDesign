@@ -311,7 +311,7 @@ function TeacherOPCourse() {
         ##############################################
         PrintTeacher # 打印Banner
 
-        target="$Green课程$NoColor" # 此时的目标字符串为：课程，用绿色显示以方便辨认
+        target="${Green}课程${NoColor}" # 此时的目标字符串为：课程，用绿色显示以方便辨认
 
 
         ##############################################
@@ -459,9 +459,9 @@ done
   ```bash
   # 这些变量打印出来都是有颜色或重量的
   # 每次刷新页面时都要清空目标变量
-  target="$Green$Bold课程实验/作业$NoColor"
+  target="${Green}${Bold}课程实验/作业${NoColor}"
   # 内容未发布提示信息
-  no_publication="$Red本课程还没有已发布的$NoColor${target}"
+  no_publication="${Red}本课程还没有已发布的${NoColor}${target}"
   
   echo "Target is $target"
   echo "No publication infomation is $no_publication"
@@ -493,7 +493,7 @@ done
   function ContinueWithKey() {
       # 按任意键继续...
       # 有的时候我们会在清空屏幕之前打印一些信息，我们决定给用户一些时间来看看这些信息是什么
-      read -n 1 -rp "$Blue$Bold按任意键继续...$NoColor" -s
+      read -n 1 -rp "${Blue}${Bold}按任意键继续...${NoColor}" -s
   }
   ```
 
@@ -866,7 +866,7 @@ mysql -uroot -p < tables.sql
       Cyan=$(tput setaf 6)
       Bold=$(tput bold)
       NoColor=$(tput sgr0)
-      ReturnPrev="$Yellow$Bold返回上一级$NoColor"
+      ReturnPrev="${Yellow}${Bold}返回上一级${NoColor}"
   }
   ```
 
@@ -1246,7 +1246,7 @@ function LoginInUI() {
           $mysql_prefix -e "$query_attachment;"
       else
           # 我们是用红色显示来让用户快速定位这一提示
-          echo "$Red本${target}$Red还没有附件$NoColor"
+          echo "${Red}本${target}${Red}还没有附件${NoColor}"
       fi
   }
   ```
@@ -1310,7 +1310,7 @@ function LoginInUI() {
   function ContinueWithKey() {
       # 按任意键继续...
       # 有的时候我们会在清空屏幕之前打印一些信息，我们决定给用户一些时间来看看这些信息是什么
-      read -n 1 -rp "$Blue$Bold按任意键继续...$NoColor" -s
+      read -n 1 -rp "${Blue}${Bold}按任意键继续...${NoColor}" -s
   }
   ```
 
@@ -1363,7 +1363,7 @@ function DefineColor() {
     Cyan=$(tput setaf 6)
     Bold=$(tput bold)
     NoColor=$(tput sgr0)
-    ReturnPrev="$Yellow$Bold返回上一级$NoColor"
+    ReturnPrev="${Yellow}${Bold}返回上一级${NoColor}"
 }
 
 function DefineMySQL() {
@@ -1594,7 +1594,7 @@ EOF
 function ContinueWithKey() {
     # 按任意键继续...
     # 有的时候我们会在清空屏幕之前打印一些信息，我们决定给用户一些时间来看看这些信息是什么
-    read -n 1 -rp "$Blue$Bold按任意键继续...$NoColor" -s
+    read -n 1 -rp "${Blue}${Bold}按任意键继续...${NoColor}" -s
 }
 
 function StudentUI() {
@@ -1605,7 +1605,7 @@ function StudentUI() {
         PrintStudent # 打印Banner
 
         # 无内容提示信息
-        no_publication="$Red您本学期没有课程$NoColor"
+        no_publication="${Red}您本学期没有课程${NoColor}"
 
         # 为了方便复用和嵌套，我们将所有的SQL查询语句存储在字符串变量中（容易遭到SQL Injection攻击，后面会提到如何防御）
         # 注意在每一次事件循环后我们都会尽量更新一次查询语句的变量内容（除非此语句是固定的）。
@@ -1729,9 +1729,9 @@ function StudentOPCourse() {
 
         # target代指我们想要管理的内容的字符串，可以是课程或课程实验/作业。用于格式化打印
         # 每次刷新页面时都要清空
-        target="$Green课程实验/作业$NoColor"
+        target="${Green}课程实验/作业${NoColor}"
         # 内容未发布提示信息
-        no_publication="$Red本课程还没有已发布的$NoColor${target}"
+        no_publication="${Red}本课程还没有已发布的${NoColor}${target}"
 
         # 课程教师查询语句
         query_tid="select tid from teach where cid=$cid"
@@ -1809,7 +1809,7 @@ function PrintAttachment() {
         $mysql_prefix -e "$query_attachment;"
     else
         # 我们是用红色显示来让用户快速定位这一提示
-        echo "$Red本${target}$Red还没有附件$NoColor"
+        echo "${Red}本${target}${Red}还没有附件${NoColor}"
     fi
 }
 
@@ -1818,11 +1818,11 @@ function StudentManageSubmission() {
         PrintStudent
 
         # "提交"的上一级为："课程作业/实验"
-        upper="$Green课程作业/实验$NoColor"
-        target="$upper$Green提交$NoColor"
+        upper="${Green}课程作业/实验${NoColor}"
+        target="$upper${Green}提交${NoColor}"
 
         # 用红色显示的没有提交的信息，方便用户定位
-        no_publication="$Red您在本$NoColor$upper$Red下还没有$NoColor${target}"
+        no_publication="${Red}您在本${NoColor}$upper${Red}下还没有${NoColor}${target}"
 
         echo "您选择了修改以下的$upper："
         query_course_homework="select id \`作业/实验ID\`, intro \`作业/实验简介\`, creation_time 创建时间, end_time 截止时间 from homework where id=$hid"
@@ -1855,7 +1855,7 @@ function StudentManageSubmission() {
         query_end_time="select unix_timestamp(end_time) from homework where id=$hid"
         end_time=$($mysql_prefix -se "$query_end_time;")
         if [ "$end_time" -lt "$(date +%s)" ]; then
-            echo "$Red本作业已经截止提交$NoColor"
+            echo "${Red}本作业已经截止提交${NoColor}"
             # ContinueWithKey
             # break
         fi
@@ -1872,7 +1872,7 @@ function StudentManageSubmission() {
             1)
                 echo "您选择了发布新的${target}"
                 if [ "$end_time" -lt "$(date +%s)" ]; then
-                    echo "$Red本作业已经截止提交$NoColor"
+                    echo "${Red}本作业已经截止提交${NoColor}"
                     ContinueWithKey
                     break
                 fi
@@ -1955,7 +1955,7 @@ function StudentManageSubmission() {
             2)
                 echo "您选择了删除已发布的${target}"
                 if [ "$end_time" -lt "$(date +%s)" ]; then
-                    echo "$Red本作业已经截止提交$NoColor"
+                    echo "${Red}本作业已经截止提交${NoColor}"
                     ContinueWithKey
                     break
                 fi
@@ -1982,7 +1982,7 @@ function StudentManageSubmission() {
             3)
                 echo "您选择了修改已发布的${target}"
                 if [ "$end_time" -lt "$(date +%s)" ]; then
-                    echo "$Red本作业已经截止提交$NoColor"
+                    echo "${Red}本作业已经截止提交${NoColor}"
                     ContinueWithKey
                     break
                 fi
@@ -2103,7 +2103,7 @@ function TeacherUI() {
     while :; do      # 页面主循环
         PrintTeacher # 打印TEACHER BANNER提示用户
 
-        no_publication="$Red您本学期没有课程$NoColor"
+        no_publication="${Red}您本学期没有课程${NoColor}"
         query_id="select cid from teach where tid=$tid"
         query_course="select id 课程号, name_zh 中文名称, name_en 英文名称 from course where id in ($query_id)"
 
@@ -2158,7 +2158,7 @@ function TeacherOPCourse() {
     while :; do      # 课程操作UI主循环
         PrintTeacher # 打印Banner
 
-        target="$Green课程$NoColor" # 此时的目标字符串为：课程，用绿色显示以方便辨认
+        target="${Green}课程${NoColor}" # 此时的目标字符串为：课程，用绿色显示以方便辨认
         query_tid="select tid from teach where cid=$cid"
         query_teacher="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称, brief 简介 from teacher where id in ($query_tid)"
 
@@ -2218,8 +2218,8 @@ function TeacherManageCourse() {
     while :; do
         PrintTeacher
 
-        target1="$Green课程公告$NoColor"
-        target2="$Green课程简介$NoColor"
+        target1="${Green}课程公告${NoColor}"
+        target2="${Green}课程简介${NoColor}"
         echo "您可以进行的操作有："
         echo "1. 管理课程$target1"
         echo "2. 修改课程$target2"
@@ -2252,7 +2252,7 @@ function TeacherManageCourse() {
 function TeacherManageCourseBrief() {
     # 管理课程简介内容
     # 因为课程简介只有一个，用户进入这一阶段就一定是为了修改它，因此这一界面没有任何重复性的提示信息
-    target="$Green课程简介$NoColor"
+    target="${Green}课程简介${NoColor}"
     echo "${target}的原内容为"
     $mysql_prefix -e "select brief 课程简介 from course where id=$cid"
 
@@ -2282,8 +2282,8 @@ function TeacherManageCourseInfo() {
     while :; do
         PrintTeacher
 
-        target="$Green课程公告$NoColor"
-        no_publication="$Red本课程没有已发布的$NoColor${target}"
+        target="${Green}课程公告${NoColor}"
+        no_publication="${Red}本课程没有已发布的${NoColor}${target}"
 
         query_iid="select id from info where cid=$cid"
         query_info="select id 公告ID, release_time 公告发布时间, content 公告内容 from info where cid=$cid"
@@ -2484,8 +2484,8 @@ function TeacherManageStudent() {
     # 添加/删除到课程等
     while :; do
         PrintTeacher # 打印Banner
-        target="$Green学生$NoColor"
-        no_publication="$Red没有$NoColor$target$Red选上这门课$NoColor"
+        target="${Green}学生${NoColor}"
+        no_publication="${Red}没有${NoColor}$target${Red}选上这门课${NoColor}"
 
         # 查询已经选上课的同学们
         query_sid="select sid from take where cid=$cid"
@@ -2588,8 +2588,8 @@ function TeacherManageHomework() {
     while :; do
         PrintTeacher
 
-        target="$Green课程作业/实验$NoColor"
-        no_publication="$Red本课程还没有已发布的$NoColor$target"
+        target="${Green}课程作业/实验${NoColor}"
+        no_publication="${Red}本课程还没有已发布的${NoColor}$target"
 
         query_hid="select id from homework where cid=$cid"
         query_hw="select id 作业ID, intro 作业简介, creation_time 作业发布时间, end_time 作业截止时间 from homework where cid=$cid"
@@ -2838,7 +2838,7 @@ function CheckFinishYet() {
                     echo "本学生在本作业/实验下创建的提交如下所示"
                     $mysql_prefix -e "$query_subs;"
                 else
-                    echo "$Red本学生还没有在该作业上发布提交$NoColor"
+                    echo "${Red}本学生还没有在该作业上发布提交${NoColor}"
                     read -rp "请输入您是否单独查询完成情况（Y/n）：" check_finish
                     break
                     # 这里不可调用break，会直接退出此界面
@@ -2933,8 +2933,8 @@ function AdminManageCourse() {
     # mark: 没有C++等语言的面向对象特性，这种复杂逻辑的设计其实是极为困难的，或许Shell语言的目的本身就不是如此吧
     while :; do
         PrintAdmin
-        target="$Green课程$NoColor"
-        no_course="$Red系统中没有课程$NoColor"
+        target="${Green}课程${NoColor}"
+        no_course="${Red}系统中没有课程${NoColor}"
         query_cid="select id from course"
         query_course="select id 课程号, name_zh 中文名称, name_en 英文名称, brief 课程简介 from course"
         cids=($($mysql_prefix -se "$query_cid;"))
@@ -3002,7 +3002,7 @@ function AdminManageCourse() {
                     [[ "${cids[*]}" =~ "${cid}" ]] && break
                     echo "您输入的${target}ID$cid有误，请输入上表中列举出的某个${target}ID"
                 done
-                echo "您选择了将下列$target从课程名单中移除，$Red注意：其所有相关信息都会丢失：$NoColor："
+                echo "您选择了将下列$target从课程名单中移除，${Red}注意：其所有相关信息都会丢失：${NoColor}："
                 query_course_info="$query_course where id=$cid"
                 $mysql_prefix -e "$query_course_info;"
 
@@ -3087,8 +3087,8 @@ function AdminManageCourse() {
 function AdminManageTeaching() {
     while :; do
         PrintAdmin
-        target="$Green教师$NoColor"
-        no_teacher="$Red没有教师教授这门课$NoColor"
+        target="${Green}教师${NoColor}"
+        no_teacher="${Red}没有教师教授这门课${NoColor}"
 
         query_tid="select tid from teach where cid=$cid"
         query_teacher_basic="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称, brief 简介 from teacher"
@@ -3184,8 +3184,8 @@ function AdminManageStudent() {
     # 和课程管理逻辑十分相似
     while :; do
         PrintAdmin
-        target="$Green学生账户$NoColor"
-        no_student="$Red系统中没有学生$NoColor"
+        target="${Green}学生账户${NoColor}"
+        no_student="${Red}系统中没有学生${NoColor}"
         query_sid="select id from student"
         query_student="select id 学生学号, name 学生姓名, if(gender='F', \"女\", \"男\") 性别, enroll_time 录取时间, brief 简介 from student"
         sids=($($mysql_prefix -se "$query_sid;"))
@@ -3264,7 +3264,7 @@ function AdminManageStudent() {
                     [[ "${sids[*]}" =~ "${sid}" ]] && break
                     echo "您输入的${target}ID$sid有误，请输入上表中列举出的某个${target}ID"
                 done
-                echo "您选择了将下列$target从系统中中移除，$Red注意：其所有相关信息都会丢失：$NoColor"
+                echo "您选择了将下列$target从系统中中移除，${Red}注意：其所有相关信息都会丢失：${NoColor}"
                 query_student_info="$query_student where id=$sid"
                 $mysql_prefix -e "$query_student_info;"
 
@@ -3357,8 +3357,8 @@ function AdminManageTeacher() {
     # 与管理同学的逻辑十分相似
     while :; do
         PrintAdmin
-        target="$Green教师账户$NoColor"
-        no_teacher="$Red系统中没有教师$NoColor"
+        target="${Green}教师账户${NoColor}"
+        no_teacher="${Red}系统中没有教师${NoColor}"
 
         query_tid="select id from teacher"
         query_teacher="select id 教师工号, name 教师姓名, if(gender='F', \"女\", \"男\") 性别, registration_time 注册时间, title 职称, brief 简介 from teacher"
@@ -3440,7 +3440,7 @@ function AdminManageTeacher() {
                     [[ "${tids[*]}" =~ "${tid}" ]] && break
                     echo "您输入的${target}ID$tid有误，请输入上表中列举出的某个${target}ID"
                 done
-                echo "您选择了将下列$target从课程名单中移除，$Red注意：其所有相关信息都会丢失：$NoColor："
+                echo "您选择了将下列$target从课程名单中移除，${Red}注意：其所有相关信息都会丢失：${NoColor}："
                 query_teacher_info="$query_teacher where id=$tid"
                 $mysql_prefix -e "$query_teacher_info;"
 
@@ -3534,8 +3534,8 @@ function AdminManageTeacher() {
 function AdminManageAdmin() {
     while :; do
         PrintAdmin
-        target="$Green管理员账户$NoColor"
-        no_admin="$Red系统中没有管理员$NoColor"
+        target="${Green}管理员账户${NoColor}"
+        no_admin="${Red}系统中没有管理员${NoColor}"
 
         query_admid="select id from admin"
         query_admin="select id 管理员账号, name 管理员姓名 from admin"
