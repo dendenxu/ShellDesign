@@ -313,7 +313,7 @@ class MyShell:
 
         try:
             commands = self.parse(command)
-            result = ""
+            result = None # so that the first piping is directly from stdin
             for cidx, command in enumerate(commands):
                 result = self.execute(command, pipe=result)
                 # log.debug(f"Getting result: {COLOR.BOLD(result)}")
@@ -337,9 +337,8 @@ class MyShell:
             if e.errors["type"] == "redi_in":
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for input. {e}")
             elif e.errors["type"] == "redi_out":
-                # if this exception is raised here, output must being appended to a file
                 if e.errors["redi_append"]:
-                    log.error(f"Cannot find/write to file at command \"{command['exec']}\" of position {cidx} for appending output. {e}")
+                    log.error(f"Cannot find/write to file at command \"{command['exec']}\" of position {cidx} for appending output, check for file permission. {e}")
                 else:
                     log.error(f"Cannot open/write to file at command \"{command['exec']}\" of position {cidx} for updating output, check for file permission. {e}")
             elif e.errors["type"] == "cd":
