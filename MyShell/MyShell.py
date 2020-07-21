@@ -211,13 +211,16 @@ class MyShell:
         to_run = [target] + args
         # to_run = subprocess.list2cmdline(to_run)
         log.debug(f"Runnning in subprocess: {COLOR.BOLD(to_run)}")
+        result = None
         if piping:
             p = subprocess.run(to_run, stdout=PIPE, input=pipe, stderr=STDOUT, encoding="utf-8")
-        else:
-            p = subprocess.run(to_run, stdout=PIPE, stdin=PIPE, stderr=STDOUT, encoding="utf-8")
+            result = str(p.stdout)
             # waits for the process to end
-        result = str(p.stdout)
-        log.debug(f"Raw string content: {COLOR.BOLD(repr(result))}")
+        else:
+            p = subprocess.run(to_run, stdout=None, stdin=None, stderr=STDOUT, encoding="utf-8")
+            # here we're directing the IO straight to the command line, so no result is needed
+            # waits for the process to end
+        log.debug(f"Raw string content: {COLOR.BOLD(result)}")
         return result
 
     def ps1(self):
@@ -328,7 +331,7 @@ class MyShell:
             elif e.errors["type"] == "dir":
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory listing. {e}")
             elif e.errors["type"] == "subshell":
-                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for an external process spawning. {e}")
+                log.error(f"Cannot find an external or internal command \"{command['exec']}\" of position {cidx} for an external process spawning. {e}")
         except QuoteUnmatchedException as e:
             log.debug("We've encountered quote unmatch error...")
             log.debug(f"Exception says: {e}")
