@@ -1,3 +1,4 @@
+#!python
 import os
 import sys
 import pwd
@@ -6,12 +7,14 @@ import subprocess
 import logging
 import coloredlogs
 import datetime
+import readline
 from os import name
 from COLOR import COLOR
 from MyShellException import *
 log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
+
 
 class OnCallDict(dict):
     def __getitem__(self, key):
@@ -94,7 +97,10 @@ class MyShell:
         pass
 
     def builtin_echo(self, pipe="", args=[]):
-        pass
+        result = ""
+        for arg in args:
+            result += f"{arg} "
+        return result
 
     def builtin_exec(self, pipe="", args=[]):
         pass
@@ -160,7 +166,9 @@ class MyShell:
         return os.uname()[1]
 
     def prompt(self):
-        return f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(COLOR.YELLOW(self.ps1()))} "
+        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BLUE(COLOR.BOLD(self.cwd()))} {COLOR.YELLOW(COLOR.BOLD(self.ps1()))} "
+        # log.debug(repr(prompt))
+        return prompt
 
     def execute(self, command, pipe=""):
         log.debug(f"Executing command {COLOR.BOLD(command['exec'])}")
@@ -205,8 +213,13 @@ class MyShell:
         # return result # won't be used anymore
 
     def command_prompt(self):
-        print(self.prompt(), end="")
-        command = input().strip()
+        # strange error if we use input
+        # the input and readline prompt seems to be counting color char as one of the line chars
+        # well it turns out to be a quirk of readline
+        # we've fixed it in COLOR.py
+        command = input(self.prompt()).strip()
+        # print(self.prompt(), end="")
+        # command = input().strip()
         log.debug(f"Getting user input: {COLOR.BOLD(command)}")
 
         try:
@@ -307,6 +320,10 @@ class MyShell:
                     # index should continue to be added in the end
                 else:
                     quote_stack += f" {command[index]}"
+                    if index == len(command)-1:
+                        raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
+                    command = command[0:index] + command[index+1::]
+                    index -= 1  # index should stay the same
             elif command[index].startswith("\""):
                 if command[index].endswith("\"") and len(command[index]) > 1:
                     # getting the inner command
@@ -318,7 +335,7 @@ class MyShell:
                     if index == len(command)-1:
                         raise QuoteUnmatchedException("Cannot match the quote for the last argument")
                     command = command[0:index] + command[index+1::]
-                    index -= 1
+                index -= 1
             elif command[index].startswith("$"):
                 log.debug(f"Trying to get varible {COLOR.BOLD(command[index])}")
                 try:
@@ -332,8 +349,8 @@ class MyShell:
                 # to result in index staying the same
                 index -= 1
             index += 1
-        if quote_stack:
-            raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
+        # if quote_stack:
+        #     raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
         return command
 
     def parsed_clean(self):
@@ -350,7 +367,7 @@ class MyShell:
 
 
 def main():
-    myshell = MyShell({"TEST": "echo $SHELL"})
+    myshell = MyShell({"TEST": "echo \"echo $SHELL\""})
     myshell()
 
 
