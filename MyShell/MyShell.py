@@ -80,6 +80,7 @@ class MyShell:
             target_dir = f"{self.home()}{target_dir[1::]}"
         # the dir might not exist
         try:
+            log.debug(f"Changing CWD to {COLOR.BOLD(target_dir)}")
             os.chdir(target_dir)
         except FileNotFoundError as e:
             raise FileNotFoundException(e, {"type": "cd"})
@@ -93,8 +94,54 @@ class MyShell:
             os.system("clear")
         return ""
 
+    def get_mode(self, permissions):
+        map_string = "rwxrwxrwx"
+        map_empty = "---------"
+        result = "".join([map_string[i] if permissions[i] else map_empty[i] for i in range(9)])
+        return result
+
     def builtin_dir(self, pipe="", args=[]):
-        pass
+        if len(args):
+            if len(args) > 1:
+                log.warn("Are you trying to list content of multiple dirs? We'll only accept the first argument.")
+            target_dir = args[0]
+        else:
+            target_dir = "."
+        if target_dir.startswith("~"):
+            target_dir = f"{self.home()}{target_dir[1::]}"
+        # the dir might not exist
+        try:
+            result = []
+            log.debug(f"Listing dir {COLOR.BOLD(target_dir)}")
+            dir_list = os.listdir(target_dir)
+            for file_name in dir_list:
+                full_name = f"{target_dir}/{file_name}"
+                file_stat = os.stat(full_name)
+                # only getting the lower part
+                file_mode = file_stat.st_mode
+                # time
+                file_time = file_stat.st_mtime
+                # guess we're not using this...
+                type_code = file_mode >> 12
+                permissions = [(file_mode >> bit) & 1 for bit in range(9 - 1, -1, -1)]
+                mode_str = self.get_mode(permissions)
+                time_str = datetime.datetime.fromtimestamp(file_time).strftime("%Y-%m-%d %H:%M:%S")
+                # print(time_str)
+                file_line = f"{mode_str} {time_str} "
+                if os.path.isdir(full_name):
+                    # path is a directory
+                    file_line += COLOR.BLUE(COLOR.BOLD(file_name))
+                else:
+                    # todo: maybe we can recognize char block or others
+                    # this is brutal
+                    if os.access(full_name, os.X_OK):
+                        file_line += COLOR.RED(COLOR.BOLD(file_name))
+                    else:
+                        file_line += COLOR.BOLD(file_name)
+                result.append(file_line)
+            return "\n".join(result)
+        except FileNotFoundError as e:
+            raise FileNotFoundException(e, {"type": "dir"})
 
     def builtin_echo(self, pipe="", args=[]):
         result = ""
@@ -251,6 +298,8 @@ class MyShell:
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for appending output. {e}")
             elif e.errors["type"] == "cd":
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory changing. {e}")
+            elif e.errors["type"] == "dir":
+                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory listing. {e}")
         except QuoteUnmatchedException as e:
             log.debug("We've encountered quote unmatch error...")
             log.debug(f"Exception says: {e}")
