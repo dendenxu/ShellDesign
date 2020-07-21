@@ -45,6 +45,12 @@ class FileNotFoundException(MyShellException):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)
 
+
+class QuoteUnmatchedException(MyShellException):
+    def __init__(self, message, errors=None):
+        super().__init__(message, errors)
+
+
 class COLOR:
     @staticmethod
     def BOLD(string): return f'\33[1m{string}\33[0m'
@@ -124,19 +130,43 @@ class COLOR:
     def WHITEBG2(string): return f'\33[107m{string}\33[0m'
 
 
+class OnCallDict(dict):
+    def __getitem__(self, key):
+        value = super().__getitem__(key)
+        if callable(value):
+            log.debug(f"Accessing callable dict element: {COLOR.BOLD(key)}")
+            return value()
+        else:
+            log.debug(f"Accessing non-callable dict element: {COLOR.BOLD(key)}")
+            return value
+
+
 class MyShell:
-    def __init__(self):
+    def __init__(self, dict_in={}):
         self.builtin_prefix = "builtin_"
 
         builtins = MyShell.__dict__.items()
+        # builtins is a simple dict containing functions (not called on access)
         self.builtins = {}
         for key, value in builtins:
             if key.startswith(self.builtin_prefix):
                 self.builtins[key[len(self.builtin_prefix)::]] = value
-        self.vars = {
-            "shell": __file__[0:-3],
-        }
-        log.debug(f"shell var content: {self.vars['shell']}")
+
+        # we're using callable dict to evaluate values on call
+        self.vars = OnCallDict({
+            "SHELL": __file__[0:-3],
+            "PWD": self.cwd,
+            "HOME": self.home,
+            "LOCATION": self.location,
+            "USER": self.user,
+        })
+
+        for key, value in dict_in.items():
+            # user should not be tampering with the vars already defined
+            # however we decided not to disturb them
+            self.vars[key] = value
+
+        log.debug(f"SHELL var content: {self.vars['SHELL']}")
         log.debug(f"Built in command list: {self.builtins}")
         log.debug("MyShell is instanciated.")
 
@@ -151,12 +181,17 @@ class MyShell:
 
     def builtin_cd(self, pipe="", args=[]):
         if len(args):
-            if len(args)>1:
+            if len(args) > 1:
                 log.warn("Are you trying to cd into multiple dirs? We'll only accept the first argument.")
             target_dir = args[0]
         else:
-            target_dir = self.home
+            # well, we'd like to stay in home
+            # but the teacher says we should pwd instead
+            # target_dir = self.home()
+            return self.builtin_pwd(pipe=pipe, args=args)
 
+        if target_dir.startswith("~"):
+            target_dir = f"{self.home()}{target_dir[1::]}"
         # the dir might not exist
         try:
             os.chdir(target_dir)
@@ -197,7 +232,9 @@ class MyShell:
         pass
 
     def builtin_pwd(self, pipe="", args=[]):
-        return self.cwd
+        cwd = self.cwd()
+        if len(args) and args[0] == "-a" and cwd.startswith("~"):
+            cwd = f"{self.home()}{cwd[1::]}"
 
     def builtin_quit(self, pipe="", args=[]):
         raise ExitException("Quitting...")
@@ -212,7 +249,7 @@ class MyShell:
         pass
 
     def builtin_time(self, pipe="", args=[]):
-        return datetime.datetime.now() 
+        return datetime.datetime.now()
 
     def builtin_unmask(self, pipe="", args=[]):
         pass
@@ -220,32 +257,26 @@ class MyShell:
     def builtin_unset(self, pipe="", args=[]):
         pass
 
-    @property
     def ps1(self):
         return "$"
 
-    @property
     def home(self):
         return os.environ['HOME']
 
-    @property
     def cwd(self):
         cwd = os.getcwd()
-        if cwd.startswith(self.home):
-            cwd = f"~{cwd[len(self.home)::]}"
+        if cwd.startswith(self.home()):
+            cwd = f"~{cwd[len(self.home())::]}"
         return cwd
 
-    @property
     def user(self):
         return pwd.getpwuid(os.getuid())[0]
 
-    @property
     def location(self):
         return os.uname()[1]
 
-    @property
     def prompt(self):
-        return f"{COLOR.BEIGE(self.user+'@'+self.location)} {COLOR.BOLD(COLOR.BLUE(self.cwd))} {COLOR.BOLD(COLOR.YELLOW(self.ps1))} "
+        return f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(COLOR.YELLOW(self.ps1()))} "
 
     def execute(self, command, pipe=""):
         log.debug(f"Executing command {COLOR.BOLD(command['exec'])}")
@@ -263,7 +294,7 @@ class MyShell:
                 # the function open will automatically raise FileNotFoundError
                 f = open(file_path, "r")
             except FileNotFoundError as e:
-                raise FileNotFoundException(e, {"type":"redi_in"})
+                raise FileNotFoundException(e, {"type": "redi_in"})
             pipe = f.read()
 
         result = ""
@@ -273,6 +304,8 @@ class MyShell:
         else:
             log.debug("This is not a builtin command.")
             # todo: finish executing none builtin command
+            # this is a placeholder
+            result = None
 
         if command['redi_out']:
             log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
@@ -288,7 +321,7 @@ class MyShell:
         # return result # won't be used anymore
 
     def command_prompt(self):
-        print(self.prompt, end="")
+        print(self.prompt(), end="")
         command = input().strip()
         log.debug(f"Getting user input: {COLOR.BOLD(command)}")
 
@@ -321,11 +354,16 @@ class MyShell:
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for appending output. {e}")
             elif e.errors["type"] == "cd":
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory changing. {e}")
+        except QuoteUnmatchedException as e:
+            log.debug("We've encountered quote unmatch error...")
+            log.debug(f"Exception says: {e}")
+            # currently the command is still a string
+            log.error(f"Cannot match quote for command \"{command}\". {e}")
         # Returning exit signal
         return False
 
     def parse(self, command):
-        inputs = command.split()  # splitting by whitespace
+        inputs = self.process_dollar_quote(command)  # splitting by whitespace and processing varibles, quotes
         # splitting command of pipling
         commands = []
         command = []
@@ -347,11 +385,11 @@ class MyShell:
                 raise EmptyException(f"Command at position {cidx} is empty", {"pipe": len(commands) > 1})
             parsed_command["pipe_in"] = (cidx > 0)
             parsed_command["pipe_out"] = (cidx != len(commands)-1)
-            parsed_command["exec"] = command[0]
-            command = command[1::]
             index = 0
             while index < len(command):
-                if command[index] == "<":
+                if not index:  # this should a larger priority
+                    parsed_command["exec"] = command[index]
+                elif command[index] == "<":
                     parsed_command["redi_in"] = command[index+1]
                     index += 1
                 elif command[index] == ">":
@@ -361,15 +399,6 @@ class MyShell:
                     parsed_command["redi_out"] = command[index+1]
                     parsed_command["redi_append"] = True
                     index += 1
-                elif command[index].startswith("$"):
-                    log.debug(f"Trying to get varible {COLOR.BOLD(command[index])}")
-                    try:
-                        command[index] = self.vars[command[index][1::]] # getting variable
-                        log.debug(f"Got the varible {COLOR.BOLD(command[index])}")
-                    except KeyError as e:
-                        command[index] = ""
-                        log.debug("Unable to get the varible, assigning empty string")
-                    parsed_command["args"].append(command[index])
                 else:
                     parsed_command["args"].append(command[index])
                 index += 1
@@ -377,6 +406,51 @@ class MyShell:
             parsed_command = self.parsed_clean()
 
         return parsed_commands
+
+    def process_dollar_quote(self, command):
+        # command should already been splitted by word
+        command = command.split()
+        quote_stack = ""
+        index = 0
+        while index < len(command):
+            if quote_stack:
+                if command[index].endswith("\""):
+                    # except the last char
+                    quote_stack += f" {command[index][0:-1]}"
+                    # recursion to process $ and "" in the already processed ""
+                    command[index] = ' '.join(self.process_dollar_quote(quote_stack))
+                    quote_stack = ""
+                    # index should continue to be added in the end
+                else:
+                    quote_stack += f" {command[index]}"
+            elif command[index].startswith("\""):
+                if command[index].endswith("\"") and len(command[index]) > 1:
+                    # getting the inner command
+                    command[index] = command[index][1:-1]
+                else:
+                    log.debug("Trying to match quote...")
+                    quote_stack += f" {command[index][1::]}"
+                    # todo: might be an error
+                    if index == len(command)-1:
+                        raise QuoteUnmatchedException("Cannot match the quote for the last argument")
+                    command = command[0:index] + command[index+1::]
+                    index -= 1
+            elif command[index].startswith("$"):
+                log.debug(f"Trying to get varible {COLOR.BOLD(command[index])}")
+                try:
+                    command[index] = self.vars[command[index][1::]]  # getting variable
+                    log.debug(f"Got the varible {COLOR.BOLD(command[index])}")
+                except KeyError as e:
+                    command[index] = ""
+                    log.debug("Unable to get the varible, assigning empty string")
+                # splitting the expanded command since it might contain some information
+                command = command[0:index] + command[index].split() + command[index + 1::]
+                # to result in index staying the same
+                index -= 1
+            index += 1
+        if quote_stack:
+            raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
+        return command
 
     def parsed_clean(self):
         parsed_command = {}
@@ -392,7 +466,7 @@ class MyShell:
 
 
 def main():
-    myshell = MyShell()
+    myshell = MyShell({"TEST": "echo $SHELL"})
     myshell()
 
 
