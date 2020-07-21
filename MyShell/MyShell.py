@@ -195,7 +195,7 @@ class MyShell:
         pass
 
     def builtin_time(self, pipe="", args=[]):
-        return datetime.datetime.now()
+        return str(datetime.datetime.now())
 
     def builtin_unmask(self, pipe="", args=[]):
         pass
@@ -204,15 +204,12 @@ class MyShell:
         pass
 
     def subshell(self, pipe="", target="", args=[], bg=False, piping=False):
-        # return "PLACEHOLDER"
-        # to_run = [target] + [f"\"{arg}\"" for arg in args]
-        # to_run = " ".join(to_run)
-        # to_run = [to_run]
         to_run = [target] + args
-        # to_run = subprocess.list2cmdline(to_run)
         log.debug(f"Runnning in subprocess: {COLOR.BOLD(to_run)}")
         result = None
         if piping:
+            log.debug("Piping in subprocess...")
+            # log.debug(f"content of pipe varible {COLOR.BOLD(pipe)}")
             p = subprocess.run(to_run, stdout=PIPE, input=pipe, stderr=STDOUT, encoding="utf-8")
             result = str(p.stdout)
             # waits for the process to end
@@ -220,7 +217,7 @@ class MyShell:
             p = subprocess.run(to_run, stdout=None, stdin=None, stderr=STDOUT, encoding="utf-8")
             # here we're directing the IO straight to the command line, so no result is needed
             # waits for the process to end
-        log.debug(f"Raw string content: {COLOR.BOLD(result)}")
+        # log.debug(f"Raw string content: {COLOR.BOLD(result)}")
         return result
 
     def ps1(self):
@@ -249,9 +246,13 @@ class MyShell:
     def execute(self, command, pipe=""):
         log.debug(f"Executing command {COLOR.BOLD(command['exec'])}")
         log.debug(f"Arguments are {COLOR.BOLD(command['args'])}")
-
+        # log.debug(f"Full content of command is {COLOR.BOLD(command)}")
         if command["pipe_in"] and command["redi_in"]:
             raise MultipleInputException("Redirection and pipe are set as input at the same time.")
+        if command["pipe_in"] or command["redi_in"] or command["redi_out"] or command["pipe_out"]:
+            command["piping"] = True
+        else:
+            command["piping"] = False
 
         # to the command itself, it doesn't matter whether the input comes from a pipe or file
         if command["redi_in"]:
@@ -263,22 +264,33 @@ class MyShell:
                 raise FileNotFoundException(e, {"type": "redi_in"})
             pipe = f.read()
 
+
         result = ""
         if command["exec"] in self.builtins.keys():
             log.debug("This is a builtin command.")
             result = self.builtins[command["exec"]](self, pipe=pipe, args=command['args'])
         else:
             log.debug("This is not a builtin command.")
-            # todo: finish executing none builtin command
-            # this is a placeholder
             try:
-                result = self.subshell(pipe, command["exec"], command['args'])
+                result = self.subshell(pipe, command["exec"], command['args'], piping=command["piping"])
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "subshell"})
 
         if command['redi_out']:
             log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
             # todo: write to file
+            if command["redi_append"]:
+                try:
+                    f = open(command["redi_out"], "a")
+                    f.write(result)
+                except FileNotFoundError as e:
+                    raise FileNotFoundException(e, {"type":"redi_out","redi_append":True})
+            else:
+                try:
+                    f = open(command["redi_out"], "w")
+                    f.write(result)
+                except FileNotFoundError as e:
+                    raise FileNotFoundException(e, {"type":"redi_out","redi_append":False})
             return result
 
         if command['pipe_out']:
@@ -304,6 +316,7 @@ class MyShell:
             result = ""
             for cidx, command in enumerate(commands):
                 result = self.execute(command, pipe=result)
+                # log.debug(f"Getting result: {COLOR.BOLD(result)}")
         except ExitException as e:
             log.debug("User is exiting...")
             log.debug(f"Exception says: {e}")
@@ -325,7 +338,10 @@ class MyShell:
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for input. {e}")
             elif e.errors["type"] == "redi_out":
                 # if this exception is raised here, output must being appended to a file
-                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for appending output. {e}")
+                if e.errors["redi_append"]:
+                    log.error(f"Cannot find/write to file at command \"{command['exec']}\" of position {cidx} for appending output. {e}")
+                else:
+                    log.error(f"Cannot open/write to file at command \"{command['exec']}\" of position {cidx} for updating output, check for file permission. {e}")
             elif e.errors["type"] == "cd":
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory changing. {e}")
             elif e.errors["type"] == "dir":
@@ -412,7 +428,6 @@ class MyShell:
                 else:
                     log.debug("Trying to match quote...")
                     quote_stack += f" {command[index][1::]}"
-                    # todo: might be an error
                     if index == len(command)-1:
                         raise QuoteUnmatchedException("Cannot match the quote for the last argument")
                     command = command[0:index] + command[index+1::]
