@@ -111,6 +111,8 @@ function LoginInUI() {
         # 我们会在密码判断前进行账号检测
         while :; do
             read -rp "请输入您的登陆账号：" user_id
+            echo "检查中..."
+            sleep 0.1s # 防止暴力登录攻击，100ms的惩罚时间
 
             # * 防止SQL注入攻击，转义危险字符，详见StudentManageSubmission逻辑
             user_id=$(RemoveDanger "$user_id")
@@ -134,8 +136,11 @@ function LoginInUI() {
             # 所以暂时使用了变量来存储密码
             read -rp "请输入您的密码：" -s password
             echo ""
+
+
             password_hash=$(echo "$password" | sha256sum - | tr -d " -")
             echo "验证中……"
+            sleep 0.1s # 防止暴力登录攻击，100ms的惩罚时间
             [ "$password_hash" = "$right_hash" ] && break
             sleep 1s # 为了防止暴力登录攻击，每次密码错误都要得到1s的时间惩罚
             echo "验证失败，请重新输入"
