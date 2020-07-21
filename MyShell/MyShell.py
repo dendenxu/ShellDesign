@@ -5,6 +5,7 @@ import copy
 import subprocess
 import logging
 import coloredlogs
+import datetime
 from os import name
 log = logging.getLogger(__name__)
 
@@ -40,50 +41,87 @@ class EmptyException(MyShellException):
         super().__init__(message, errors)
 
 
-class Colors:
-    END = '\33[0m'
-    BOLD = '\33[1m'
-    ITALIC = '\33[3m'
-    URL = '\33[4m'
-    BLINK = '\33[5m'
-    BLINK2 = '\33[6m'
-    SELECTED = '\33[7m'
+class FileNotFoundException(MyShellException):
+    def __init__(self, message, errors=None):
+        super().__init__(message, errors)
 
-    BLACK = '\33[30m'
-    RED = '\33[31m'
-    GREEN = '\33[32m'
-    YELLOW = '\33[33m'
-    BLUE = '\33[34m'
-    VIOLET = '\33[35m'
-    BEIGE = '\33[36m'
-    WHITE = '\33[37m'
-
-    BLACKBG = '\33[40m'
-    REDBG = '\33[41m'
-    GREENBG = '\33[42m'
-    YELLOWBG = '\33[43m'
-    BLUEBG = '\33[44m'
-    VIOLETBG = '\33[45m'
-    BEIGEBG = '\33[46m'
-    WHITEBG = '\33[47m'
-
-    GREY = '\33[90m'
-    RED2 = '\33[91m'
-    GREEN2 = '\33[92m'
-    YELLOW2 = '\33[93m'
-    BLUE2 = '\33[94m'
-    VIOLET2 = '\33[95m'
-    BEIGE2 = '\33[96m'
-    WHITE2 = '\33[97m'
-
-    GREYBG = '\33[100m'
-    REDBG2 = '\33[101m'
-    GREENBG2 = '\33[102m'
-    YELLOWBG2 = '\33[103m'
-    BLUEBG2 = '\33[104m'
-    VIOLETBG2 = '\33[105m'
-    BEIGEBG2 = '\33[106m'
-    WHITEBG2 = '\33[107m'
+class COLOR:
+    @staticmethod
+    def BOLD(string): return f'\33[1m{string}\33[0m'
+    @staticmethod
+    def ITALIC(string): return f'\33[3m{string}\33[0m'
+    @staticmethod
+    def URL(string): return f'\33[4m{string}\33[0m'
+    @staticmethod
+    def BLINK(string): return f'\33[5m{string}\33[0m'
+    @staticmethod
+    def BLINK2(string): return f'\33[6m{string}\33[0m'
+    @staticmethod
+    def SELECTED(string): return f'\33[7m{string}\33[0m'
+    @staticmethod
+    def BLACK(string): return f'\33[30m{string}\33[0m'
+    @staticmethod
+    def RED(string): return f'\33[31m{string}\33[0m'
+    @staticmethod
+    def GREEN(string): return f'\33[32m{string}\33[0m'
+    @staticmethod
+    def YELLOW(string): return f'\33[33m{string}\33[0m'
+    @staticmethod
+    def BLUE(string): return f'\33[34m{string}\33[0m'
+    @staticmethod
+    def VIOLET(string): return f'\33[35m{string}\33[0m'
+    @staticmethod
+    def BEIGE(string): return f'\33[36m{string}\33[0m'
+    @staticmethod
+    def WHITE(string): return f'\33[37m{string}\33[0m'
+    @staticmethod
+    def BLACKBG(string): return f'\33[40m{string}\33[0m'
+    @staticmethod
+    def REDBG(string): return f'\33[41m{string}\33[0m'
+    @staticmethod
+    def GREENBG(string): return f'\33[42m{string}\33[0m'
+    @staticmethod
+    def YELLOWBG(string): return f'\33[43m{string}\33[0m'
+    @staticmethod
+    def BLUEBG(string): return f'\33[44m{string}\33[0m'
+    @staticmethod
+    def VIOLETBG(string): return f'\33[45m{string}\33[0m'
+    @staticmethod
+    def BEIGEBG(string): return f'\33[46m{string}\33[0m'
+    @staticmethod
+    def WHITEBG(string): return f'\33[47m{string}\33[0m'
+    @staticmethod
+    def GREY(string): return f'\33[90m{string}\33[0m'
+    @staticmethod
+    def RED2(string): return f'\33[91m{string}\33[0m'
+    @staticmethod
+    def GREEN2(string): return f'\33[92m{string}\33[0m'
+    @staticmethod
+    def YELLOW2(string): return f'\33[93m{string}\33[0m'
+    @staticmethod
+    def BLUE2(string): return f'\33[94m{string}\33[0m'
+    @staticmethod
+    def VIOLET2(string): return f'\33[95m{string}\33[0m'
+    @staticmethod
+    def BEIGE2(string): return f'\33[96m{string}\33[0m'
+    @staticmethod
+    def WHITE2(string): return f'\33[97m{string}\33[0m'
+    @staticmethod
+    def GREYBG(string): return f'\33[100m{string}\33[0m'
+    @staticmethod
+    def REDBG2(string): return f'\33[101m{string}\33[0m'
+    @staticmethod
+    def GREENBG2(string): return f'\33[102m{string}\33[0m'
+    @staticmethod
+    def YELLOWBG2(string): return f'\33[103m{string}\33[0m'
+    @staticmethod
+    def BLUEBG2(string): return f'\33[104m{string}\33[0m'
+    @staticmethod
+    def VIOLETBG2(string): return f'\33[105m{string}\33[0m'
+    @staticmethod
+    def BEIGEBG2(string): return f'\33[106m{string}\33[0m'
+    @staticmethod
+    def WHITEBG2(string): return f'\33[107m{string}\33[0m'
 
 
 class MyShell:
@@ -112,7 +150,18 @@ class MyShell:
         pass
 
     def builtin_cd(self, pipe="", args=[]):
-        pass
+        if len(args):
+            if len(args)>1:
+                log.warn("Are you trying to cd into multiple dirs? We'll only accept the first argument.")
+            target_dir = args[0]
+        else:
+            target_dir = self.home
+
+        # the dir might not exist
+        try:
+            os.chdir(target_dir)
+        except FileNotFoundError as e:
+            raise FileNotFoundException(e, {"type": "cd"})
 
     def builtin_clr(self, pipe="", args=[]):
         # clear the screen
@@ -163,7 +212,7 @@ class MyShell:
         pass
 
     def builtin_time(self, pipe="", args=[]):
-        pass
+        return datetime.datetime.now() 
 
     def builtin_unmask(self, pipe="", args=[]):
         pass
@@ -196,16 +245,26 @@ class MyShell:
 
     @property
     def prompt(self):
-        return f"{Colors.BEIGE}{self.user}@{self.location}{Colors.END} {Colors.BLUE}{self.cwd}{Colors.END} {Colors.BOLD}{Colors.YELLOW}{self.ps1}{Colors.END} "
+        return f"{COLOR.BEIGE(self.user+'@'+self.location)} {COLOR.BOLD(COLOR.BLUE(self.cwd))} {COLOR.BOLD(COLOR.YELLOW(self.ps1))} "
 
     def execute(self, command, pipe=""):
-        log.debug(f"Executing command {Colors.BOLD}{command['exec']}{Colors.END}")
-        log.debug(f"Arguments are {Colors.BOLD}{command['args']}{Colors.END}")
+        log.debug(f"Executing command {COLOR.BOLD(command['exec'])}")
+        log.debug(f"Arguments are {COLOR.BOLD(command['args'])}")
 
         if command["pipe_in"] and command["redi_in"]:
             raise MultipleInputException("Redirection and pipe are set as input at the same time.")
 
         # todo: finish possible redirection from input file
+
+        # to the command itself, it doesn't matter whether the input comes from a pipe or file
+        if command["redi_in"]:
+            file_path = command["redi_in"]
+            try:
+                # the function open will automatically raise FileNotFoundError
+                f = open(file_path, "r")
+            except FileNotFoundError as e:
+                raise FileNotFoundException(e, {"type":"redi_in"})
+            pipe = f.read()
 
         result = ""
         if command["exec"] in self.builtins.keys():
@@ -216,26 +275,27 @@ class MyShell:
             # todo: finish executing none builtin command
 
         if command['redi_out']:
-            log.debug(f"User want to redirect the output to {command['redi_out']}")
+            log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
             # todo: write to file
             return result
-        
+
         if command['pipe_out']:
             log.debug(f"User want to pipe the IO")
             return result
 
-        print(result)
+        if result is not None:
+            print(result)
         # return result # won't be used anymore
 
     def command_prompt(self):
         print(self.prompt, end="")
         command = input().strip()
-        log.debug(f"Getting user input: {Colors.BOLD}{command}{Colors.END}")
+        log.debug(f"Getting user input: {COLOR.BOLD(command)}")
 
         try:
             commands = self.parse(command)
             result = ""
-            for command in commands:
+            for cidx, command in enumerate(commands):
                 result = self.execute(command, pipe=result)
         except ExitException as e:
             log.debug("User is exiting...")
@@ -251,7 +311,17 @@ class MyShell:
             log.debug("Syntax error, user want to use input from pipe and redirection...")
             log.debug(f"Exception says: {e}")
             log.error(f"Cannot handle multiple inputs at the same time. {e}")
-       # Returning exit signal
+        except FileNotFoundException as e:
+            log.debug("IO error, cannot find the file specified")
+            log.debug(f"Exception says: {e}")
+            if e.errors["type"] == "redi_in":
+                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for input. {e}")
+            elif e.errors["type"] == "redi_out":
+                # if this exception is raised here, output must being appended to a file
+                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for appending output. {e}")
+            elif e.errors["type"] == "cd":
+                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory changing. {e}")
+        # Returning exit signal
         return False
 
     def parse(self, command):
@@ -291,6 +361,15 @@ class MyShell:
                     parsed_command["redi_out"] = command[index+1]
                     parsed_command["redi_append"] = True
                     index += 1
+                elif command[index].startswith("$"):
+                    log.debug(f"Trying to get varible {COLOR.BOLD(command[index])}")
+                    try:
+                        command[index] = self.vars[command[index][1::]] # getting variable
+                        log.debug(f"Got the varible {COLOR.BOLD(command[index])}")
+                    except KeyError as e:
+                        command[index] = ""
+                        log.debug("Unable to get the varible, assigning empty string")
+                    parsed_command["args"].append(command[index])
                 else:
                     parsed_command["args"].append(command[index])
                 index += 1
