@@ -3,11 +3,12 @@ import os
 import sys
 import pwd
 import copy
-import subprocess
 import logging
 import coloredlogs
 import datetime
 import readline
+import subprocess
+from subprocess import Popen, PIPE, STDOUT
 from os import name
 from COLOR import COLOR
 from MyShellException import *
@@ -156,7 +157,7 @@ class MyShell:
         raise ExitException("Exitting...")
 
     def builtin_environ(self, pipe="", args=[]):
-        pass
+        return "\n".join([f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars])
 
     def builtin_fg(self, pipe="", args=[]):
         pass
@@ -177,7 +178,15 @@ class MyShell:
         raise ExitException("Quitting...")
 
     def builtin_set(self, pipe="", args=[]):
-        pass
+        # we'd like the user to use the equal sign
+        # and we'd like to treat varibles only as string
+        for arg in args:
+            split = arg.split("=")
+            if len(split) != 2:
+                raise SetPairUnmatchedException(f"Cannot match argument {arg}")
+            key, value = split
+            log.debug(f"Setting \"{key}\" in environment variables to \"{value}\"")
+            self.vars[key] = value
 
     def builtin_shift(self, pipe="", args=[]):
         pass
@@ -193,6 +202,23 @@ class MyShell:
 
     def builtin_unset(self, pipe="", args=[]):
         pass
+
+    def subshell(self, pipe="", target="", args=[], bg=False, piping=False):
+        # return "PLACEHOLDER"
+        # to_run = [target] + [f"\"{arg}\"" for arg in args]
+        # to_run = " ".join(to_run)
+        # to_run = [to_run]
+        to_run = [target] + args
+        # to_run = subprocess.list2cmdline(to_run)
+        log.debug(f"Runnning in subprocess: {COLOR.BOLD(to_run)}")
+        if piping:
+            p = subprocess.run(to_run, stdout=PIPE, input=pipe, stderr=STDOUT, encoding="utf-8")
+        else:
+            p = subprocess.run(to_run, stdout=PIPE, stdin=PIPE, stderr=STDOUT, encoding="utf-8")
+            # waits for the process to end
+        result = str(p.stdout)
+        log.debug(f"Raw string content: {COLOR.BOLD(repr(result))}")
+        return result
 
     def ps1(self):
         return "$"
@@ -224,8 +250,6 @@ class MyShell:
         if command["pipe_in"] and command["redi_in"]:
             raise MultipleInputException("Redirection and pipe are set as input at the same time.")
 
-        # todo: finish possible redirection from input file
-
         # to the command itself, it doesn't matter whether the input comes from a pipe or file
         if command["redi_in"]:
             file_path = command["redi_in"]
@@ -244,7 +268,10 @@ class MyShell:
             log.debug("This is not a builtin command.")
             # todo: finish executing none builtin command
             # this is a placeholder
-            result = "PLACEHOLDER"
+            try:
+                result = self.subshell(pipe, command["exec"], command['args'])
+            except FileNotFoundError as e:
+                raise FileNotFoundException(e, {"type": "subshell"})
 
         if command['redi_out']:
             log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
@@ -256,7 +283,7 @@ class MyShell:
             return result
 
         if result is not None:
-            print(result)
+            print(result, end="" if result.endswith("\n") or not len(result) else "\n")
         # return result # won't be used anymore
 
     def command_prompt(self):
@@ -300,6 +327,8 @@ class MyShell:
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory changing. {e}")
             elif e.errors["type"] == "dir":
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory listing. {e}")
+            elif e.errors["type"] == "subshell":
+                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for an external process spawning. {e}")
         except QuoteUnmatchedException as e:
             log.debug("We've encountered quote unmatch error...")
             log.debug(f"Exception says: {e}")
