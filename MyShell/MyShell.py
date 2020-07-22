@@ -22,7 +22,6 @@ log = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
 
-
 class OnCallDict(dict):
     unsupported = ["HOME", "USER", "LOCATION", "SHELL"]
     reserved = unsupported + ["PATH", "PWD"]
@@ -90,6 +89,7 @@ class MyShell:
         self.job_manager = Manager()
         self.job_counter = Value("i", 0)
         self.jobs = self.job_manager.dict()
+        self.jobs_input = self.job_manager.dict()
 
         for key, value in dict_in.items():
             # user should not be tampering with the vars already defined
@@ -378,7 +378,7 @@ class MyShell:
         return self.run_command(command)
 
     @staticmethod
-    def run_command_wrap(shell, args, jobs):
+    def run_command_wrap(shell, args, jobs, inputs):
         log.debug(f"Wrapper called with {COLOR.BOLD(f'{shell} and {args}')}")
         count = shell.job_counter.value
         with shell.job_counter.get_lock():
@@ -386,7 +386,19 @@ class MyShell:
         jobs[count] = args
 
         shell.run_command(args)
+
         del jobs[count]
+        del inputs[count]
+
+# import sys
+# import multiprocessing
+# def func():
+#     sys.stdin=open(0)
+#     print(sys.stdin)
+#     c = sys.stdin.read(1)
+#     print("Got", c)
+
+# multiprocessing.Process(target=func).start()
 
     @staticmethod
     def clean(arg):
@@ -398,7 +410,7 @@ class MyShell:
             commands, is_bg = self.parse(command)
             if is_bg:
                 # ! changes made in subprocess is totally within the subprocess only
-                p = Process(target=self.run_command_wrap, args=(self, command[0:-1], self.jobs), name=command)
+                p = Process(target=self.run_command_wrap, args=(self, command[0:-1], self.jobs, self.jobs_input), name=command)
                 # self.jobs.append(p)
                 p.start()
                 log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
