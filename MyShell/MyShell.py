@@ -19,6 +19,8 @@ coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
 
 class OnCallDict(dict):
+    unsupported = ["HOME", "USER", "LOCATION", "SHELL"]
+    reserved = unsupported + ["PATH", "PWD"]
     def __getitem__(self, key):
         value = super().__getitem__(key)
         if callable(value):
@@ -29,7 +31,6 @@ class OnCallDict(dict):
             return value
 
     def __setitem__(self, key, value):
-        unsupported = ["HOME", "USER", "LOCATION", "SHELL"]
         if key == "PATH":
             # for whatever reason, set this to a string (environment variables are meant to be strings)
             # here we're actually setting the REAL environ so that user can call stuff more conveniently
@@ -41,10 +42,17 @@ class OnCallDict(dict):
             # ? or should we just set variable
             log.info(f"User set PWD to {COLOR.BOLD(value)}")
             os.chdir(value)
-        elif key in unsupported:
-            log.warning(f"Sorry, we don't currently support setting \"{key}\", included in {COLOR.BOLD(unsupported)}")
+        elif key in OnCallDict.unsupported:
+            log.warning(f"Sorry, we don't currently support setting \"{key}\", included in {COLOR.BOLD(OnCallDict.unsupported)}")
         else:
             super().__setitem__(key, value)
+
+    def __delitem__(self, key):
+        if key in OnCallDict.reserved:
+            log.warning(f"Sorry, we don't currently support deleting \"{key}\", included in {COLOR.BOLD(OnCallDict.reserved)}")
+            raise ReservedKeyException(f"\"{key}\" is reserved, along with {OnCallDict.reserved}")
+        else:
+            super().__delitem__(key)
 
 
 class MyShell:
@@ -228,7 +236,14 @@ class MyShell:
         pass
 
     def builtin_unset(self, pipe="", args=[]):
-        pass
+        keys = []
+        for key in args:
+            try:
+                del self.vars[key]
+            except (KeyError, ReservedKeyException):
+                keys.append(key)
+        if len(keys):
+            raise UnsetKeyException("Cannot find/unset these keys.", {"keys": keys})
 
     def subshell(self, pipe="", target="", args=[], bg=False, piping=False):
         if not target:
@@ -396,7 +411,12 @@ class MyShell:
             log.debug("We've encountered error in a subprocess")
             log.info(f"Exception says: {e}")
             # currently the command is still a string
-            log.warning(f"Cannot run process successfully command \"{command}\". {e}")
+            log.warning(f"Cannot run process successfully with command \"{command['exec']}\". {e}")
+        except UnsetKeyException as e:
+            log.debug("Exception when unsetting keys")
+            log.info(f"Exception says: {e}")
+            # currently the command is still a string
+            log.warning(f"Cannot unset \"{e.errors['keys']}\" using command \"{command['exec']}\". {e}")
         # Returning exit signal
         return False
 
