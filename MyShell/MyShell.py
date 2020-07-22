@@ -9,9 +9,10 @@ import coloredlogs
 import datetime
 import readline
 import subprocess
+import multiprocessing
 import tempfile
 from subprocess import Popen, PIPE, STDOUT
-from multiprocessing import Process, Queue, Pipe, Pool
+from multiprocessing import Process, Queue, Pipe, Pool, Manager
 from os import name
 from COLOR import COLOR
 from MyShellException import *
@@ -19,15 +20,19 @@ log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
-class IDPool():
+
+class Counter(object):
     def __init__(self):
-        self.values = []
+        self.val = multiprocessing.Value('i', 0)
 
-    def get(self):
-        pass
+    def increment(self, n=1):
+        with self.val.get_lock():
+            self.val.value += n
 
-    def delete(self, value):
-        self.values
+    @property
+    def value(self):
+        return self.val.value
+
 
 class OnCallDict(dict):
     unsupported = ["HOME", "USER", "LOCATION", "SHELL"]
@@ -70,25 +75,6 @@ class OnCallDict(dict):
         else:
             super().__delitem__(key)
 
-    # def __deepcopy__(self, memo):
-    #     getitem = self.__getitem__
-    #     setitem = self.__setitem__
-    #     delitem = self.__delitem__
-    #     deepcopy = self.__deepcopy__
-    #     def getter(self, key): return super().__getitem__(key)
-    #     def setter(self, key, value): super().__setitem__(key, value)
-    #     def deleter(self, key): super().__delitem__(key)
-    #     self.__getitem__ = getter
-    #     self.__setitem__ = setter
-    #     self.__delitem__ = deleter
-    #     self.__deepcopy__ = None
-    #     cp = copy.deepcopy(self, memo)
-    #     self.__getitem__ = getitem
-    #     self.__setitem__ = setitem
-    #     self.__delitem__ = delitem
-    #     self.__deepcopy__ = deepcopy
-    #     return cp
-
 
 class MyShell:
     def __init__(self, dict_in={}):
@@ -112,7 +98,9 @@ class MyShell:
             "PS1": "$",
         })
 
-        self.jobs = []
+        self.job_manager = Manager()
+        self.job_counter = Counter()
+        self.jobs = self.job_manager.dict()
 
         for key, value in dict_in.items():
             # user should not be tampering with the vars already defined
@@ -233,7 +221,10 @@ class MyShell:
         pass
 
     def builtin_jobs(self, pipe="", args=[]):
-        pass
+        # todo: finish it
+        log.debug("Trying to get all jobs")
+        log.info(f"Content of jobs {COLOR.BOLD(self.jobs)}")
+        return str(self.jobs)
 
     def builtin_pwd(self, pipe="", args=[]):
         cwd = self.cwd()
@@ -398,9 +389,14 @@ class MyShell:
         return self.run_command(command)
 
     @staticmethod
-    def run_command_wrap(shell, args):
+    def run_command_wrap(shell, args, jobs):
         log.debug(f"Wrapper called with {COLOR.BOLD(f'{shell} and {args}')}")
+        count = shell.job_counter.value
+        shell.job_counter.increment(1)
+        jobs[count] = args
+
         shell.run_command(args)
+        del jobs[count]
 
     @staticmethod
     def clean(arg):
@@ -412,13 +408,13 @@ class MyShell:
             commands, is_bg = self.parse(command)
             if is_bg:
                 # ! changes made in subprocess is totally within the subprocess only
-                # p = Process(target=self.run_command, args=(command[0:-1],), name=command)
+                p = Process(target=self.run_command_wrap, args=(self, command[0:-1], self.jobs), name=command)
                 # self.jobs.append(p)
-                # p.start()
-                # log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
-                pool = Pool()
+                p.start()
+                log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
+                # pool = Pool()
                 # my_copy = copy.deepcopy(self)
-                pool.apply_async(func=self.run_command_wrap, args=(self, command[0:-1],), callback=self.clean)
+                # pool.apply_async(func=self.run_command_wrap, args=(my_copy, command[0:-1], self.jobs, ), callback=self.clean)
             else:
                 result = None  # so that the first piping is directly from stdin
                 for cidx, command in enumerate(commands):
