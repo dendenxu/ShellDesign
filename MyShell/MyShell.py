@@ -88,7 +88,7 @@ class MyShell:
         })
 
         self.job_manager = Manager()
-        self.job_counter = Value("i")
+        self.job_counter = Value("i", 0)
         self.jobs = self.job_manager.dict()
 
         for key, value in dict_in.items():
