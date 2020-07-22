@@ -380,9 +380,9 @@ class MyShell:
     @staticmethod
     def run_command_wrap(shell, args, jobs):
         log.debug(f"Wrapper called with {COLOR.BOLD(f'{shell} and {args}')}")
-        count = shell.job_counter
+        count = shell.job_counter.value
         with shell.job_counter.get_lock():
-            shell.job_counter += 1
+            shell.job_counter.value += 1
         jobs[count] = args
 
         shell.run_command(args)
