@@ -9,7 +9,9 @@ import coloredlogs
 import datetime
 import readline
 import subprocess
+import tempfile
 from subprocess import Popen, PIPE, STDOUT
+from multiprocessing import Process, Queue, Pipe, Pool
 from os import name
 from COLOR import COLOR
 from MyShellException import *
@@ -17,10 +19,20 @@ log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
+class IDPool():
+    def __init__(self):
+        self.values = []
+
+    def get(self):
+        pass
+
+    def delete(self, value):
+        self.values
 
 class OnCallDict(dict):
     unsupported = ["HOME", "USER", "LOCATION", "SHELL"]
     reserved = unsupported + ["PATH", "PWD"]
+
     def __getitem__(self, key):
         value = super().__getitem__(key)
         if callable(value):
@@ -31,7 +43,11 @@ class OnCallDict(dict):
             return value
 
     def __setitem__(self, key, value):
-        if key == "PATH":
+        if callable(value):
+            log.info(f"We might be copying current shell, setting callable value \"{value}\" to \"{key}\"")
+            super().__setitem__(key, value)
+            return
+        elif key == "PATH":
             # for whatever reason, set this to a string (environment variables are meant to be strings)
             # here we're actually setting the REAL environ so that user can call stuff more conveniently
             # ? or should we
@@ -53,6 +69,25 @@ class OnCallDict(dict):
             raise ReservedKeyException(f"\"{key}\" is reserved, along with {OnCallDict.reserved}")
         else:
             super().__delitem__(key)
+
+    # def __deepcopy__(self, memo):
+    #     getitem = self.__getitem__
+    #     setitem = self.__setitem__
+    #     delitem = self.__delitem__
+    #     deepcopy = self.__deepcopy__
+    #     def getter(self, key): return super().__getitem__(key)
+    #     def setter(self, key, value): super().__setitem__(key, value)
+    #     def deleter(self, key): super().__delitem__(key)
+    #     self.__getitem__ = getter
+    #     self.__setitem__ = setter
+    #     self.__delitem__ = deleter
+    #     self.__deepcopy__ = None
+    #     cp = copy.deepcopy(self, memo)
+    #     self.__getitem__ = getitem
+    #     self.__setitem__ = setitem
+    #     self.__delitem__ = delitem
+    #     self.__deepcopy__ = deepcopy
+    #     return cp
 
 
 class MyShell:
@@ -76,6 +111,8 @@ class MyShell:
             "PATH": self.path,
             "PS1": "$",
         })
+
+        self.jobs = []
 
         for key, value in dict_in.items():
             # user should not be tampering with the vars already defined
@@ -358,14 +395,35 @@ class MyShell:
         # print(self.prompt(), end="")
         # command = input().strip()
         log.debug(f"Getting user input: {COLOR.BOLD(command)}")
+        return self.run_command(command)
 
+    @staticmethod
+    def run_command_wrap(shell, args):
+        log.debug(f"Wrapper called with {COLOR.BOLD(f'{shell} and {args}')}")
+        shell.run_command(args)
+
+    @staticmethod
+    def clean(arg):
+        log.debug(f"Cleaner called with {COLOR.BOLD(arg)}")
+
+    def run_command(self, command):
         try:
             # todo: finish subprocess here...
-            commands = self.parse(command)
-            result = None  # so that the first piping is directly from stdin
-            for cidx, command in enumerate(commands):
-                result = self.execute(command, pipe=result)
-                # log.debug(f"Getting result: {COLOR.BOLD(result)}")
+            commands, is_bg = self.parse(command)
+            if is_bg:
+                # ! changes made in subprocess is totally within the subprocess only
+                # p = Process(target=self.run_command, args=(command[0:-1],), name=command)
+                # self.jobs.append(p)
+                # p.start()
+                # log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
+                pool = Pool()
+                # my_copy = copy.deepcopy(self)
+                pool.apply_async(func=self.run_command_wrap, args=(self, command[0:-1],), callback=self.clean)
+            else:
+                result = None  # so that the first piping is directly from stdin
+                for cidx, command in enumerate(commands):
+                    result = self.execute(command, pipe=result)
+                    # log.debug(f"Getting result: {COLOR.BOLD(result)}")
         except ExitException as e:
             log.debug("User is exiting...")
             log.debug(f"Exception says: {e}")
@@ -447,6 +505,7 @@ class MyShell:
 
         # print(commands)
 
+        is_bg = False
         parsed_commands = []
         parsed_command = self.parsed_clean()
 
@@ -460,27 +519,28 @@ class MyShell:
                 if not index:  # this should have a larger priority
                     parsed_command["exec"] = command[index]
                 elif command[index] == "<":
-                    if index == len(command) -1:
+                    if index == len(command) - 1:
                         raise SetPairUnmatchedException("Cannot match redirection input file with < sign.", {"type": "redi"})
                     parsed_command["redi_in"] = command[index+1]
                     index += 1
                 elif command[index] == ">":
-                    if index == len(command) -1:
+                    if index == len(command) - 1:
                         raise SetPairUnmatchedException("Cannot match redirection output file with > sign.", {"type": "redi"})
                     parsed_command["redi_out"] = command[index+1]
                     index += 1
                 elif command[index] == ">>":
-                    if index == len(command) -1:
+                    if index == len(command) - 1:
                         raise SetPairUnmatchedException("Cannot match redirection output file with >> sign.", {"type": "redi"})
                     parsed_command["redi_out"] = command[index+1]
                     parsed_command["redi_append"] = True
                     index += 1
                 elif command[index] == "&":
-                    if index != len(command)-1 or cidx != len(commands) -1:
+                    if index != len(command)-1 or cidx != len(commands) - 1:
                         # & not at the end
                         raise UnexpectedAndException("Syntax error, unexpected & found")
 
                     # todo: communication
+                    is_bg = True
                     log.info("User want this to run in background.")
                 else:
                     parsed_command["args"].append(command[index])
@@ -488,7 +548,7 @@ class MyShell:
             parsed_commands.append(parsed_command)
             parsed_command = self.parsed_clean()
 
-        return parsed_commands
+        return parsed_commands, is_bg
 
     def quote(self, command, quote=True):
         # command should already been splitted by word
@@ -551,7 +611,7 @@ class MyShell:
 
         str_list.append(string[prev[1]::])
 
-        log.debug(f"The splitted vars are {COLOR.BOLD(str_list)}")
+        # log.debug(f"The splitted vars are {COLOR.BOLD(str_list)}")
 
         for i in range(1, len(str_list), 2):
             key = str_list[i][1::]
@@ -589,4 +649,5 @@ def main():
 
 if __name__ == "__main__":
     # hello -n "world" < input.txt | tr -d -c "re"
+    # echo "zy" | sha256sum | tr -d " -" | wc
     main()
