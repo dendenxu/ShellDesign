@@ -2,6 +2,7 @@
 import os
 import sys
 import pwd
+import re
 import copy
 import logging
 import coloredlogs
@@ -27,6 +28,21 @@ class OnCallDict(dict):
             log.debug(f"Accessing non-callable dict element: {COLOR.BOLD(key)}")
             return value
 
+    def __setitem__(self, key, value):
+        if key == "PATH":
+            # for whatever reason, set this to a string (environment variables are meant to be strings)
+            # here we're actually setting the REAL environ so that user can call stuff more conveniently
+            # ? or should we
+            log.info(f"User set PATH to {COLOR.BOLD(value)}")
+            os.environ[key] = str(value)
+        elif key == "PWD":
+            # we're changing dir...
+            # ? or should we just set variable
+            log.info(f"User set PWD to {COLOR.BOLD(value)}")
+            os.chdir(value)
+        else:
+            super().__setitem__(key, value)
+
 
 class MyShell:
     def __init__(self, dict_in={}):
@@ -46,6 +62,7 @@ class MyShell:
             "HOME": self.home,
             "LOCATION": self.location,
             "USER": self.user,
+            "PATH": self.path,
         })
 
         for key, value in dict_in.items():
@@ -69,7 +86,7 @@ class MyShell:
     def builtin_cd(self, pipe="", args=[]):
         if len(args):
             if len(args) > 1:
-                log.warn("Are you trying to cd into multiple dirs? We'll only accept the first argument.")
+                log.warning("Are you trying to cd into multiple dirs? We'll only accept the first argument.")
             target_dir = args[0]
         else:
             # well, we'd like to stay in home
@@ -81,7 +98,7 @@ class MyShell:
             target_dir = f"{self.home()}{target_dir[1::]}"
         # the dir might not exist
         try:
-            log.debug(f"Changing CWD to {COLOR.BOLD(target_dir)}")
+            log.info(f"Changing CWD to {COLOR.BOLD(target_dir)}")
             os.chdir(target_dir)
         except FileNotFoundError as e:
             raise FileNotFoundException(e, {"type": "cd"})
@@ -94,6 +111,9 @@ class MyShell:
         else:
             os.system("clear")
         return ""
+
+    def path(self):
+        return os.environ["PATH"]
 
     def get_mode(self, permissions):
         map_string = "rwxrwxrwx"
@@ -186,7 +206,12 @@ class MyShell:
                 raise SetPairUnmatchedException(f"Cannot match argument {arg}")
             key, value = split
             log.debug(f"Setting \"{key}\" in environment variables to \"{value}\"")
-            self.vars[key] = value
+
+            try:
+                # might be error since self.vars is not a simple dict
+                self.vars[key] = value
+            except FileNotFoundError as e:
+                raise FileNotFoundException(e, {"type": "set", "arg_pair": [key, value]})
 
     def builtin_shift(self, pipe="", args=[]):
         pass
@@ -244,8 +269,8 @@ class MyShell:
         return prompt
 
     def execute(self, command, pipe=""):
-        log.debug(f"Executing command {COLOR.BOLD(command['exec'])}")
-        log.debug(f"Arguments are {COLOR.BOLD(command['args'])}")
+        log.info(f"Executing command {COLOR.BOLD(command['exec'])}")
+        log.info(f"Arguments are {COLOR.BOLD(command['args'])}")
         # log.debug(f"Full content of command is {COLOR.BOLD(command)}")
         if command["pipe_in"] and command["redi_in"]:
             raise MultipleInputException("Redirection and pipe are set as input at the same time.")
@@ -263,7 +288,6 @@ class MyShell:
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "redi_in"})
             pipe = f.read()
-
 
         result = ""
         if command["exec"] in self.builtins.keys():
@@ -284,13 +308,13 @@ class MyShell:
                     f = open(command["redi_out"], "a")
                     f.write(result)
                 except FileNotFoundError as e:
-                    raise FileNotFoundException(e, {"type":"redi_out","redi_append":True})
+                    raise FileNotFoundException(e, {"type": "redi_out", "redi_append": True})
             else:
                 try:
                     f = open(command["redi_out"], "w")
                     f.write(result)
                 except FileNotFoundError as e:
-                    raise FileNotFoundException(e, {"type":"redi_out","redi_append":False})
+                    raise FileNotFoundException(e, {"type": "redi_out", "redi_append": False})
             return result
 
         if command['pipe_out']:
@@ -313,7 +337,7 @@ class MyShell:
 
         try:
             commands = self.parse(command)
-            result = None # so that the first piping is directly from stdin
+            result = None  # so that the first piping is directly from stdin
             for cidx, command in enumerate(commands):
                 result = self.execute(command, pipe=result)
                 # log.debug(f"Getting result: {COLOR.BOLD(result)}")
@@ -324,16 +348,16 @@ class MyShell:
             return True
         except EmptyException as e:
             log.debug("The command is empty...")
-            log.debug(f"Exception says: {e}")
+            log.info(f"Exception says: {e}")
             if e.errors["pipe"]:
                 log.error(f"Your pipe is incomplete. {e}")
         except MultipleInputException as e:
             log.debug("Syntax error, user want to use input from pipe and redirection...")
-            log.debug(f"Exception says: {e}")
+            log.info(f"Exception says: {e}")
             log.error(f"Cannot handle multiple inputs at the same time. {e}")
         except FileNotFoundException as e:
             log.debug("IO error, cannot find the file specified")
-            log.debug(f"Exception says: {e}")
+            log.info(f"Exception says: {e}")
             if e.errors["type"] == "redi_in":
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for input. {e}")
             elif e.errors["type"] == "redi_out":
@@ -347,11 +371,17 @@ class MyShell:
                 log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory listing. {e}")
             elif e.errors["type"] == "subshell":
                 log.error(f"Cannot find an external or internal command \"{command['exec']}\" of position {cidx} for an external process spawning. {e}")
+            elif e.errors["type"] == "set":
+                log.error(f"Setting environment {e.errors['arg_pair'][0]} to {e.errors['arg_pair'][1]} failed. You're probably setting PWD and we're unable to find a proper place to cd into... {e}")
         except QuoteUnmatchedException as e:
             log.debug("We've encountered quote unmatch error...")
-            log.debug(f"Exception says: {e}")
+            log.info(f"Exception says: {e}")
             # currently the command is still a string
             log.error(f"Cannot match quote for command \"{command}\". {e}")
+        # except EmptyVarException as e:
+        #     log.debug("We've encountered a completely empty var")
+        #     log.info(f"Exception says: {e}")
+        #     log.error(f"Cannot match variable for command \"{command}\". {e}")
         # Returning exit signal
         return False
 
@@ -400,53 +430,82 @@ class MyShell:
 
         return parsed_commands
 
-    def process_dollar_quote(self, command):
+    def process_dollar_quote(self, command, quote=True):
         # command should already been splitted by word
         command = command.split()
-        quote_stack = ""
+        quote_stack = []
         index = 0
         while index < len(command):
-            if quote_stack:
-                if command[index].endswith("\""):
+            if command[index].count("\"") >= 1:
+                # should remove all quotes here
+                quote_count = command[index].count("\"")
+                log.debug("Trying to remove quote...")
+                splitted = command[index].split("\"")
+                # there were not space at the beginning
+                command[index] = "".join([self.expand(split) for split in splitted])
+                
+            else:
+                quote_count = 0
+
+            if quote_count % 2: # previous quote_count
+                if quote_stack:
                     # except the last char
-                    quote_stack += f" {command[index][0:-1]}"
+                    quote_stack.append(command[index])
                     # recursion to process $ and "" in the already processed ""
-                    command[index] = ' '.join(self.process_dollar_quote(quote_stack))
+                    command[index] = self.expand(" ".join(quote_stack)) 
                     quote_stack = ""
                     # index should continue to be added in the end
                 else:
-                    quote_stack += f" {command[index]}"
-                    if index == len(command)-1:
-                        raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
-                    command = command[0:index] + command[index+1::]
-                    index -= 1  # index should stay the same
-            elif command[index].startswith("\""):
-                if command[index].endswith("\"") and len(command[index]) > 1:
-                    # getting the inner command
-                    command[index] = command[index][1:-1]
-                else:
                     log.debug("Trying to match quote...")
-                    quote_stack += f" {command[index][1::]}"
+                    quote_stack.append(command[index])
                     if index == len(command)-1:
                         raise QuoteUnmatchedException("Cannot match the quote for the last argument")
                     command = command[0:index] + command[index+1::]
-                index -= 1
-            elif command[index].startswith("$"):
-                log.debug(f"Trying to get varible {COLOR.BOLD(command[index])}")
-                try:
-                    command[index] = self.vars[command[index][1::]]  # getting variable
-                    log.debug(f"Got the varible {COLOR.BOLD(command[index])}")
-                except KeyError as e:
-                    command[index] = ""
-                    log.debug("Unable to get the varible, assigning empty string")
-                # splitting the expanded command since it might contain some information
-                command = command[0:index] + command[index].split() + command[index + 1::]
-                # to result in index staying the same
-                index -= 1
+                    index -= 1
+            elif quote_stack:
+                # no quote but
+                quote_stack.append(command[index])
+                if index == len(command)-1:
+                    raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
+                command = command[0:index] + command[index+1::]
+                index -= 1  # index should stay the same
+            
+            command[index] = self.expand(command[index])
+
             index += 1
+
         # if quote_stack:
         #     raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
         return command
+
+    def expand(self, string):
+        var_list = [(m.start(0), m.end(0)) for m in re.finditer(r"\$\w+", string)]
+        str_list = []
+        prev = [0, 0]
+        for start, end in var_list:
+            str_list.append(string[prev[1]:start])
+            str_list.append(string[start:end])
+            prev = [start, end]
+
+        str_list.append(string[prev[1]::])
+
+        log.debug(f"The splitted vars are {COLOR.BOLD(str_list)}")
+
+        for i in range(1, len(str_list), 2):
+            key = str_list[i][1::]
+            log.debug(f"Trying to get varible {COLOR.BOLD(key)}")
+            try:
+                var = self.vars[key]
+                log.debug(f"Got the varible {COLOR.BOLD(var)}")
+            except KeyError as e:
+                log.warning(f"Unable to get the varible \"{key}\", assigning empty string")
+                var = ""
+            # splitting the expanded command since it might contain some information
+            str_list[i] = var
+            # to result in index staying the same
+
+        string = "".join(str_list)
+        return string
 
     def parsed_clean(self):
         parsed_command = {}
