@@ -29,6 +29,7 @@ class OnCallDict(dict):
             return value
 
     def __setitem__(self, key, value):
+        unsupported = ["HOME", "USER", "LOCATION", "SHELL"]
         if key == "PATH":
             # for whatever reason, set this to a string (environment variables are meant to be strings)
             # here we're actually setting the REAL environ so that user can call stuff more conveniently
@@ -40,6 +41,8 @@ class OnCallDict(dict):
             # ? or should we just set variable
             log.info(f"User set PWD to {COLOR.BOLD(value)}")
             os.chdir(value)
+        elif key in unsupported:
+            log.warning(f"Sorry, we don't currently support setting \"{key}\", included in {COLOR.BOLD(unsupported)}")
         else:
             super().__setitem__(key, value)
 
@@ -267,6 +270,11 @@ class MyShell:
     def prompt(self):
         prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BLUE(COLOR.BOLD(self.cwd()))} {COLOR.YELLOW(COLOR.BOLD(self.vars['PS1']))} "
         # log.debug(repr(prompt))
+        try:
+            conda = os.environ["CONDA_DEFAULT_ENV"]
+            prompt = f"({conda}) {prompt}"
+        except KeyError:
+            pass
         return prompt
 
     def execute(self, command, pipe=""):
@@ -452,16 +460,16 @@ class MyShell:
                 splitted = command[index].split("\"")
                 # there were not space at the beginning
                 command[index] = "".join([self.expand(split) for split in splitted])
-                
+
             else:
                 quote_count = 0
 
-            if quote_count % 2: # previous quote_count
+            if quote_count % 2:  # previous quote_count
                 if quote_stack:
                     # except the last char
                     quote_stack.append(command[index])
                     # recursion to process $ and "" in the already processed ""
-                    command[index] = self.expand(" ".join(quote_stack)) 
+                    command[index] = self.expand(" ".join(quote_stack))
                     quote_stack = ""
                     # index should continue to be added in the end
                 else:
@@ -478,14 +486,16 @@ class MyShell:
                     raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
                 command = command[0:index] + command[index+1::]
                 index -= 1  # index should stay the same
-            
+
             prev = command[index]
             command[index] = self.expand(command[index])
-            if prev == command[index]: index += 1 # advance only if the var is unchanged
+            if prev == command[index]:
+                index += 1  # advance only if the var is unchanged
 
         return command
 
     def expand(self, string):
+        string = re.sub("~", self.home(), string)
         var_list = [(m.start(0), m.end(0)) for m in re.finditer(r"\$\w+", string)]
         str_list = []
         prev = [0, 0]
@@ -515,15 +525,16 @@ class MyShell:
         return string
 
     def parsed_clean(self):
-        parsed_command = {}
-        parsed_command["exec"] = ""
-        parsed_command["args"] = []
-        parsed_command["pipe_in"] = False
-        parsed_command["pipe_out"] = False
-        parsed_command["redi_in"] = ""
-        parsed_command["redi_out"] = ""
-        parsed_command["redi_append"] = False
-        parsed_command["background"] = False
+        parsed_command = {
+            "exec": "",
+            "args": [],
+            "pipe_in": False,
+            "pipe_out": False,
+            "redi_in": "",
+            "redi_out": "",
+            "redi_append": False,
+            "background": False,
+        }
         return parsed_command
 
 
