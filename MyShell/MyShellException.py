@@ -54,3 +54,7 @@ class ReservedKeyException(MyShellException):
 class UnsetKeyException(MyShellException):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)
+
+class UnexpectedAndException(MyShellException):
+    def __init__(self, message, errors=None):
+        super().__init__(message, errors)

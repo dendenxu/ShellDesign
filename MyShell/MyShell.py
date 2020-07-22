@@ -213,7 +213,7 @@ class MyShell:
         for arg in args:
             split = arg.split("=")
             if len(split) != 2:
-                raise SetPairUnmatchedException(f"Cannot match argument {arg}")
+                raise SetPairUnmatchedException(f"Cannot match argument {arg}.", {"type": "set"})
             key, value = split
             log.debug(f"Setting \"{key}\" in environment variables to \"{value}\"")
 
@@ -245,7 +245,7 @@ class MyShell:
         if len(keys):
             raise UnsetKeyException("Cannot find/unset these keys.", {"keys": keys})
 
-    def subshell(self, pipe="", target="", args=[], bg=False, piping=False):
+    def subshell(self, pipe="", target="", args=[], piping=False):
         if not target:
             raise EmptyException(f"Command \"{target}\" is empty", {"type": "subshell"})
         to_run = [target] + args
@@ -327,7 +327,6 @@ class MyShell:
 
         if command['redi_out']:
             log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
-            # todo: write to file
             if command["redi_append"]:
                 try:
                     f = open(command["redi_out"], "a")
@@ -361,6 +360,7 @@ class MyShell:
         log.debug(f"Getting user input: {COLOR.BOLD(command)}")
 
         try:
+            # todo: finish subprocess here...
             commands = self.parse(command)
             result = None  # so that the first piping is directly from stdin
             for cidx, command in enumerate(commands):
@@ -417,6 +417,18 @@ class MyShell:
             log.info(f"Exception says: {e}")
             # currently the command is still a string
             log.warning(f"Cannot unset \"{e.errors['keys']}\" using command \"{command['exec']}\". {e}")
+        except SetPairUnmatchedException as e:
+            log.debug("Exception when unsetting keys")
+            log.info(f"Exception says: {e}")
+            if e.errors["type"] == "redi":
+                log.error(f"Cannot set redirection using command \"{command}\". {e}")
+            elif e.errors["type"] == "set":
+                log.error(f"Cannot set keys using command \"{command['exec']}\". {e}")
+        except UnexpectedAndException as e:
+            log.debug("Exception when parsing command")
+            log.info(f"Exception says: {e}")
+            # currently the command is still a string
+            log.error(f"Cannot interpret & sign in command \"{command}\". {e}")
         # Returning exit signal
         return False
 
@@ -445,18 +457,31 @@ class MyShell:
             parsed_command["pipe_out"] = (cidx != len(commands)-1)
             index = 0
             while index < len(command):
-                if not index:  # this should a larger priority
+                if not index:  # this should have a larger priority
                     parsed_command["exec"] = command[index]
                 elif command[index] == "<":
+                    if index == len(command) -1:
+                        raise SetPairUnmatchedException("Cannot match redirection input file with < sign.", {"type": "redi"})
                     parsed_command["redi_in"] = command[index+1]
                     index += 1
                 elif command[index] == ">":
+                    if index == len(command) -1:
+                        raise SetPairUnmatchedException("Cannot match redirection output file with > sign.", {"type": "redi"})
                     parsed_command["redi_out"] = command[index+1]
                     index += 1
                 elif command[index] == ">>":
+                    if index == len(command) -1:
+                        raise SetPairUnmatchedException("Cannot match redirection output file with >> sign.", {"type": "redi"})
                     parsed_command["redi_out"] = command[index+1]
                     parsed_command["redi_append"] = True
                     index += 1
+                elif command[index] == "&":
+                    if index != len(command)-1 or cidx != len(commands) -1:
+                        # & not at the end
+                        raise UnexpectedAndException("Syntax error, unexpected & found")
+
+                    # todo: communication
+                    log.info("User want this to run in background.")
                 else:
                     parsed_command["args"].append(command[index])
                 index += 1
@@ -553,7 +578,6 @@ class MyShell:
             "redi_in": "",
             "redi_out": "",
             "redi_append": False,
-            "background": False,
         }
         return parsed_command
 
