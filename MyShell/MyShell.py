@@ -63,6 +63,7 @@ class MyShell:
             "LOCATION": self.location,
             "USER": self.user,
             "PATH": self.path,
+            "PS1": "$",
         })
 
         for key, value in dict_in.items():
@@ -165,9 +166,7 @@ class MyShell:
             raise FileNotFoundException(e, {"type": "dir"})
 
     def builtin_echo(self, pipe="", args=[]):
-        result = ""
-        for arg in args:
-            result += f"{arg} "
+        result = f"{' '.join(args)}\n"
         return result
 
     def builtin_exec(self, pipe="", args=[]):
@@ -229,6 +228,8 @@ class MyShell:
         pass
 
     def subshell(self, pipe="", target="", args=[], bg=False, piping=False):
+        if not target:
+            raise EmptyException(f"Command \"{target}\" is empty", {"type": "subshell"})
         to_run = [target] + args
         log.debug(f"Runnning in subprocess: {COLOR.BOLD(to_run)}")
         result = None
@@ -242,11 +243,11 @@ class MyShell:
             p = subprocess.run(to_run, stdout=None, stdin=None, stderr=STDOUT, encoding="utf-8")
             # here we're directing the IO straight to the command line, so no result is needed
             # waits for the process to end
+        if p.returncode != 0:
+            log.warning("The subprocess is not running correctly")
+            raise CalledProcessException("None zero return code encountered")
         # log.debug(f"Raw string content: {COLOR.BOLD(result)}")
         return result
-
-    def ps1(self):
-        return "$"
 
     def home(self):
         return os.environ['HOME']
@@ -264,7 +265,7 @@ class MyShell:
         return os.uname()[1]
 
     def prompt(self):
-        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BLUE(COLOR.BOLD(self.cwd()))} {COLOR.YELLOW(COLOR.BOLD(self.ps1()))} "
+        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BLUE(COLOR.BOLD(self.cwd()))} {COLOR.YELLOW(COLOR.BOLD(self.vars['PS1']))} "
         # log.debug(repr(prompt))
         return prompt
 
@@ -292,6 +293,7 @@ class MyShell:
         result = ""
         if command["exec"] in self.builtins.keys():
             log.debug("This is a builtin command.")
+            # executing as static method, calling with self variable
             result = self.builtins[command["exec"]](self, pipe=pipe, args=command['args'])
         else:
             log.debug("This is not a builtin command.")
@@ -349,8 +351,12 @@ class MyShell:
         except EmptyException as e:
             log.debug("The command is empty...")
             log.info(f"Exception says: {e}")
-            if e.errors["pipe"]:
+            if e.errors["type"] == "pipe":
                 log.error(f"Your pipe is incomplete. {e}")
+            elif e.errors["type"] == "subshell":
+                log.warning(f"Your command is empty. Did you use an empty var? {e}")
+            elif e.errors["type"] == "empty":
+                log.info(f"Your command is empty. {e}")
         except MultipleInputException as e:
             log.debug("Syntax error, user want to use input from pipe and redirection...")
             log.info(f"Exception says: {e}")
@@ -378,15 +384,16 @@ class MyShell:
             log.info(f"Exception says: {e}")
             # currently the command is still a string
             log.error(f"Cannot match quote for command \"{command}\". {e}")
-        # except EmptyVarException as e:
-        #     log.debug("We've encountered a completely empty var")
-        #     log.info(f"Exception says: {e}")
-        #     log.error(f"Cannot match variable for command \"{command}\". {e}")
+        except CalledProcessException as e:
+            log.debug("We've encountered error in a subprocess")
+            log.info(f"Exception says: {e}")
+            # currently the command is still a string
+            log.warning(f"Cannot run process successfully command \"{command}\". {e}")
         # Returning exit signal
         return False
 
     def parse(self, command):
-        inputs = self.process_dollar_quote(command)  # splitting by whitespace and processing varibles, quotes
+        inputs = self.quote(command)  # splitting by whitespace and processing varibles, quotes
         # splitting command of pipling
         commands = []
         command = []
@@ -405,7 +412,7 @@ class MyShell:
 
         for cidx, command in enumerate(commands):
             if not len(command):
-                raise EmptyException(f"Command at position {cidx} is empty", {"pipe": len(commands) > 1})
+                raise EmptyException(f"Command at position {cidx} is empty", {"type": "pipe" if len(commands) > 1 else "empty"})
             parsed_command["pipe_in"] = (cidx > 0)
             parsed_command["pipe_out"] = (cidx != len(commands)-1)
             index = 0
@@ -430,8 +437,10 @@ class MyShell:
 
         return parsed_commands
 
-    def process_dollar_quote(self, command, quote=True):
+    def quote(self, command, quote=True):
         # command should already been splitted by word
+        # mark: this structure makes it possible that the arg is keep in one place if using quote
+        # by not brutally expanding on every possible environment variables
         command = command.split()
         quote_stack = []
         index = 0
@@ -470,12 +479,10 @@ class MyShell:
                 command = command[0:index] + command[index+1::]
                 index -= 1  # index should stay the same
             
+            prev = command[index]
             command[index] = self.expand(command[index])
+            if prev == command[index]: index += 1 # advance only if the var is unchanged
 
-            index += 1
-
-        # if quote_stack:
-        #     raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
         return command
 
     def expand(self, string):
