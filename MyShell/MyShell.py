@@ -1,7 +1,8 @@
 #!python
 import os
 import sys
-import pwd
+import getpass
+import platform
 import re
 import copy
 import logging
@@ -12,7 +13,7 @@ import subprocess
 import multiprocessing
 import tempfile
 from subprocess import Popen, PIPE, STDOUT
-from multiprocessing import Process, Queue, Pipe, Pool, Manager
+from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value
 from os import name
 from COLOR import COLOR
 from MyShellException import *
@@ -20,18 +21,6 @@ log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
-
-class Counter(object):
-    def __init__(self):
-        self.val = multiprocessing.Value('i', 0)
-
-    def increment(self, n=1):
-        with self.val.get_lock():
-            self.val.value += n
-
-    @property
-    def value(self):
-        return self.val.value
 
 
 class OnCallDict(dict):
@@ -99,7 +88,7 @@ class MyShell:
         })
 
         self.job_manager = Manager()
-        self.job_counter = Counter()
+        self.job_counter = Value("i")
         self.jobs = self.job_manager.dict()
 
         for key, value in dict_in.items():
@@ -147,7 +136,7 @@ class MyShell:
             os.system("cls")
         else:
             os.system("clear")
-        return ""
+        # return ""
 
     def path(self):
         return os.environ["PATH"]
@@ -305,13 +294,13 @@ class MyShell:
         return cwd
 
     def user(self):
-        return pwd.getpwuid(os.getuid())[0]
+        return getpass.getuser()
 
     def location(self):
-        return os.uname()[1]
+        return platform.node()
 
     def prompt(self):
-        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BLUE(COLOR.BOLD(self.cwd()))} {COLOR.YELLOW(COLOR.BOLD(self.vars['PS1']))} "
+        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(COLOR.YELLOW(self.vars['PS1']))} "
         # log.debug(repr(prompt))
         try:
             conda = os.environ["CONDA_DEFAULT_ENV"]
@@ -391,8 +380,9 @@ class MyShell:
     @staticmethod
     def run_command_wrap(shell, args, jobs):
         log.debug(f"Wrapper called with {COLOR.BOLD(f'{shell} and {args}')}")
-        count = shell.job_counter.value
-        shell.job_counter.increment(1)
+        count = shell.job_counter
+        with shell.job_counter.get_lock():
+            shell.job_counter += 1
         jobs[count] = args
 
         shell.run_command(args)
@@ -596,7 +586,9 @@ class MyShell:
         return command
 
     def expand(self, string):
-        string = re.sub("~", self.home(), string)
+        # log.debug(f"The string to be expanded is: {COLOR.BOLD(string)}")
+        # string = re.sub(r"~", self.home(), string)
+        string = string.replace("~", self.home())
         var_list = [(m.start(0), m.end(0)) for m in re.finditer(r"\$\w+", string)]
         str_list = []
         prev = [0, 0]
