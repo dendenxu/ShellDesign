@@ -390,16 +390,6 @@ class MyShell:
         del jobs[count]
         del inputs[count]
 
-# import sys
-# import multiprocessing
-# def func():
-#     sys.stdin=open(0)
-#     print(sys.stdin)
-#     c = sys.stdin.read(1)
-#     print("Got", c)
-
-# multiprocessing.Process(target=func).start()
-
     @staticmethod
     def clean(arg):
         log.debug(f"Cleaner called with {COLOR.BOLD(arg)}")

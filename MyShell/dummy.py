@@ -28,3 +28,12 @@ if __name__ == '__main__':
     queue.join_thread()
     p.join()
     
+# import sys
+# import multiprocessing
+# def func():
+#     sys.stdin=open(0)
+#     print(sys.stdin)
+#     c = sys.stdin.read(1)
+#     print("Got", c)
+
+# multiprocessing.Process(target=func).start()
