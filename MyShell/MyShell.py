@@ -1,5 +1,6 @@
 #!python
 import os
+import io
 import sys
 import getpass
 import platform
@@ -17,9 +18,65 @@ from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value
 from os import name
 from COLOR import COLOR
 from MyShellException import *
+from unittest.mock import patch
 log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
+
+def logger(func):
+    def wrapper(*args, **kwargs):
+        log.critical(f"CALLING FUNCTION: {COLOR.BOLD(func)}")
+        return func(*args, **kwargs)
+    return wrapper
+
+def for_all_methods(decorator):
+    def decorate(cls):
+        for attr in cls.__dict__: # there's propably a better way to do this
+            if callable(getattr(cls, attr)):
+                setattr(cls, attr, decorator(getattr(cls, attr)))
+        return cls
+    return decorate
+class LoggingDict(dict):
+    def __getitem__(self, key):
+        log.critical(f"GETTING DICT ITEM {COLOR.BOLD(key)}")
+        return super().__getitem__(key)
+
+@for_all_methods(logger)
+class StdinWrapper(io.TextIOWrapper):
+    def __init__(self, queue, count, job, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.queue = queue
+        self.job = job
+        self.count = count
+        self.ok = False
+
+    def isok(self):
+        if not self.ok:
+            log.debug("Aha! You want to read something? Wait on!")
+            print(f"[{self.count}] suspended env {self.job}")
+            self.queue.get()
+            self.isok = True
+            print(f"[{self.count}] continued env {self.job}")
+
+    def __getattribute__(self, name):
+        log.critical(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
+        return super().__getattribute__(name)
+
+    def fileno(self):
+        self.isok()
+        return super().fileno()
+
+    # def readlines(self, hint):
+    #     self.isok()
+    #     return super().readlines(hint)
+
+    # def readline(self, size=-1):
+    #     self.isok()
+    #     return super().readline(size)
+
+    # def read(self, size=-1):
+    #     self.isok()
+    #     return super().read(size)
 
 
 class OnCallDict(dict):
@@ -86,10 +143,13 @@ class MyShell:
             "PS1": "$",
         })
 
-        self.job_manager = Manager()
-        self.job_counter = Value("i", 0)
-        self.jobs = self.job_manager.dict()
-        self.jobs_input = self.job_manager.dict()
+        # self.job_manager = Manager()
+        # self.job_counter = Value("i", 0)
+        # self.jobs = self.job_manager.dict()
+        # self.queues = self.job_manager.dict()
+        self.job_counter = 0
+        self.jobs = {}
+        self.queues = {}
 
         for key, value in dict_in.items():
             # user should not be tampering with the vars already defined
@@ -204,13 +264,23 @@ class MyShell:
         return "\n".join([f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars])
 
     def builtin_fg(self, pipe="", args=[]):
-        pass
+        # todo: finish it
+        # todo: exception
+        log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
+        self.queues[args[0]].put("dummy")
+
+        log.info("Waiting for foreground task to finish...")
+
+        self.queues[args[0]].get()
+        log.debug("Continuing main process")
+        del self.queues[args[0]]
+        del self.jobs[args[0]]
+        
 
     def builtin_help(self, pipe="", args=[]):
         pass
 
     def builtin_jobs(self, pipe="", args=[]):
-        # todo: finish it
         log.debug("Trying to get all jobs")
         log.info(f"Content of jobs {COLOR.BOLD(self.jobs)}")
         return str(self.jobs)
@@ -262,7 +332,15 @@ class MyShell:
         if len(keys):
             raise UnsetKeyException("Cannot find/unset these keys.", {"keys": keys})
 
-    def subshell(self, pipe="", target="", args=[], piping=False):
+    def builtin_dummy(self, pipe="", args=[]):
+        # result = sys.stdin.readline()
+        print("builtin_dummy: before any input requirements")
+        print(input("dummy1> "))
+        print(input("dummy2> "))
+        print(input("dummy3> "))
+        print(input("dummyend> "))
+
+    def subshell(self, pipe="", target="", args=[], piping=False, io_control=False):
         if not target:
             raise EmptyException(f"Command \"{target}\" is empty", {"type": "subshell"})
         to_run = [target] + args
@@ -274,8 +352,20 @@ class MyShell:
             p = subprocess.run(to_run, stdout=PIPE, input=pipe, stderr=STDOUT, encoding="utf-8")
             result = str(p.stdout)
             # waits for the process to end
+        elif io_control:
+            # todo: cry
+            log.debug("Doing io control")
+            log.debug(f"IO controller is: {sys.stdin}")
+            p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8")
+            # p.stdin.write("hello\n")
+            # p.wait()
+            result, error = p.communicate()
+            # result = str(p.stdout)
+            log.debug(f"The result is \"{result}\" and \"{error}\"")
+            # waits for the process to end
         else:
-            p = subprocess.run(to_run, stdout=None, stdin=None, stderr=STDOUT, encoding="utf-8")
+            log.debug("Just running in regular env")
+            p = subprocess.run(to_run, stderr=STDOUT, encoding="utf-8")
             # here we're directing the IO straight to the command line, so no result is needed
             # waits for the process to end
         if p.returncode != 0:
@@ -338,7 +428,7 @@ class MyShell:
         else:
             log.debug("This is not a builtin command.")
             try:
-                result = self.subshell(pipe, command["exec"], command['args'], piping=command["piping"])
+                result = self.subshell(pipe, command["exec"], command['args'], piping=command["piping"], io_control=command["io_control"])
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "subshell"})
 
@@ -378,37 +468,51 @@ class MyShell:
         return self.run_command(command)
 
     @staticmethod
-    def run_command_wrap(shell, args, jobs, inputs):
-        log.debug(f"Wrapper called with {COLOR.BOLD(f'{shell} and {args}')}")
-        count = shell.job_counter.value
-        with shell.job_counter.get_lock():
-            shell.job_counter.value += 1
-        jobs[count] = args
+    def run_command_wrap(count, shell, args, job, queue):
+        log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
 
-        shell.run_command(args)
+        if sys.stdin is not None:
+            sys.stdin.close()
+        stdin = open(0)
+        buffer = stdin.detach()
+        wrapper = StdinWrapper(queue, count, job, buffer)
+        sys.stdin = wrapper
+        # sys.__stdin__ = wrapper
 
-        del jobs[count]
-        del inputs[count]
+        shell.run_command(args, io_control=True)
 
-    @staticmethod
-    def clean(arg):
-        log.debug(f"Cleaner called with {COLOR.BOLD(arg)}")
+        queue.put("dummy")
 
-    def run_command(self, command):
+    def run_command(self, command, io_control=False):
         try:
             # todo: finish subprocess here...
             commands, is_bg = self.parse(command)
             if is_bg:
                 # ! changes made in subprocess is totally within the subprocess only
-                p = Process(target=self.run_command_wrap, args=(self, command[0:-1], self.jobs, self.jobs_input), name=command)
-                # self.jobs.append(p)
+                # count = self.job_counter.value
+                # todo: the counter might get significantly large
+                # with self.job_counter.get_lock():
+                    # self.job_counter.value += 1
+                str_cnt = str(self.job_counter)
+                self.jobs[str_cnt] = command
+                self.queues[str_cnt] = Queue()
+                p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt]), name=command)
                 p.start()
+                # todo: this is supposed to be a background task
+                # ! revert this
+                # ! *****************************************************************
+                # p.join()
+                # ! *****************************************************************
+                self.job_counter += 1
                 log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
-                # pool = Pool()
-                # my_copy = copy.deepcopy(self)
-                # pool.apply_async(func=self.run_command_wrap, args=(my_copy, command[0:-1], self.jobs, ), callback=self.clean)
             else:
                 result = None  # so that the first piping is directly from stdin
+                if io_control:
+                    for command in commands:
+                        command["io_control"] = True
+                else:
+                    for command in commands:
+                        command["io_control"] = False
                 for cidx, command in enumerate(commands):
                     result = self.execute(command, pipe=result)
                     # log.debug(f"Getting result: {COLOR.BOLD(result)}")
