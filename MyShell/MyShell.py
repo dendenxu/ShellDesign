@@ -13,6 +13,7 @@ import readline
 import subprocess
 import multiprocessing
 import tempfile
+import traceback
 from subprocess import Popen, PIPE, STDOUT
 from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value
 from os import name
@@ -21,9 +22,9 @@ from MyShellException import *
 from unittest.mock import patch
 log = logging.getLogger(__name__)
 
-coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
+coloredlogs.install(level='WARNING')  # Change this to DEBUG to see more info.
 
-
+# a decorator for logging function call
 def logger(func):
     def wrapper(*args, **kwargs):
         log.debug(f"CALLING FUNCTION: {COLOR.BOLD(func)}")
@@ -31,6 +32,8 @@ def logger(func):
     return wrapper
 
 
+# a class decorator that can modify all callable class method with a decorator
+# here we use this to log function call of sys.stdin wrapper
 def for_all_methods(decorator):
     def decorate(cls):
         for attr in cls.__dict__:  # there's propably a better way to do this
@@ -40,13 +43,14 @@ def for_all_methods(decorator):
     return decorate
 
 
+# a dict that logs itself on every getting item operation
 class LoggingDict(dict):
     def __getitem__(self, key):
         log.debug(f"GETTING DICT ITEM {COLOR.BOLD(key)}")
         return super().__getitem__(key)
 
 
-@for_all_methods(logger)
+@for_all_methods(logger) # using the full class logging system
 class StdinWrapper(io.TextIOWrapper):
     def __init__(self, queue, count, job, status_dict, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,12 +69,12 @@ class StdinWrapper(io.TextIOWrapper):
             log.debug("Aha! You want to read something? Wait on!")
             self.job_status("suspended")
             
-            log.critical(f"WHAT IS SELF.STATUS_DICT: {self.status_dict}")
-            log.critical(f"WHAT IS SELF.COUNT: {self.count}")
+            log.debug(f"WHAT IS SELF.STATUS_DICT: {self.status_dict}")
+            log.debug(f"WHAT IS SELF.COUNT: {self.count}")
 
             content = self.queue.get()
 
-            log.critical(f"WHAT DID YOU GET: {content}")
+            log.debug(f"WHAT DID YOU GET: {content}")
             
             self.isok = True
             
@@ -152,12 +156,9 @@ class MyShell:
 
         # ! damn strange... when an object has a Manager, multiprocessing refuse to spawn it on Windows
         # self.job_manager = Manager()
-        # self.job_counter = Value("i", 0)
         self.jobs = Manager().dict()
         self.status_dict = Manager().dict()
-        # self.queues = self.job_manager.dict()
         self.job_counter = 0
-        # self.jobs = {}
         self.queues = {}
 
         for key, value in dict_in.items():
@@ -184,6 +185,12 @@ class MyShell:
                     raise JobException(f"Cannot find job is jobs number \"{arg}\".", {"type": "key"})
 
         log.debug(f"Background is called with {COLOR.BOLD(args)}")
+        for job_number in args:
+            if self.status_dict[job_number] == "suspended":
+                print(self.job_status_fmt(job_number, "running", self.jobs[job_number]))
+                print(self.job_status_fmt(job_number, "suspended", self.jobs[job_number]))
+            elif self.status_dict[job_number] == "running":
+                log.warning(f"Job [{job_number}] is already running")
 
     def builtin_cd(self, pipe="", args=[]):
         if len(args):
@@ -297,12 +304,23 @@ class MyShell:
 
     def builtin_help(self, pipe="", args=[]):
         pass
+    
+    @staticmethod
+    def job_status_fmt(job_number, status, content):
+        return f"{COLOR.BOLD(COLOR.YELLOW(f'[{job_number}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(content)}"
+
+    def job_status(self, job_number, status=None):
+        if status is not None:
+            self.status_dict[job_number] = status
+        else:
+            status = self.status_dict[job_number]
+        return self.job_status_fmt(job_number, status, self.jobs[job_number])
 
     def builtin_jobs(self, pipe="", args=[]):
         log.debug("Trying to get all jobs")
         log.info(f"Content of jobs {COLOR.BOLD(self.jobs)}")
         log.info(f"Content of status_dict {COLOR.BOLD(self.status_dict)}")
-        result = [ f"{COLOR.BOLD(COLOR.YELLOW(f'[{key}]'))} {COLOR.BOLD(self.status_dict[key])} env {COLOR.BOLD(self.jobs[key])}" for key in self.jobs.keys() ]
+        result = [ self.job_status(key) for key in self.jobs.keys() ]
         return '\n'.join(result)
 
     def builtin_queues(self, pipe="", args=[]):
@@ -525,20 +543,17 @@ class MyShell:
     def run_command_wrap(count, shell, args, job, queue, jobs, status_dict):
         log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
 
-        # ! revert this
-        # ! *****************************************************************
         if sys.stdin is not None:
             sys.stdin.close()
         stdin = open(0)
         buffer = stdin.detach()
         wrapper = StdinWrapper(queue, count, job, status_dict, buffer)
         sys.stdin = wrapper
-        # ! *****************************************************************
 
         try:
             shell.run_command(args, io_control=True)
         finally:
-            print(f"[{count}] finished env {job}")
+            print(shell.job_status_fmt(count, "finished", job))
             queue.put("dummy")
             del jobs[count]
             del status_dict[count]
@@ -549,21 +564,13 @@ class MyShell:
             commands, is_bg = self.parse(command)
             if is_bg:
                 # ! changes made in subprocess is totally within the subprocess only
-                # count = self.job_counter.value
                 # todo: the counter might get significantly large
-                # with self.job_counter.get_lock():
-                # self.job_counter.value += 1
                 str_cnt = str(self.job_counter)
                 self.jobs[str_cnt] = command
                 self.queues[str_cnt] = Queue()
                 self.status_dict[str_cnt] = "running"
                 p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
                 p.start()
-                # todo: this is supposed to be a background task
-                # ! revert this
-                # ! *****************************************************************
-                # p.join()
-                # ! *****************************************************************
                 self.job_counter += 1
                 log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
             else:
@@ -647,6 +654,8 @@ class MyShell:
                 log.error(f"Error number of argements in command \"{command['exec']}\", {e}")
             elif e.errors["type"] == "key":
                 log.error(f"Error job number in command \"{command['exec']}\", {e}")
+        except Exception as e:
+            log.error(f"Unhandled error. {traceback.format_exc()}")
 
         # Returning exit signal
         return False
