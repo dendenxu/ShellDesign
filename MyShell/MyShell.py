@@ -58,14 +58,10 @@ class StdinWrapper(io.TextIOWrapper):
     def isok(self):
         if not self.ok:
             log.debug("Aha! You want to read something? Wait on!")
-            self.job["status"] = "suspended"
-            print(f"[{self.count}] suspended env {self.job['command']}")
-
+            print(f"[{self.count}] suspended env {self.job}")
             self.queue.get()
             self.isok = True
-
-            self.job["status"] = "running"
-            print(f"[{self.count}] continued env {self.job['command']}")
+            print(f"[{self.count}] continued env {self.job}")
 
     def __getattribute__(self, name):
         log.debug(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
@@ -533,7 +529,7 @@ class MyShell:
         try:
             shell.run_command(args, io_control=True)
         finally:
-            print(f"[{count}] finished env {job['command']}")
+            print(f"[{count}] finished env {job}")
             queue.put("dummy")
             del jobs[count]
 
@@ -548,9 +544,7 @@ class MyShell:
                 # with self.job_counter.get_lock():
                 # self.job_counter.value += 1
                 str_cnt = str(self.job_counter)
-                self.jobs[str_cnt] = {}
-                self.jobs[str_cnt]["command"] = command
-                self.jobs[str_cnt]["status"] = "running"
+                self.jobs[str_cnt] = command
                 self.queues[str_cnt] = Queue()
                 p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs), name=command)
                 p.start()
