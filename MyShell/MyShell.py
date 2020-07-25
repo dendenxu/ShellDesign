@@ -23,23 +23,28 @@ log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
+
 def logger(func):
     def wrapper(*args, **kwargs):
-        log.critical(f"CALLING FUNCTION: {COLOR.BOLD(func)}")
+        log.debug(f"CALLING FUNCTION: {COLOR.BOLD(func)}")
         return func(*args, **kwargs)
     return wrapper
 
+
 def for_all_methods(decorator):
     def decorate(cls):
-        for attr in cls.__dict__: # there's propably a better way to do this
+        for attr in cls.__dict__:  # there's propably a better way to do this
             if callable(getattr(cls, attr)):
                 setattr(cls, attr, decorator(getattr(cls, attr)))
         return cls
     return decorate
+
+
 class LoggingDict(dict):
     def __getitem__(self, key):
-        log.critical(f"GETTING DICT ITEM {COLOR.BOLD(key)}")
+        log.debug(f"GETTING DICT ITEM {COLOR.BOLD(key)}")
         return super().__getitem__(key)
+
 
 @for_all_methods(logger)
 class StdinWrapper(io.TextIOWrapper):
@@ -59,24 +64,12 @@ class StdinWrapper(io.TextIOWrapper):
             print(f"[{self.count}] continued env {self.job}")
 
     def __getattribute__(self, name):
-        log.critical(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
+        log.debug(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
         return super().__getattribute__(name)
 
     def fileno(self):
         self.isok()
         return super().fileno()
-
-    # def readlines(self, hint):
-    #     self.isok()
-    #     return super().readlines(hint)
-
-    # def readline(self, size=-1):
-    #     self.isok()
-    #     return super().readline(size)
-
-    # def read(self, size=-1):
-    #     self.isok()
-    #     return super().read(size)
 
 
 class OnCallDict(dict):
@@ -143,12 +136,12 @@ class MyShell:
             "PS1": "$",
         })
 
-        # self.job_manager = Manager()
+        self.job_manager = Manager()
         # self.job_counter = Value("i", 0)
-        # self.jobs = self.job_manager.dict()
+        self.jobs = self.job_manager.dict()
         # self.queues = self.job_manager.dict()
         self.job_counter = 0
-        self.jobs = {}
+        # self.jobs = {}
         self.queues = {}
 
         for key, value in dict_in.items():
@@ -273,9 +266,8 @@ class MyShell:
 
         self.queues[args[0]].get()
         log.debug("Continuing main process")
-        del self.queues[args[0]]
-        del self.jobs[args[0]]
-        
+        # del self.queues[args[0]]
+        # del self.jobs[args[0]]
 
     def builtin_help(self, pipe="", args=[]):
         pass
@@ -284,6 +276,11 @@ class MyShell:
         log.debug("Trying to get all jobs")
         log.info(f"Content of jobs {COLOR.BOLD(self.jobs)}")
         return str(self.jobs)
+
+    def builtin_queues(self, pipe="", args=[]):
+        log.debug("Trying to get all queues")
+        log.info(f"Content of queues {COLOR.BOLD(self.queues)}")
+        return str(self.queues)
 
     def builtin_pwd(self, pipe="", args=[]):
         cwd = self.cwd()
@@ -346,9 +343,9 @@ class MyShell:
             try:
                 # This will raise an exception on Windows.  That's ok.
                 pid, status = os.waitpid(any_process, os.WNOHANG)
-                log.error(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + ', ' + str(status))}")
                 if pid == 0:
                     break
+                log.error(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + ', ' + str(status))}")
                 if os.WIFEXITED(status):
                     log.error(f"The job of pid \"{pid}\" is done.")
                 if os.WIFSTOPPED(status):
@@ -373,12 +370,12 @@ class MyShell:
         elif io_control:
             # todo: cry
             log.debug("Doing io control")
-            log.debug(f"IO controller is: {sys.stdin}")
+            log.debug(f"Multiprocessing IO controller is: {sys.stdin}")
             p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8")
 
-            p.wait()
+            # p.wait()
             # p.stdin.write("hello\n")
-            # result, error = p.communicate()
+            result, error = p.communicate()
             # result = str(p.stdout)
             log.debug(f"The result is \"{result}\" and \"{error}\"")
             # waits for the process to end
@@ -392,6 +389,14 @@ class MyShell:
             raise CalledProcessException("None zero return code encountered")
         # log.debug(f"Raw string content: {COLOR.BOLD(result)}")
         return result
+
+    def cleanup(self):
+        keys = list(self.queues.keys())
+        log.debug(f"Queue is being cleaned, previous keys are {COLOR.BOLD(keys)}")
+        for i in keys:
+            if i not in self.jobs.keys():
+                del self.queues[i]
+        log.debug(f"Queue is cleaned, keys are {COLOR.BOLD(self.queues.keys())}")
 
     def home(self):
         return os.environ['HOME']
@@ -484,25 +489,29 @@ class MyShell:
         # print(self.prompt(), end="")
         # command = input().strip()
         log.debug(f"Getting user input: {COLOR.BOLD(command)}")
-        return self.run_command(command)
+        result = self.run_command(command)
+        self.cleanup()
+        return result
 
     @staticmethod
-    def run_command_wrap(count, shell, args, job, queue):
+    def run_command_wrap(count, shell, args, job, queue, jobs):
         log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
 
         # ! revert this
         # ! *****************************************************************
-        # if sys.stdin is not None:
-        #     sys.stdin.close()
-        # stdin = open(0)
-        # buffer = stdin.detach()
-        # wrapper = StdinWrapper(queue, count, job, buffer)
-        # sys.stdin = wrapper
+        if sys.stdin is not None:
+            sys.stdin.close()
+        stdin = open(0)
+        buffer = stdin.detach()
+        wrapper = StdinWrapper(queue, count, job, buffer)
+        sys.stdin = wrapper
         # ! *****************************************************************
 
-        shell.run_command(args, io_control=True)
-
-        queue.put("dummy")
+        try:
+            shell.run_command(args, io_control=True)
+        finally:
+            queue.put("dummy")
+            del jobs[count]
 
     def run_command(self, command, io_control=False):
         try:
@@ -513,11 +522,11 @@ class MyShell:
                 # count = self.job_counter.value
                 # todo: the counter might get significantly large
                 # with self.job_counter.get_lock():
-                    # self.job_counter.value += 1
+                # self.job_counter.value += 1
                 str_cnt = str(self.job_counter)
                 self.jobs[str_cnt] = command
                 self.queues[str_cnt] = Queue()
-                p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt]), name=command)
+                p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs), name=command)
                 p.start()
                 # todo: this is supposed to be a background task
                 # ! revert this
