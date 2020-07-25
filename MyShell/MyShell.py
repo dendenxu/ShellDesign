@@ -154,6 +154,24 @@ class MyShell:
             "PS1": "$",
         })
 
+        self.level = {
+            "(": 0,
+            ")": 0,
+            "-z": 1,
+            "-n": 1,
+            "=": 2,
+            "!=": 2,
+            "-eq": 2,
+            "-ge": 2,
+            "-gt": 2,
+            "-le": 2,
+            "-lt": 2,
+            "-ne": 2,
+            "!": 3,
+            "-a": 4,
+            "-o": 4,
+        }
+
         # ! damn strange... when an object has a Manager, multiprocessing refuse to spawn it on Windows
         # self.job_manager = Manager()
         self.jobs = Manager().dict()
@@ -362,6 +380,8 @@ class MyShell:
             return not len(operand)
         if operator == "-n":
             return len(operand)
+        if operator == "!":
+            return not operand
         # todo: raise
         log.critical("Unrecoginized operator in a place it shouldn't be")
 
@@ -384,77 +404,78 @@ class MyShell:
             return int(lhs) < int(rhs)
         if op == "-ne":
             return int(lhs) != int(rhs)
-
-        # todo: raise
-        log.critical("Unrecoginized operator in a place it shouldn't be")
-
-    @staticmethod
-    def test_logic_binary(op, lhs, rhs):
         if op == "-a":
             return lhs and rhs
         elif op == "-o":
             return lhs or rhs
+
         # todo: raise
         log.critical("Unrecoginized operator in a place it shouldn't be")
 
-    @staticmethod
-    def test_logic_unary(operator, operand):
-        if operator == "!":
-            return not operand
-        # todo: raise
-        log.critical("Unrecoginized operator in a place it shouldn't be")
+    def expand_expr(self, args):
+        if len(args) == 1:
+            return args[0]
+        else:
+            ind = 0
 
-    def infix2postfix(self, args):
-        level = {
-            "(": 0,
-            ")": 0,
-            "-z": 1,
-            "-n": 1,
-            "=": 2,
-            "!=": 2,
-            "-eq": 2,
-            "-ge": 2,
-            "-gt": 2,
-            "-le": 2,
-            "-lt": 2,
-            "-ne": 2,
-            "!": 3,
-            "-a": 4,
-            "-o": 4,
-        }
-        wait = ["(", ")", "!", "-a", "-o"]
-        binary = [key for key in level if level[key] == 2 or level[key] == 4]
-        unary = [key for key in level if level[key] == 1 or level[key] == 3]
+            if args[ind] not in self.level:
+                lhs = args[ind]
+                op = args[ind+1]
+                rhs = self.expand_expr(args[ind+2::])
+                return self.test_binary(op, lhs, rhs)
+            else:
+                # todo: operator
 
-        stack = []
+                # match parentheses
+                if args[ind] == "(":
+                    org = ind
+                    while args[ind] != ")":
+                        ind += 1
+                    lhs = self.expand_expr(args[org+1:ind])
+                    op = args[ind+1]
+                    rhs = self.expand_expr(args[ind+2::])
+                    return self.test_binary(op, lhs, rhs)
 
-        ind = 0
-        while ind < len(args):
-            if args[ind] not in level:
-                # if this is not a operator
-                if ind == len(args)-1 or args[ind+1] not in level:
-                    # todo:
-                    # log.error("Operator expected")
-                    raise TestException(f"Operator expected at position {ind+1}")
-                if args[ind+1] not in wait and (ind == len(args)-2 or args[ind+1] in level):
-                    raise TestException(f"Operand expected at position {ind+2}")
-                
-                if args[ind+1] not in binary:
-                    raise TestException(f"Binary compitable expression expected at position {ind+1}")
-                
-                if args[ind+1] in wait:
-                # do the operation and push binary result to stack
-                stack.append(self.test_binary(args[ind+1], args[ind], args[ind+2]))
+                if self.level[args[ind]] in [1, 3]:
+                    op = args[ind]
+                    oa, ind = self.get_one(args[ind+1::])
+                    lhs = self.test_unary(op, oa)
+                    op = args[ind]
+                    rhs = self.expand_expr(args[ind+1::])
+                    return self.test_binary(op, lhs, rhs)
+
+    def get_one(self, args):
+        
+        if len(args) == 1:
+            return args[0], 1
+        else:
+            ind = 0
+            if args[ind] == "(":
+                org = ind
+                while args[ind] != ")":
+                    ind += 1
+                return self.expand_expr(args[org+1:ind]), ind+1
+
+            if self.level[args[ind]] in [1, 3]:
+                op = args[ind]
+                oa, ind = self.get_one(args[ind+1::])
+                return self.test_unary(op, oa), ind + 1
 
     def builtin_test(self, pipe="", args=[]):
         # we can only use print to pass values
 
+        tf = {
+            True: "True",
+            False: "False",
+        }
+
+        return tf[self.expand_expr(args)]
         # todo: fill in the hole
-        try:
-            self.subshell(target="test", args=args, pipe=pipe, piping=True)
-            return "True"
-        except CalledProcessException as e:
-            return "False"
+        # try:
+        #     self.subshell(target="test", args=args, pipe=pipe, piping=True)
+        #     return "True"
+        # except CalledProcessException as e:
+        #     return "False"
 
     def builtin_time(self, pipe="", args=[]):
         return str(datetime.datetime.now())
