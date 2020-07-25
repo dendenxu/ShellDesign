@@ -155,21 +155,11 @@ class MyShell:
         })
 
         self.level = {
-            "(": 0,
-            ")": 0,
-            "-z": 1,
-            "-n": 1,
-            "=": 2,
-            "!=": 2,
-            "-eq": 2,
-            "-ge": 2,
-            "-gt": 2,
-            "-le": 2,
-            "-lt": 2,
-            "-ne": 2,
+            "(": 0, ")": 0,
+            "-z": 1, "-n": 1,
+            "=": 2, "!=": 2, "-eq": 2, "-ge": 2, "-gt": 2, "-le": 2, "-lt": 2, "-ne": 2,
             "!": 3,
-            "-a": 4,
-            "-o": 4,
+            "-a": 4, "-o": 4,
         }
 
         # ! damn strange... when an object has a Manager, multiprocessing refuse to spawn it on Windows
@@ -420,7 +410,7 @@ class MyShell:
             ind = 0
             if len(args) == 1:
                 return args[0]
-            
+
             if args[ind] not in self.level:
                 lhs = args[ind]
                 # not possible
@@ -451,12 +441,12 @@ class MyShell:
                 op = args[ind+1]
                 rhs = self.expand_expr(args[ind+2::])
                 return self.test_binary(op, lhs, rhs)
-                
+
         except (ValueError, KeyError) as e:
             raise TestException(e)
 
     def get_one(self, args):
-        
+
         ind = 0
         if len(args) == 1:
             return args[0], 1
