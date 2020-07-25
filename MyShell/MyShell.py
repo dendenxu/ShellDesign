@@ -420,18 +420,21 @@ class MyShell:
 
             if args[ind] not in self.level:
                 lhs = args[ind]
+                # not possible
+                # if ind == len(args)-1:
+                #     return lhs
                 op = args[ind+1]
                 rhs = self.expand_expr(args[ind+2::])
                 return self.test_binary(op, lhs, rhs)
             else:
-                # todo: operator
-
                 # match parentheses
                 if args[ind] == "(":
                     org = ind
                     while args[ind] != ")":
                         ind += 1
                     lhs = self.expand_expr(args[org+1:ind])
+                    if ind == len(args)-1:
+                        return lhs
                     op = args[ind+1]
                     rhs = self.expand_expr(args[ind+2::])
                     return self.test_binary(op, lhs, rhs)
@@ -440,8 +443,10 @@ class MyShell:
                     op = args[ind]
                     oa, ind = self.get_one(args[ind+1::])
                     lhs = self.test_unary(op, oa)
-                    op = args[ind]
-                    rhs = self.expand_expr(args[ind+1::])
+                    if ind == len(args)-1:
+                        return lhs
+                    op = args[ind+1]
+                    rhs = self.expand_expr(args[ind+2::])
                     return self.test_binary(op, lhs, rhs)
 
     def get_one(self, args):
@@ -469,7 +474,7 @@ class MyShell:
             False: "False",
         }
 
-        return tf[self.expand_expr(args)]
+        return tf[bool(self.expand_expr(args))]
         # todo: fill in the hole
         # try:
         #     self.subshell(target="test", args=args, pipe=pipe, piping=True)
