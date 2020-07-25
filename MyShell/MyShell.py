@@ -382,8 +382,10 @@ class MyShell:
             return len(operand)
         if operator == "!":
             return not operand
+
         # todo: raise
         log.critical("Unrecoginized operator in a place it shouldn't be")
+        raise TestException(f"Unrecognized unary operator \"{operator}\"")
 
     @staticmethod
     def test_binary(op, lhs, rhs):
@@ -411,13 +413,14 @@ class MyShell:
 
         # todo: raise
         log.critical("Unrecoginized operator in a place it shouldn't be")
+        raise TestException(f"Unrecognized binary operator \"{operator}\"")
 
     def expand_expr(self, args):
-        if len(args) == 1:
-            return args[0]
-        else:
+        try:
             ind = 0
-
+            if len(args) == 1:
+                return args[0]
+            
             if args[ind] not in self.level:
                 lhs = args[ind]
                 # not possible
@@ -426,45 +429,48 @@ class MyShell:
                 op = args[ind+1]
                 rhs = self.expand_expr(args[ind+2::])
                 return self.test_binary(op, lhs, rhs)
-            else:
-                # match parentheses
-                if args[ind] == "(":
-                    org = ind
-                    while args[ind] != ")":
-                        ind += 1
-                    lhs = self.expand_expr(args[org+1:ind])
-                    if ind == len(args)-1:
-                        return lhs
-                    op = args[ind+1]
-                    rhs = self.expand_expr(args[ind+2::])
-                    return self.test_binary(op, lhs, rhs)
 
-                if self.level[args[ind]] in [1, 3]:
-                    op = args[ind]
-                    oa, ind = self.get_one(args[ind+1::])
-                    lhs = self.test_unary(op, oa)
-                    if ind == len(args)-1:
-                        return lhs
-                    op = args[ind+1]
-                    rhs = self.expand_expr(args[ind+2::])
-                    return self.test_binary(op, lhs, rhs)
-
-    def get_one(self, args):
-        
-        if len(args) == 1:
-            return args[0], 1
-        else:
-            ind = 0
+            # match parentheses
             if args[ind] == "(":
                 org = ind
                 while args[ind] != ")":
                     ind += 1
-                return self.expand_expr(args[org+1:ind]), ind+1
+                lhs = self.expand_expr(args[org+1:ind])
+                if ind == len(args)-1:
+                    return lhs
+                op = args[ind+1]
+                rhs = self.expand_expr(args[ind+2::])
+                return self.test_binary(op, lhs, rhs)
 
             if self.level[args[ind]] in [1, 3]:
                 op = args[ind]
                 oa, ind = self.get_one(args[ind+1::])
-                return self.test_unary(op, oa), ind + 1
+                lhs = self.test_unary(op, oa)
+                if ind == len(args)-1:
+                    return lhs
+                op = args[ind+1]
+                rhs = self.expand_expr(args[ind+2::])
+                return self.test_binary(op, lhs, rhs)
+                
+        except (ValueError, KeyError) as e:
+            raise TestException(e)
+
+    def get_one(self, args):
+        
+        ind = 0
+        if len(args) == 1:
+            return args[0], 1
+
+        if args[ind] == "(":
+            org = ind
+            while args[ind] != ")":
+                ind += 1
+            return self.expand_expr(args[org+1:ind]), ind+1
+
+        if self.level[args[ind]] in [1, 3]:
+            op = args[ind]
+            oa, ind = self.get_one(args[ind+1::])
+            return self.test_unary(op, oa), ind + 1
 
     def builtin_test(self, pipe="", args=[]):
         # we can only use print to pass values
@@ -799,6 +805,11 @@ class MyShell:
                 log.error(f"Error number of argements in command \"{command['exec']}\", {e}")
             elif e.errors["type"] == "value":
                 log.error(f"Unable to interpret umask value in command \"{command['exec']}\", {e}")
+
+        except TestException as e:
+            log.debug("Error during test command")
+            log.info(f"Exception says: {e}")
+            log.error(f"Unable to perform \"{command['exec']}\", please check your syntax and operator match. {e}")
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
 
