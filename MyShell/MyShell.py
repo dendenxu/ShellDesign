@@ -58,10 +58,14 @@ class StdinWrapper(io.TextIOWrapper):
     def isok(self):
         if not self.ok:
             log.debug("Aha! You want to read something? Wait on!")
-            print(f"[{self.count}] suspended env {self.job}")
+            self.job["status"] = "suspended"
+            print(f"[{self.count}] suspended env {self.job['command']}")
+
             self.queue.get()
             self.isok = True
-            print(f"[{self.count}] continued env {self.job}")
+
+            self.job["status"] = "running"
+            print(f"[{self.count}] continued env {self.job['command']}")
 
     def __getattribute__(self, name):
         log.debug(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
@@ -86,8 +90,8 @@ class OnCallDict(dict):
             return value
 
     def __setitem__(self, key, value):
-        if callable(value):
-            log.info(f"We might be copying current shell, setting callable value \"{value}\" to \"{key}\"")
+        if key not in self:
+            log.info(f"We might be copying current shell, setting value \"{value}\" to \"{key}\"")
             super().__setitem__(key, value)
             return
         elif key == "PATH":
@@ -161,7 +165,22 @@ class MyShell:
             exit_signal = self.command_prompt()
 
     def builtin_bg(self, pipe="", args=[]):
-        pass
+        if len(args) != 1:
+            raise JobException("Argument number is not correct, only one expected.", {"type": "len"})
+        else:
+            for arg in args:
+                if arg not in self.jobs:
+                    raise JobException(f"Cannot find job is jobs number \"{arg}\".", {"type": "key"})
+
+        log.debug(f"Background is called with {COLOR.BOLD(args)}")
+        # self.queues[args[0]].put("dummy")
+
+        # log.info("Waiting for foreground task to finish...")
+
+        # self.queues[args[0]].get()
+        # log.debug("Continuing main process")
+        # del self.queues[args[0]]
+        # del self.jobs[args[0]]
 
     def builtin_cd(self, pipe="", args=[]):
         if len(args):
@@ -258,8 +277,11 @@ class MyShell:
         return "\n".join([f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars])
 
     def builtin_fg(self, pipe="", args=[]):
-        # todo: finish it
-        # todo: exception
+        if len(args) != 1:
+            raise JobException("Argument number is not correct, only one expected.", {"type": "len"})
+        elif args[0] not in self.jobs:
+            raise JobException(f"Cannot find job is jobs number \"{args[0]}\".", {"type": "key"})
+
         log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
         self.queues[args[0]].put("dummy")
 
@@ -511,7 +533,7 @@ class MyShell:
         try:
             shell.run_command(args, io_control=True)
         finally:
-            print(f"[{count}] Finished")
+            print(f"[{count}] finished env {job['command']}")
             queue.put("dummy")
             del jobs[count]
 
@@ -526,7 +548,9 @@ class MyShell:
                 # with self.job_counter.get_lock():
                 # self.job_counter.value += 1
                 str_cnt = str(self.job_counter)
-                self.jobs[str_cnt] = command
+                self.jobs[str_cnt] = {}
+                self.jobs[str_cnt]["command"] = command
+                self.jobs[str_cnt]["status"] = "running"
                 self.queues[str_cnt] = Queue()
                 p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs), name=command)
                 p.start()
@@ -611,6 +635,14 @@ class MyShell:
             log.info(f"Exception says: {e}")
             # currently the command is still a string
             log.error(f"Cannot interpret & sign in command \"{command}\". {e}")
+        except JobException as e:
+            log.debug("Exception when parsing command")
+            log.info(f"Exception says: {e}")
+            if e.errors["type"] == "len":
+                log.error(f"Error number of argements in command \"{command['exec']}\", {e}")
+            elif e.errors["type"] == "key":
+                log.error(f"Error job number in command \"{command['exec']}\", {e}")
+
         # Returning exit signal
         return False
 

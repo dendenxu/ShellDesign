@@ -58,3 +58,7 @@ class UnsetKeyException(MyShellException):
 class UnexpectedAndException(MyShellException):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)
+
+class JobException(MyShellException):
+    def __init__(self, message, errors=None):
+        super().__init__(message, errors)
