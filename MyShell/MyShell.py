@@ -22,7 +22,7 @@ from MyShellException import *
 from unittest.mock import patch
 log = logging.getLogger(__name__)
 
-coloredlogs.install(level='WARNING')  # Change this to DEBUG to see more info.
+coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
 # a decorator for logging function call
 def logger(func):
@@ -362,8 +362,24 @@ class MyShell:
     def builtin_time(self, pipe="", args=[]):
         return str(datetime.datetime.now())
 
-    def builtin_unmask(self, pipe="", args=[]):
-        pass
+    def builtin_umask(self, pipe="", args=[]):
+        if len(args) > 1:
+            raise UmaskException("Argument number is not correct, only one or zero expected.", {"type": "len"})
+        elif len(args) == 1:
+            try:
+                log.debug(f"Value of ARG: {COLOR.BOLD(args[0])}")
+                umask = int(args[0], 8)
+                log.debug(f"Value of ARG in int of 8: {COLOR.BOLD(umask)}")
+                os.umask(umask)
+            except ValueError as e:
+                raise UmaskException(e, {"type": "value"})
+        else:
+            # dummy parameter
+            old = os.umask(0)
+            log.debug(f"Value of OLD: {COLOR.BOLD(old)}")
+            os.umask(old)
+            return "0o{:03o}".format(old)
+
 
     def builtin_unset(self, pipe="", args=[]):
         keys = []
@@ -410,14 +426,14 @@ class MyShell:
         if piping:
             log.debug("Piping in subprocess...")
             # log.debug(f"content of pipe varible {COLOR.BOLD(pipe)}")
-            p = subprocess.run(to_run, stdout=PIPE, input=pipe, stderr=STDOUT, encoding="utf-8")
+            p = subprocess.run(to_run, stdout=PIPE, input=pipe, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
             result = str(p.stdout)
             # waits for the process to end
         elif io_control:
             # todo: cry
             log.debug("Doing io control")
             log.debug(f"Multiprocessing IO controller is: {sys.stdin}")
-            p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8")
+            p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
 
             # p.wait()
             # p.stdin.write("hello\n")
@@ -427,7 +443,7 @@ class MyShell:
             # waits for the process to end
         else:
             log.debug("Just running in regular env")
-            p = subprocess.run(to_run, stderr=STDOUT, encoding="utf-8")
+            p = subprocess.run(to_run, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
             # here we're directing the IO straight to the command line, so no result is needed
             # waits for the process to end
         if p.returncode != 0:
@@ -648,12 +664,19 @@ class MyShell:
             # currently the command is still a string
             log.error(f"Cannot interpret & sign in command \"{command}\". {e}")
         except JobException as e:
-            log.debug("Exception when parsing command")
+            log.debug("Exception when managing jobs")
             log.info(f"Exception says: {e}")
             if e.errors["type"] == "len":
                 log.error(f"Error number of argements in command \"{command['exec']}\", {e}")
             elif e.errors["type"] == "key":
                 log.error(f"Error job number in command \"{command['exec']}\", {e}")
+        except UmaskException as e:
+            log.debug("Exception when managing jobs")
+            log.info(f"Exception says: {e}")
+            if e.errors["type"] == "len":
+                log.error(f"Error number of argements in command \"{command['exec']}\", {e}")
+            elif e.errors["type"] == "value":
+                log.error(f"Unable to interpret umask value in command \"{command['exec']}\", {e}")
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
 
