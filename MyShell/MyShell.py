@@ -340,6 +340,24 @@ class MyShell:
         print(input("dummy3> "))
         print(input("dummyend> "))
 
+    def builtin_check_zombie(self, pipe="", args=[]):
+        any_process = -1
+        while True:
+            try:
+                # This will raise an exception on Windows.  That's ok.
+                pid, status = os.waitpid(any_process, os.WNOHANG)
+                log.error(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + str(status))}")
+                if pid == 0:
+                    break
+                if os.WIFEXITED(status):
+                    log.error(f"The job of pid \"{pid}\" is done.")
+                if os.WIFSTOPPED(status):
+                    log.error(f"The job of pid \"{pid}\" is suspended.")
+                if os.WIFCONTINUED(status):
+                    log.error(f"The job of pid \"{pid}\" is continued.")
+            except:
+                break
+
     def subshell(self, pipe="", target="", args=[], piping=False, io_control=False):
         if not target:
             raise EmptyException(f"Command \"{target}\" is empty", {"type": "subshell"})
@@ -357,9 +375,10 @@ class MyShell:
             log.debug("Doing io control")
             log.debug(f"IO controller is: {sys.stdin}")
             p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8")
+
+            p.wait()
             # p.stdin.write("hello\n")
-            # p.wait()
-            result, error = p.communicate()
+            # result, error = p.communicate()
             # result = str(p.stdout)
             log.debug(f"The result is \"{result}\" and \"{error}\"")
             # waits for the process to end
@@ -471,13 +490,15 @@ class MyShell:
     def run_command_wrap(count, shell, args, job, queue):
         log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
 
-        if sys.stdin is not None:
-            sys.stdin.close()
-        stdin = open(0)
-        buffer = stdin.detach()
-        wrapper = StdinWrapper(queue, count, job, buffer)
-        sys.stdin = wrapper
-        # sys.__stdin__ = wrapper
+        # ! revert this
+        # ! *****************************************************************
+        # if sys.stdin is not None:
+        #     sys.stdin.close()
+        # stdin = open(0)
+        # buffer = stdin.detach()
+        # wrapper = StdinWrapper(queue, count, job, buffer)
+        # sys.stdin = wrapper
+        # ! *****************************************************************
 
         shell.run_command(args, io_control=True)
 
