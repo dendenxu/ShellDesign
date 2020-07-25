@@ -25,6 +25,8 @@ log = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
 # a decorator for logging function call
+
+
 def logger(func):
     def wrapper(*args, **kwargs):
         log.debug(f"CALLING FUNCTION: {COLOR.BOLD(func)}")
@@ -50,7 +52,7 @@ class LoggingDict(dict):
         return super().__getitem__(key)
 
 
-@for_all_methods(logger) # using the full class logging system
+@for_all_methods(logger)  # using the full class logging system
 class StdinWrapper(io.TextIOWrapper):
     def __init__(self, queue, count, job, status_dict, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -68,18 +70,17 @@ class StdinWrapper(io.TextIOWrapper):
         if not self.ok:
             log.debug("Aha! You want to read something? Wait on!")
             self.job_status("suspended")
-            
+
             log.debug(f"WHAT IS SELF.STATUS_DICT: {self.status_dict}")
             log.debug(f"WHAT IS SELF.COUNT: {self.count}")
 
             content = self.queue.get()
 
             log.debug(f"WHAT DID YOU GET: {content}")
-            
-            self.isok = True
-            
-            self.job_status("running")
 
+            self.isok = True
+
+            self.job_status("running")
 
     def __getattribute__(self, name):
         log.debug(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
@@ -145,7 +146,7 @@ class MyShell:
 
         # we're using callable dict to evaluate values on call
         self.vars = OnCallDict({
-            "SHELL": __file__[0:-3],
+            "SHELL": os.path.abspath(__file__),
             "PWD": self.cwd,
             "HOME": self.home,
             "LOCATION": self.location,
@@ -304,7 +305,7 @@ class MyShell:
 
     def builtin_help(self, pipe="", args=[]):
         pass
-    
+
     @staticmethod
     def job_status_fmt(job_number, status, content):
         return f"{COLOR.BOLD(COLOR.YELLOW(f'[{job_number}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(content)}"
@@ -320,7 +321,7 @@ class MyShell:
         log.debug("Trying to get all jobs")
         log.info(f"Content of jobs {COLOR.BOLD(self.jobs)}")
         log.info(f"Content of status_dict {COLOR.BOLD(self.status_dict)}")
-        result = [ self.job_status(key) for key in self.jobs.keys() ]
+        result = [self.job_status(key) for key in self.jobs.keys()]
         return '\n'.join(result)
 
     def builtin_queues(self, pipe="", args=[]):
@@ -357,7 +358,21 @@ class MyShell:
         pass
 
     def builtin_test(self, pipe="", args=[]):
-        pass
+        # we can only use print to pass values
+        if not len(args):
+            return "False"
+        if args[0] == "-z":
+            if len(args) == 1 or not len(args[1]):
+                return "True"
+            else:
+                return "False"
+
+        # todo: fill in the hole
+        try:
+            self.subshell(target="test", args=args, pipe=pipe, piping=True)
+            return "True"
+        except CalledProcessException as e:
+            return "False"
 
     def builtin_time(self, pipe="", args=[]):
         return str(datetime.datetime.now())
@@ -379,7 +394,6 @@ class MyShell:
             log.debug(f"Value of OLD: {COLOR.BOLD(old)}")
             os.umask(old)
             return "0o{:03o}".format(old)
-
 
     def builtin_unset(self, pipe="", args=[]):
         keys = []
@@ -447,7 +461,7 @@ class MyShell:
             # here we're directing the IO straight to the command line, so no result is needed
             # waits for the process to end
         if p.returncode != 0:
-            log.warning("The subprocess is not running correctly")
+            log.warning("The subprocess is not returning zero exit code")
             raise CalledProcessException("None zero return code encountered")
         # log.debug(f"Raw string content: {COLOR.BOLD(result)}")
         return result
