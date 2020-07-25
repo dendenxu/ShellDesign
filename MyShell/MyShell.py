@@ -510,6 +510,7 @@ class MyShell:
         try:
             shell.run_command(args, io_control=True)
         finally:
+            print(f"[{count}] Finished")
             queue.put("dummy")
             del jobs[count]
 
