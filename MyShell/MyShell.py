@@ -19,7 +19,6 @@ from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value
 from os import name
 from COLOR import COLOR
 from MyShellException import *
-from unittest.mock import patch
 log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
@@ -357,15 +356,98 @@ class MyShell:
     def builtin_shift(self, pipe="", args=[]):
         pass
 
+    @staticmethod
+    def test_unary(operator, operand):
+        if operator == "-z":
+            return not len(operand)
+        if operator == "-n":
+            return len(operand)
+        # todo: raise
+        log.critical("Unrecoginized operator in a place it shouldn't be")
+
+    @staticmethod
+    def test_binary(op, lhs, rhs):
+        if op == "=":
+            return lhs == rhs
+        if op == "!=":
+            return lhs != rhs
+        if op == "-eq":
+            # todo: exception
+            return int(lhs) == int(rhs)
+        if op == "-ge":
+            return int(lhs) >= int(rhs)
+        if op == "-gt":
+            return int(lhs) > int(rhs)
+        if op == "-le":
+            return int(lhs) <= int(rhs)
+        if op == "-lt":
+            return int(lhs) < int(rhs)
+        if op == "-ne":
+            return int(lhs) != int(rhs)
+
+        # todo: raise
+        log.critical("Unrecoginized operator in a place it shouldn't be")
+
+    @staticmethod
+    def test_logic_binary(op, lhs, rhs):
+        if op == "-a":
+            return lhs and rhs
+        elif op == "-o":
+            return lhs or rhs
+        # todo: raise
+        log.critical("Unrecoginized operator in a place it shouldn't be")
+
+    @staticmethod
+    def test_logic_unary(operator, operand):
+        if operator == "!":
+            return not operand
+        # todo: raise
+        log.critical("Unrecoginized operator in a place it shouldn't be")
+
+    def infix2postfix(self, args):
+        level = {
+            "(": 0,
+            ")": 0,
+            "-z": 1,
+            "-n": 1,
+            "=": 2,
+            "!=": 2,
+            "-eq": 2,
+            "-ge": 2,
+            "-gt": 2,
+            "-le": 2,
+            "-lt": 2,
+            "-ne": 2,
+            "!": 3,
+            "-a": 4,
+            "-o": 4,
+        }
+        wait = ["(", ")", "!", "-a", "-o"]
+        binary = [key for key in level if level[key] == 2 or level[key] == 4]
+        unary = [key for key in level if level[key] == 1 or level[key] == 3]
+
+        stack = []
+
+        ind = 0
+        while ind < len(args):
+            if args[ind] not in level:
+                # if this is not a operator
+                if ind == len(args)-1 or args[ind+1] not in level:
+                    # todo:
+                    # log.error("Operator expected")
+                    raise TestException(f"Operator expected at position {ind+1}")
+                if args[ind+1] not in wait and (ind == len(args)-2 or args[ind+1] in level):
+                    raise TestException(f"Operand expected at position {ind+2}")
+                
+                if args[ind+1] not in binary:
+                    raise TestException(f"Binary compitable expression expected at position {ind+1}")
+                
+                if args[ind+1] in wait:
+                # do the operation and push binary result to stack
+                stack.append(self.test_binary(args[ind+1], args[ind], args[ind+2]))
+
     def builtin_test(self, pipe="", args=[]):
         # we can only use print to pass values
-        if not len(args):
-            return "False"
-        if args[0] == "-z":
-            if len(args) == 1 or not len(args[1]):
-                return "True"
-            else:
-                return "False"
 
         # todo: fill in the hole
         try:
