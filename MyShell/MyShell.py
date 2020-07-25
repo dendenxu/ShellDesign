@@ -136,9 +136,10 @@ class MyShell:
             "PS1": "$",
         })
 
-        self.job_manager = Manager()
+        # ! damn strange... when an object has a Manager, multiprocessing refuse to spawn it on Windows
+        # self.job_manager = Manager()
         # self.job_counter = Value("i", 0)
-        self.jobs = self.job_manager.dict()
+        self.jobs = Manager().dict()
         # self.queues = self.job_manager.dict()
         self.job_counter = 0
         # self.jobs = {}
