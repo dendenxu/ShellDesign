@@ -346,7 +346,7 @@ class MyShell:
             try:
                 # This will raise an exception on Windows.  That's ok.
                 pid, status = os.waitpid(any_process, os.WNOHANG)
-                log.error(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + str(status))}")
+                log.error(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + ', ' + str(status))}")
                 if pid == 0:
                     break
                 if os.WIFEXITED(status):
