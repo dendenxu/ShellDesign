@@ -48,20 +48,34 @@ class LoggingDict(dict):
 
 @for_all_methods(logger)
 class StdinWrapper(io.TextIOWrapper):
-    def __init__(self, queue, count, job, *args, **kwargs):
+    def __init__(self, queue, count, job, status_dict, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.queue = queue
         self.job = job
+        self.status_dict = status_dict
         self.count = count
         self.ok = False
+
+    def job_status(self, status):
+        self.status_dict[self.count] = status
+        print(f"{COLOR.BOLD(COLOR.YELLOW(f'[{self.count}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(self.job)}")
 
     def isok(self):
         if not self.ok:
             log.debug("Aha! You want to read something? Wait on!")
-            print(f"[{self.count}] suspended env {self.job}")
-            self.queue.get()
+            self.job_status("suspended")
+            
+            log.critical(f"WHAT IS SELF.STATUS_DICT: {self.status_dict}")
+            log.critical(f"WHAT IS SELF.COUNT: {self.count}")
+
+            content = self.queue.get()
+
+            log.critical(f"WHAT DID YOU GET: {content}")
+            
             self.isok = True
-            print(f"[{self.count}] continued env {self.job}")
+            
+            self.job_status("running")
+
 
     def __getattribute__(self, name):
         log.debug(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
@@ -140,6 +154,7 @@ class MyShell:
         # self.job_manager = Manager()
         # self.job_counter = Value("i", 0)
         self.jobs = Manager().dict()
+        self.status_dict = Manager().dict()
         # self.queues = self.job_manager.dict()
         self.job_counter = 0
         # self.jobs = {}
@@ -169,14 +184,6 @@ class MyShell:
                     raise JobException(f"Cannot find job is jobs number \"{arg}\".", {"type": "key"})
 
         log.debug(f"Background is called with {COLOR.BOLD(args)}")
-        # self.queues[args[0]].put("dummy")
-
-        # log.info("Waiting for foreground task to finish...")
-
-        # self.queues[args[0]].get()
-        # log.debug("Continuing main process")
-        # del self.queues[args[0]]
-        # del self.jobs[args[0]]
 
     def builtin_cd(self, pipe="", args=[]):
         if len(args):
@@ -294,7 +301,9 @@ class MyShell:
     def builtin_jobs(self, pipe="", args=[]):
         log.debug("Trying to get all jobs")
         log.info(f"Content of jobs {COLOR.BOLD(self.jobs)}")
-        return str(self.jobs)
+        log.info(f"Content of status_dict {COLOR.BOLD(self.status_dict)}")
+        result = [ f"{COLOR.BOLD(COLOR.YELLOW(f'[{key}]'))} {COLOR.BOLD(self.status_dict[key])} env {COLOR.BOLD(self.jobs[key])}" for key in self.jobs.keys() ]
+        return '\n'.join(result)
 
     def builtin_queues(self, pipe="", args=[]):
         log.debug("Trying to get all queues")
@@ -513,7 +522,7 @@ class MyShell:
         return result
 
     @staticmethod
-    def run_command_wrap(count, shell, args, job, queue, jobs):
+    def run_command_wrap(count, shell, args, job, queue, jobs, status_dict):
         log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
 
         # ! revert this
@@ -522,7 +531,7 @@ class MyShell:
             sys.stdin.close()
         stdin = open(0)
         buffer = stdin.detach()
-        wrapper = StdinWrapper(queue, count, job, buffer)
+        wrapper = StdinWrapper(queue, count, job, status_dict, buffer)
         sys.stdin = wrapper
         # ! *****************************************************************
 
@@ -532,6 +541,7 @@ class MyShell:
             print(f"[{count}] finished env {job}")
             queue.put("dummy")
             del jobs[count]
+            del status_dict[count]
 
     def run_command(self, command, io_control=False):
         try:
@@ -546,7 +556,8 @@ class MyShell:
                 str_cnt = str(self.job_counter)
                 self.jobs[str_cnt] = command
                 self.queues[str_cnt] = Queue()
-                p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs), name=command)
+                self.status_dict[str_cnt] = "running"
+                p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
                 p.start()
                 # todo: this is supposed to be a background task
                 # ! revert this
