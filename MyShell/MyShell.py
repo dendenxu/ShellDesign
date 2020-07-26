@@ -746,29 +746,23 @@ class MyShell:
     @staticmethod
     def run_command_wrap(count, shell, args, job, queue, jobs, status_dict):
         log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
-        # os.setpgrp()
+
+        # ! doesn't work on WINDOWS
         my_pid = os.getpid()
 
         def exit_subp(sig, frame):
             if shell.subp.pid is not None:
                 log.warning("Killing a still running subprocess...")
-                if os.name == "nt":
-                    os.kill(shell.subp.pid, signal.CTRL_BREAK_EVENT)
-                else:
-                    os.kill(shell.subp.pid, signal.SIGKILL)
+                # os.kill(shell.subp.pid, signal.SIGTERM)
+                shell.subp.pid.kill()
             log.warning(f"Getting signal: {COLOR.BOLD(sig)}")
             log.warning(f"Are you: {COLOR.BOLD(signal.SIGTERM)}")
             if sig == signal.SIGTERM:
                 log.warning("Terminating self")
-                if os.name == "nt":
-                    os.kill(my_pid, signal.CTRL_BREAK_EVENT)
-                else:
-                    os.kill(my_pid, signal.SIGKILL)
+                os.kill(my_pid, signal.SIGTERM)
                 
-            # os.killpg(0, signal.SIGKILL)
 
         signal.signal(signal.SIGTERM, exit_subp)
-
         if sys.stdin is not None:
             sys.stdin.close()
         stdin = open(0)
