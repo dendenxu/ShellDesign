@@ -619,37 +619,42 @@ class MyShell:
             raise EmptyException(f"Command \"{target}\" is empty", {"type": "subshell"})
         to_run = [target] + args
         log.debug(f"Runnning in subprocess: {COLOR.BOLD(to_run)}")
-        result = None
-        if piping:
-            log.debug("Piping in subprocess...")
-            # log.debug(f"content of pipe varible {COLOR.BOLD(pipe)}")
-            p = subprocess.Popen(to_run, stdin=PIPE, stdout=PIPE, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
-            self.subp = p
-            result, error = p.communicate(pipe)
-            # waits for the process to end
-        elif io_control:
-            # todo: cry
-            log.debug("Doing io control")
-            log.debug(f"Multiprocessing IO controller is: {sys.stdin}")
-            p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
-            self.subp = p
+        try:
+            result = None
+            if piping:
+                log.debug("Piping in subprocess...")
+                # log.debug(f"content of pipe varible {COLOR.BOLD(pipe)}")
+                p = subprocess.Popen(to_run, stdin=PIPE, stdout=PIPE, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+                self.subp = p
+                result, error = p.communicate(pipe)
+                # waits for the process to end
+            elif io_control:
+                # todo: cry
+                log.debug("Doing io control")
+                log.debug(f"Multiprocessing IO controller is: {sys.stdin}")
+                p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+                self.subp = p
 
-            # p.wait()
-            # p.stdin.write("hello\n")
-            result, error = p.communicate()
-            # result = str(p.stdout)
-            log.debug(f"The result is \"{result}\" and \"{error}\"")
-            # waits for the process to end
-        else:
-            log.debug("Just running in regular env")
-            p = subprocess.Popen(to_run, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
-            self.subp = p
-            p.wait()
-            # here we're directing the IO straight to the command line, so no result is needed
-            # waits for the process to end
-        if p.returncode != 0:
-            log.warning("The subprocess is not returning zero exit code")
-            raise CalledProcessException("None zero return code encountered")
+                # p.wait()
+                # p.stdin.write("hello\n")
+                result, error = p.communicate()
+                # result = str(p.stdout)
+                log.debug(f"The result is \"{result}\" and \"{error}\"")
+                # waits for the process to end
+            else:
+                log.debug("Just running in regular env")
+                p = subprocess.Popen(to_run, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+                self.subp = p
+                p.wait()
+                # here we're directing the IO straight to the command line, so no result is needed
+                # waits for the process to end
+            if p.returncode != 0:
+                log.warning("The subprocess is not returning zero exit code")
+                raise CalledProcessException("None zero return code encountered")
+        except:
+            raise
+        finally:
+            self.subp = None
         # log.debug(f"Raw string content: {COLOR.BOLD(result)}")
         return result
 
@@ -823,7 +828,7 @@ class MyShell:
                 process_bak = self.process
                 jobs_bak = self.jobs
                 status_dict_bak = self.status_dict
-                
+
                 del self.queues
                 del self.process
                 del self.jobs
