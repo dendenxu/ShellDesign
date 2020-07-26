@@ -132,7 +132,7 @@ class OnCallDict(dict):
 
 
 class MyShell:
-    def __init__(self, dict_in={}, cmd_args={}):
+    def __init__(self, dict_in={}, cmd_args=[]):
         self.builtin_prefix = "builtin_"
 
         builtins = MyShell.__dict__.items()
@@ -152,16 +152,16 @@ class MyShell:
             "PATH": self.path,
             "PS1": "$"
         })
+        # todo: implement cmd args
+        self.cmd_args = cmd_args
 
         prev_level = coloredlogs.get_level()
         log.debug(f"Logging level is {COLOR.BOLD(prev_level)}")
         coloredlogs.set_level("WARNING")
         for i in range(10):
-            self.vars[str(i)] = MyShell.picklable_nested(self, i)
+            self.vars[str(i)] = MyShell.picklable_nested(self.cmd_args, i)
         coloredlogs.set_level(prev_level)
 
-        # todo: implement cmd args
-        self.cmd_args = cmd_args
 
         self.level = {
             "(": 0, ")": 0,
@@ -194,12 +194,12 @@ class MyShell:
             exit_signal = self.command_prompt()
 
     class picklable_nested():
-        def __init__(self, shell, number):
-            self.shell = shell
+        def __init__(self, cmd_args, number):
+            self.cmd_args = cmd_args
             self.number = number
 
         def __call__(self):
-            return self.shell.cmd_args[self.number]
+            return self.cmd_args[self.number]
 
     def builtin_bg(self, pipe="", args=[]):
         if len(args) != 1:
