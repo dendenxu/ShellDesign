@@ -1,8 +1,13 @@
 test ! -z ""
 date +%s
 time
+set BOLD="\033[1m"
+set BLUE="\033[34m"
+set RESET="\033[0m"
 
-echo
+set LINE="$BOLD$BLUE##############################################################$RESET"
+
+echo $LINE
 
 umask
 echo "Changing UMASK to 0o777"
@@ -11,7 +16,7 @@ umask
 echo "Changing UMASK to 0o002"
 umask 002
 
-echo
+echo $LINE
 
 echo "Hello, my name is $SHELL"
 set hello_msg="Hello, my name is"
@@ -21,7 +26,7 @@ echo "xz" | sha256sum | tr -d " -"
 echo "Should print 1 1 65 in the following line"
 echo "zy" | sha256sum | tr -d " -" | wc
 
-echo
+echo $LINE
 
 dir
 pwd
@@ -29,14 +34,14 @@ unset hello_msg
 echo "Should get empty output"
 echo $hello_msg
 
-echo
+echo $LINE
 
 echo "Should print /dev/null"
 ls /dev | grep null
 echo "Should print all files containing 1 in /tmp"
 ls /tmp | grep 1
 
-echo
+echo $LINE
 
 echo "Should make a file log.log"
 echo "Hello, I'm your logger." > log.log
@@ -49,32 +54,42 @@ cat log.log
 echo "Should display word count of log.log"
 wc < log.log
 
-echo
+echo $LINE
 
 echo "Opening some sleepy jobs"
 echo "And calling command jobs"
-sleep 3s &
-echo "waiting 0.5s"
+sleep 2s | echo "Sleeping in $0" &
+echo "waiting 0.25s"
 jobs
-sleep 0.5s
-sleep 3s &
-echo "waiting 0.5s"
+sleep 0.25s
+sleep 2s | echo "This is some job management" &
+echo "waiting 0.25s"
 jobs
-sleep 0.5s
-sleep 3s &
-echo "waiting 0.5s"
+sleep 0.25s
+sleep 2s | echo "MyShell is $SHELL" &
+echo "waiting 0.25s"
 jobs
-sleep 0.5s
-sleep 3s &
-echo "waiting 0.5s"
+sleep 0.25s
+sleep 2s &
+echo "waiting 0.25s"
 jobs
-sleep 0.5s
-sleep 3s &
+sleep 0.25s
+sleep 2s &
 echo "Getting current runnning jobs..."
 jobs
 
 echo "Getting back to fore ground"
 echo "Waiting for background jobs to terminate"
-sleep 3s
+echo "At the same time I can still do other things like testing..."
+test "" -o "a"
+test ! -z "a" -a ( -n "1" -o 1 -ge 1 ) -a 2 -ne 1
+
+sleep 2s
+
 echo "Should produce empty content"
 jobs
+
+
+echo "Bye \~"
+
+echo $LINE

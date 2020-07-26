@@ -15,6 +15,7 @@ import multiprocessing
 import tempfile
 import traceback
 import argparse
+import codecs
 from subprocess import Popen, PIPE, STDOUT
 from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value
 from os import name
@@ -91,7 +92,7 @@ class StdinWrapper(io.TextIOWrapper):
 
 
 class OnCallDict(dict):
-    unsupported = ["HOME", "USER", "LOCATION", "SHELL"]
+    unsupported = ["HOME", "USER", "LOCATION", "SHELL"] + [str(i) for i in range(10)]
     reserved = unsupported + ["PATH", "PWD"]
 
     def __getitem__(self, key):
@@ -133,7 +134,7 @@ class OnCallDict(dict):
 
 
 class MyShell:
-    def __init__(self, dict_in={}):
+    def __init__(self, dict_in={}, cmd_args={}):
         self.builtin_prefix = "builtin_"
 
         builtins = MyShell.__dict__.items()
@@ -151,8 +152,15 @@ class MyShell:
             "LOCATION": self.location,
             "USER": self.user,
             "PATH": self.path,
-            "PS1": "$",
+            "PS1": "$"
         })
+
+        for i in range(10):
+            self.vars[str(i)] = self.wrapper_cmd_args(i)
+
+        # todo: implement cmd args
+        self.cmd_args = cmd_args
+        self.cmd_arg_offset = 0
 
         self.level = {
             "(": 0, ")": 0,
@@ -183,6 +191,11 @@ class MyShell:
         exit_signal = False
         while not exit_signal:
             exit_signal = self.command_prompt()
+
+    def wrapper_cmd_args(self, number):
+        def get_value():
+            return self.cmd_args[number]
+        return get_value
 
     def builtin_bg(self, pipe="", args=[]):
         if len(args) != 1:
@@ -283,6 +296,7 @@ class MyShell:
 
     def builtin_echo(self, pipe="", args=[]):
         result = f"{' '.join(args)}\n"
+        result = codecs.escape_decode(bytes(result, "utf-8"))[0].decode("utf-8")
         return result
 
     def builtin_exec(self, pipe="", args=[]):
@@ -367,11 +381,11 @@ class MyShell:
     @staticmethod
     def test_unary(operator, operand):
         if operator == "-z":
-            return not len(operand)
+            return not len(str(operand))
         if operator == "-n":
-            return len(operand)
+            return len(str(operand))
         if operator == "!":
-            return not operand
+            return not bool(operand)
 
         # todo: raise
         log.critical("Unrecoginized operator in a place it shouldn't be")
@@ -380,9 +394,9 @@ class MyShell:
     @staticmethod
     def test_binary(op, lhs, rhs):
         if op == "=":
-            return lhs == rhs
+            return str(lhs) == str(rhs)
         if op == "!=":
-            return lhs != rhs
+            return str(lhs) != str(rhs)
         if op == "-eq":
             # todo: exception
             return int(lhs) == int(rhs)
@@ -397,15 +411,16 @@ class MyShell:
         if op == "-ne":
             return int(lhs) != int(rhs)
         if op == "-a":
-            return lhs and rhs
+            return bool(lhs) and bool(rhs)
         elif op == "-o":
-            return lhs or rhs
+            return bool(lhs) or bool(rhs)
 
         # todo: raise
         log.critical("Unrecoginized operator in a place it shouldn't be")
         raise TestException(f"Unrecognized binary operator \"{operator}\"")
 
     def expand_expr(self, args):
+        # ! we combine from the right, that is the right most value are evaluated first
         try:
             ind = 0
             if len(args) == 1:
@@ -443,12 +458,13 @@ class MyShell:
                 return self.test_binary(op, lhs, rhs)
 
         except (ValueError, KeyError) as e:
+            # log.error(f"{e}")
             raise TestException(e)
 
     def get_one(self, args):
 
         ind = 0
-        if len(args) == 1:
+        if len(args) == 1 or args[ind] not in self.level:
             return args[0], 1
 
         if args[ind] == "(":
@@ -917,9 +933,9 @@ class MyShell:
 
     def expand(self, string):
         # log.debug(f"The string to be expanded is: {COLOR.BOLD(string)}")
-        # string = re.sub(r"~", self.home(), string)
-        string = string.replace("~", self.home())
-        var_list = [(m.start(0), m.end(0)) for m in re.finditer(r"\$\w+", string)]
+        string = re.sub(r"(?<!\\)~", self.home(), string)
+        # string = string.replace("~", self.home())
+        var_list = [(m.start(0), m.end(0)) for m in re.finditer(r"(?<!\\)\$\w+", string)]
         str_list = []
         prev = [0, 0]
         for start, end in var_list:
@@ -937,7 +953,7 @@ class MyShell:
             try:
                 var = self.vars[key]
                 log.debug(f"Got the varible {COLOR.BOLD(var)}")
-            except KeyError as e:
+            except (KeyError, IndexError) as e:
                 log.warning(f"Unable to get the varible \"{key}\", assigning empty string")
                 var = ""
             # splitting the expanded command since it might contain some information
@@ -960,7 +976,7 @@ class MyShell:
         return parsed_command
 
 
-def main(args):
+def main(args, cmd_args):
 
     if args.e:
         coloredlogs.set_level("ERROR")
@@ -972,20 +988,21 @@ def main(args):
         coloredlogs.set_level("DEBUG")
 
     # myshell = MyShell({"TEST": "echo \"echo $SHELL\""})
-    myshell = MyShell()
+    myshell = MyShell(cmd_args=cmd_args)
     log.debug(f"Getting user command line argument(s): {COLOR.BOLD(args)}")
     # todo: batch process
 
     if args.f:
         try:
-            for file_name in args.f:
-                # ! using utf-8
-                f = open(file_name, encoding="utf-8")  # opending the file specified
-                for line in f:
-                    line = line.strip()
-                    myshell.run_command(line)  # execute line by line
+            # ! using utf-8
+            f = open(args.f, encoding="utf-8")  # opending the file specified
+            for line in f:
+                line = line.strip()
+                result = myshell.run_command(line)  # execute line by line
+                if result: # the execution of the file should be terminated
+                    break
         except FileNotFoundError as e:
-            log.error(f"Cannot find the file specified for batch processing: \"{file_name}\". {e}")
+            log.error(f"Cannot find the file specified for batch processing: \"{args.f}\". {e}")
     else:
         myshell()
 
@@ -994,11 +1011,13 @@ if __name__ == "__main__":
     # hello -n "world" < input.txt | tr -d -c "re"
     # echo "zy" | sha256sum | tr -d " -" | wc
     parser = argparse.ArgumentParser(description='MyShell by xudenden@gmail.com')
-    parser.add_argument('f', metavar='F', type=str, nargs='*', help='the batch file to be executed')
+    parser.add_argument('f', metavar='F', type=str, nargs='?', help='the batch file to be executed')
     parser.add_argument('-e', help='enable error level debugging info log', action='store_true')
     parser.add_argument('-w', help='enable warning level debugging info log', action='store_true')
     parser.add_argument('-i', help='enable info level debugging info log', action='store_true')
     parser.add_argument('-d', help='enable debug(verbose) level debugging info log', action='store_true')
 
     args = parser.parse_args()
-    main(args)
+    reserved = ["-e", "-w", "-i", "-d"]
+    filtered = [i for i in sys.argv if i not in reserved]
+    main(args, filtered)
