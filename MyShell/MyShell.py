@@ -1,26 +1,26 @@
 #!python
-import os # 大部分os相关功能来自此包
-import io # 用于构建一个stdin的wrapper以捕捉程序的输入/输出请求
-import sys # 一些系统调用/常数的来源包
-import re # 正则表达式
-import time # 用在builtin_sleep中，针对Windows系统的睡眠操作
-import platform # 获取平台信息
-import getpass # 获取用户信息
-import logging # 用于打印一些详细调试信息
-import coloredlogs # 用于打印带颜色的调试信息
-import datetime # 用于取得时间/日期，用于builtin_time
-import readline # 用于提供人性化的input函数操作，例如输入历史功能等
-import subprocess # 用于刷出/控制子进程
-import multiprocessing # 用于后台程序的运行/管理
-import traceback # 用于打印报错信息的调用堆栈
-import argparse # 用于解释本程序的命令行参数
-import codecs # 用于转义字符串，用于builtin_echo
+import os  # 大部分os相关功能来自此包
+import io  # 用于构建一个stdin的wrapper以捕捉程序的输入/输出请求
+import sys  # 一些系统调用/常数的来源包
+import re  # 正则表达式
+import time  # 用在builtin_sleep中，针对Windows系统的睡眠操作
+import platform  # 获取平台信息
+import getpass  # 获取用户信息
+import logging  # 用于打印一些详细调试信息
+import coloredlogs  # 用于打印带颜色的调试信息
+import datetime  # 用于取得时间/日期，用于builtin_time
+import readline  # 用于提供人性化的input函数操作，例如输入历史功能等
+import subprocess  # 用于刷出/控制子进程
+import multiprocessing  # 用于后台程序的运行/管理
+import traceback  # 用于打印报错信息的调用堆栈
+import argparse  # 用于解释本程序的命令行参数
+import codecs  # 用于转义字符串，用于builtin_echo
 import signal
 
-from subprocess import Popen, PIPE, STDOUT # 子进程管理
-from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value # 多进程管理
-from COLOR import COLOR # 颜色信息
-from MyShellException import * # MyShell错误管理
+from subprocess import Popen, PIPE, STDOUT  # 子进程管理
+from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value  # 多进程管理
+from COLOR import COLOR  # 颜色信息
+from MyShellException import *  # MyShell错误管理
 log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
@@ -165,7 +165,6 @@ class MyShell:
             self.vars[str(i)] = MyShell.picklable_nested(self, i)
         coloredlogs.set_level(prev_level)
 
-
         self.level = {
             "(": 0, ")": 0,
             "-z": 1, "-n": 1,
@@ -192,7 +191,6 @@ class MyShell:
         log.debug(f"Built in command list: {self.builtins}")
         log.debug("MyShell is instanciated.")
 
-
     def __call__(self):
         log.debug("This is MyShell.")
         exit_signal = False
@@ -208,12 +206,15 @@ class MyShell:
             return self.shell.cmd_args[self.number]
 
     def builtin_bg(self, pipe="", args=[]):
-        if len(args) != 1:
-            raise JobException("Argument number is not correct, only one expected.", {"type": "len"})
+        not_in_list = []
+        if not len(args):
+            raise JobException("Argument number is not correct, one or more expected.", {"type": "len"})
         else:
             for arg in args:
                 if arg not in self.jobs:
-                    raise JobException(f"Cannot find job is jobs number \"{arg}\".", {"type": "key"})
+                    not_in_list.append(arg)
+        if len(not_in_list):
+            raise JobException(f"Cannot find job with number \"{not_in_list}\".", {"type": "key"})
 
         log.debug(f"Background is called with {COLOR.BOLD(args)}")
         for job_number in args:
@@ -406,7 +407,7 @@ class MyShell:
             self.cmd_args = self.cmd_args[args[0]::]
         except IndexError:
             pass
-        if not len(self.cmd_args):    
+        if not len(self.cmd_args):
             self.cmd_args = [dollar_zero]
 
         self.cmd_args[0] = dollar_zero
@@ -529,9 +530,28 @@ class MyShell:
         # except CalledProcessException as e:
         #     return "False"
 
+    def builtin_term(self, pipe="", args=[]):
+        not_in_list = []
+        if len(args)>=1:
+            for arg in args:
+                if arg not in self.jobs:
+                    not_in_list.append(arg)
+                else:
+                    log.debug("Terminating...")
+                    # if self.status_dict[arg] == "suspended":
+                    #     self.queues[arg].put("dummy")
+                    os.kill(self.process[arg].pid, signal.SIGTERM)
+                    del self.jobs[arg]
+        else:
+            raise JobException(f"One or more arguments expected", {"type":"len"})
+        if len(not_in_list):
+            raise JobException(f"Cannot find jobs with number \"{not_in_list}\".", {"type": "key"})
+
+
     def builtin_sleep(self, pipe="", args=[]):
+        # todo: raise
         if os.name == "nt":
-            if len(args) ==1 and args[0].endswith("s"):
+            if len(args) == 1 and args[0].endswith("s"):
                 time.sleep(float(args[0][0:-1]))
         else:
             self.subshell(target="sleep", args=args, pipe=pipe)
@@ -634,13 +654,13 @@ class MyShell:
 
     def cleanup(self):
         keys = list(self.queues.keys())
-        
+
         log.debug(f"Queue is being cleaned, previous keys are {COLOR.BOLD(keys)}")
         for i in keys:
             if i not in self.jobs.keys():
                 del self.queues[i]
         log.debug(f"Queue is cleaned, keys are {COLOR.BOLD(self.queues.keys())}")
-        
+
         keys = list(self.process.keys())
 
         log.debug(f"Process is being cleaned, previous keys are {COLOR.BOLD(keys)}")
@@ -648,6 +668,14 @@ class MyShell:
             if i not in self.jobs.keys():
                 del self.process[i]
         log.debug(f"Process is cleaned, keys are {COLOR.BOLD(self.process.keys())}")
+
+        keys = list(self.status_dict.keys())
+
+        log.debug(f"Status Dict is being cleaned, previous keys are {COLOR.BOLD(keys)}")
+        for i in keys:
+            if i not in self.jobs.keys():
+                del self.status_dict[i]
+        log.debug(f"Status Dict is cleaned, keys are {COLOR.BOLD(self.status_dict.keys())}")
 
     def home(self):
         return os.environ['HOME']
@@ -747,22 +775,22 @@ class MyShell:
     def run_command_wrap(count, shell, args, job, queue, jobs, status_dict):
         log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
 
-        # ! doesn't work on WINDOWS
+        # ! DOESN"T WORK ON WINDOWS!
+        # ! WILL CREATE ZOMBIE PROCESS!
         my_pid = os.getpid()
 
         def exit_subp(sig, frame):
-            if shell.subp.pid is not None:
+            if shell.subp is not None:
                 log.warning("Killing a still running subprocess...")
-                # os.kill(shell.subp.pid, signal.SIGTERM)
-                shell.subp.pid.kill()
+                os.kill(shell.subp.pid, signal.SIGKILL)
             log.warning(f"Getting signal: {COLOR.BOLD(sig)}")
             log.warning(f"Are you: {COLOR.BOLD(signal.SIGTERM)}")
             if sig == signal.SIGTERM:
                 log.warning("Terminating self")
-                os.kill(my_pid, signal.SIGTERM)
-                
+                os.kill(my_pid, signal.SIGKILL)
 
         signal.signal(signal.SIGTERM, exit_subp)
+
         if sys.stdin is not None:
             sys.stdin.close()
         stdin = open(0)
@@ -810,6 +838,10 @@ class MyShell:
             log.debug("User is exiting...")
             log.debug(f"Exception says: {e}")
             log.info("Bye")
+            for job in self.jobs:
+                os.kill(self.process[job].pid, signal.SIGTERM)
+                print(self.job_status_fmt(job, "terminated", self.jobs[job]))
+                # del self.jobs[job]
             return True
         except EmptyException as e:
             log.debug("The command is empty...")
