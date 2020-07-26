@@ -90,6 +90,51 @@ echo "Should produce empty content"
 jobs
 
 
-echo "Bye \~"
+echo "Jobs are done ~"
 
 echo $LINE
+
+echo "Arg 0 is: $0"
+echo "Arg 1 is: $1"
+echo "Arg 2 is: $2"
+echo "Arg 3 is: $3"
+echo "Arg 4 is: $4"
+echo "Arg 5 is: $5"
+echo "Arg 6 is: $6"
+echo "Arg 7 is: $7"
+echo "Arg 8 is: $8"
+echo "Arg 9 is: $9"
+
+echo "Shifting #1"
+shift
+echo "Arg 0 is: $0"
+echo "Arg 1 is: $1"
+echo "Arg 2 is: $2"
+echo "Arg 3 is: $3"
+echo "Arg 4 is: $4"
+echo "Arg 5 is: $5"
+echo "Arg 6 is: $6"
+echo "Arg 7 is: $7"
+echo "Arg 8 is: $8"
+echo "Arg 9 is: $9"
+
+
+
+echo "Shifting #2"
+shift
+echo "Arg 1 is: $1"
+
+echo "Shifting #3"
+shift
+echo "Arg 1 is: $1"
+
+echo "Shifting #4"
+shift
+echo "Arg 1 is: $1"
+
+echo "Shifting #5"
+shift
+echo "Arg 1 is: $1"
+
+
+echo "$BOLD"Bye!"$RESET"

@@ -155,12 +155,15 @@ class MyShell:
             "PS1": "$"
         })
 
+        prev_level = coloredlogs.get_level()
+        log.debug(f"Logging level is {COLOR.BOLD(prev_level)}")
+        coloredlogs.set_level("WARNING")
         for i in range(10):
             self.vars[str(i)] = self.wrapper_cmd_args(i)
+        coloredlogs.set_level(prev_level)
 
         # todo: implement cmd args
         self.cmd_args = cmd_args
-        self.cmd_arg_offset = 0
 
         self.level = {
             "(": 0, ")": 0,
@@ -297,7 +300,7 @@ class MyShell:
     def builtin_echo(self, pipe="", args=[]):
         # ! if -r is provided, we won't do any escaping
         result = f"{' '.join(args)}\n"
-        if len(args)>=1 and args[0] == "-r":
+        if len(args) >= 1 and args[0] == "-r":
             result = result[len("-r ")::]
         else:
             result = codecs.escape_decode(bytes(result, "utf-8"))[0].decode("utf-8")
@@ -378,9 +381,30 @@ class MyShell:
                 self.vars[key] = value
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "set", "arg_pair": [key, value]})
+        return None
 
     def builtin_shift(self, pipe="", args=[]):
-        pass
+        log.debug(f"Shift args are {COLOR.BOLD(args)}")
+        log.debug(f"Previously cmd_args are {COLOR.BOLD(self.cmd_args)}")
+
+        if len(args) > 1:
+            raise ArgCountException("Expecting zero or one arguments")
+
+        elif not args:
+            args.append(1)
+
+        dollar_zero = self.cmd_args[0]
+
+        try:
+            self.cmd_args = self.cmd_args[args[0]::]
+        except IndexError:
+            pass
+        if not len(self.cmd_args):    
+            self.cmd_args = [dollar_zero]
+
+        self.cmd_args[0] = dollar_zero
+
+        log.debug(f"Now cmd_args are {COLOR.BOLD(self.cmd_args)}")
 
     @staticmethod
     def test_unary(operator, operand):
@@ -1003,7 +1027,7 @@ def main(args, cmd_args):
             for line in f:
                 line = line.strip()
                 result = myshell.run_command(line)  # execute line by line
-                if result: # the execution of the file should be terminated
+                if result:  # the execution of the file should be terminated
                     break
         except FileNotFoundError as e:
             log.error(f"Cannot find the file specified for batch processing: \"{args.f}\". {e}")
@@ -1014,14 +1038,16 @@ def main(args, cmd_args):
 if __name__ == "__main__":
     # hello -n "world" < input.txt | tr -d -c "re"
     # echo "zy" | sha256sum | tr -d " -" | wc
+    # ./MyShell.py -w dummy.mysh foo bar foobar hello world linux linus PyTorch CS231n
     parser = argparse.ArgumentParser(description='MyShell by xudenden@gmail.com')
     parser.add_argument('f', metavar='F', type=str, nargs='?', help='the batch file to be executed')
+    parser.add_argument('a', metavar='A', type=str, nargs='*', help='command line arguments to batch file')
     parser.add_argument('-e', help='enable error level debugging info log', action='store_true')
     parser.add_argument('-w', help='enable warning level debugging info log', action='store_true')
     parser.add_argument('-i', help='enable info level debugging info log', action='store_true')
     parser.add_argument('-d', help='enable debug(verbose) level debugging info log', action='store_true')
 
     args = parser.parse_args()
-    reserved = ["-e", "-w", "-i", "-d"]
+    reserved = ["-e", "-w", "-i", "-d", sys.argv[0]]
     filtered = [i for i in sys.argv if i not in reserved]
     main(args, filtered)

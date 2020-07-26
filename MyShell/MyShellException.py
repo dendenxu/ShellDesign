@@ -71,3 +71,7 @@ class UmaskException(MyShellException):
 class TestException(MyShellException):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)
+
+class ArgCountException(MyShellException):
+    def __init__(self, message, errors=None):
+        super().__init__(message, errors)
