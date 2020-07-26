@@ -5,6 +5,7 @@ import sys
 import re
 import time
 import platform
+import getpass
 import logging
 import coloredlogs
 import datetime
@@ -156,7 +157,7 @@ class MyShell:
         log.debug(f"Logging level is {COLOR.BOLD(prev_level)}")
         coloredlogs.set_level("WARNING")
         for i in range(10):
-            self.vars[str(i)] = self.wrapper_cmd_args(i)
+            self.vars[str(i)] = MyShell.picklable_nested(self, i)
         coloredlogs.set_level(prev_level)
 
         # todo: implement cmd args
@@ -192,10 +193,13 @@ class MyShell:
         while not exit_signal:
             exit_signal = self.command_prompt()
 
-    def wrapper_cmd_args(self, number):
-        def get_value():
-            return self.cmd_args[number]
-        return get_value
+    class picklable_nested():
+        def __init__(self, shell, number):
+            self.shell = shell
+            self.number = number
+
+        def __call__(self):
+            return self.shell.cmd_args[self.number]
 
     def builtin_bg(self, pipe="", args=[]):
         if len(args) != 1:
@@ -522,7 +526,7 @@ class MyShell:
     def builtin_sleep(self, pipe="", args=[]):
         if os.name == "nt":
             if len(args) ==1 and args[0].endswith("s"):
-                time.sleep(args[0][0:-1])
+                time.sleep(float(args[0][0:-1]))
         else:
             self.subshell(target="sleep", args=args, pipe=pipe)
 
