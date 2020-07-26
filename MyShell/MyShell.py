@@ -818,15 +818,28 @@ class MyShell:
                 self.jobs[str_cnt] = command
                 self.queues[str_cnt] = Queue()
                 self.status_dict[str_cnt] = "running"
-                queue_bak = self.queues
+
+                queues_bak = self.queues
                 process_bak = self.process
-                del self.queues
-                del self.process
-                clean_self = copy.deepcopy(self)
-                self.queues = queue_bak
+                jobs_bak = self.jobs
+                status_dict_bak = self.status_dict
+                
+                self.queues = {}
+                self.process = {}
+                self.jobs = {}
+                self.status_dict = {}
+                
+                clean_self = copy.copy(self)
+                
+                self.queues = queues_bak
                 self.process = process_bak
+                self.jobs = jobs_bak
+                self.status_dict = status_dict_bak
+
                 p = Process(target=self.run_command_wrap, args=(str_cnt, clean_self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
+                
                 self.process[str_cnt] = p
+                
                 p.daemon = True
                 p.start()
                 self.job_counter += 1
