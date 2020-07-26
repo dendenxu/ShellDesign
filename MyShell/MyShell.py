@@ -16,6 +16,7 @@ import traceback  # 用于打印报错信息的调用堆栈
 import argparse  # 用于解释本程序的命令行参数
 import codecs  # 用于转义字符串，用于builtin_echo
 import signal
+import copy
 
 from subprocess import Popen, PIPE, STDOUT  # 子进程管理
 from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value  # 多进程管理
@@ -817,7 +818,14 @@ class MyShell:
                 self.jobs[str_cnt] = command
                 self.queues[str_cnt] = Queue()
                 self.status_dict[str_cnt] = "running"
-                p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
+                queue_bak = self.queues
+                process_bak = self.process
+                del self.queues
+                del self.process
+                clean_self = copy.deepcopy(self)
+                self.queues = queue_bak
+                self.process = process_bak
+                p = Process(target=self.run_command_wrap, args=(str_cnt, clean_self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
                 self.process[str_cnt] = p
                 p.daemon = True
                 p.start()
