@@ -2,23 +2,20 @@
 import os
 import io
 import sys
-import getpass
-import platform
 import re
-import copy
+import time
+import platform
 import logging
 import coloredlogs
 import datetime
 import readline
 import subprocess
 import multiprocessing
-import tempfile
 import traceback
 import argparse
 import codecs
 from subprocess import Popen, PIPE, STDOUT
 from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value
-from os import name
 from COLOR import COLOR
 from MyShellException import *
 log = logging.getLogger(__name__)
@@ -239,7 +236,7 @@ class MyShell:
     def builtin_clr(self, pipe="", args=[]):
         # clear the screen
         # we're forced to do a system call here...
-        if name == "nt":
+        if os.name == "nt":
             os.system("cls")
         else:
             os.system("clear")
@@ -521,6 +518,13 @@ class MyShell:
         #     return "True"
         # except CalledProcessException as e:
         #     return "False"
+
+    def builtin_sleep(self, pipe="", args=[]):
+        if os.name == "nt":
+            if len(args) ==1 and args[0].endswith("s"):
+                time.sleep(args[0][0:-1])
+        else:
+            self.subshell(target="sleep", args=args, pipe=pipe)
 
     def builtin_time(self, pipe="", args=[]):
         return str(datetime.datetime.now())
