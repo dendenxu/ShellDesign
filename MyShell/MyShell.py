@@ -824,12 +824,16 @@ class MyShell:
                 jobs_bak = self.jobs
                 status_dict_bak = self.status_dict
                 
-                self.queues = {}
-                self.process = {}
-                self.jobs = {}
-                self.status_dict = {}
+                del self.queues
+                del self.process
+                del self.jobs
+                del self.status_dict
                 
-                clean_self = copy.copy(self)
+                clean_self = copy.deepcopy(self)
+                clean_self.queues = {}
+                clean_self.jobs = {}
+                clean_self.process = {}
+                clean_self.status_dict = {}
                 
                 self.queues = queues_bak
                 self.process = process_bak
