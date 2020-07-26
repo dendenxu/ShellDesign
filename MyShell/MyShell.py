@@ -183,6 +183,9 @@ class MyShell:
         self.process = {}
         self.subp = None
 
+        self.input_file = None
+        self.output_file = None
+
         for key, value in dict_in.items():
             # user should not be tampering with the vars already defined
             # however we decided not to disturb them
@@ -316,7 +319,36 @@ class MyShell:
         return result
 
     def builtin_exec(self, pipe="", args=[]):
-        pass
+        if len(args) != 2:
+            log.critical("Internal error, builtin_exec should be executed with exactly two arguments")
+            return
+
+        if self.input_file is not None:
+            self.input_file.close()
+        if self.output_file is not None:
+            self.output_file.close()
+
+        log.debug(f"FILE NUMBER OF SYS.__STDIN__: {COLOR.BOLD(sys.__stdin__.fileno())}")
+        log.debug(f"FILE NUMBER OF SYS.__STDOUT__: {COLOR.BOLD(sys.__stdout__.fileno())}")
+        log.debug(f"FILE NUMBER OF SYS.__STDERR__: {COLOR.BOLD(sys.__stderr__.fileno())}")
+        if args[0]:
+            try:
+                # the function open will automatically raise FileNotFoundError
+                self.input_file = open(args[0], "r", encoding="utf-8")
+                log.debug(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.input_file.fileno())}")
+            except FileNotFoundError as e:
+                raise FileNotFoundException(e, {"type": "redi_in"})
+        else:
+            self.input_file = None
+        if args[1]:
+            try:
+                # the function open will automatically raise FileNotFoundError
+                self.output_file = open(args[1], "w", encoding="utf-8")
+                log.debug(f"FILE NUMBER OF OUTPUT FILE: {COLOR.BOLD(self.output_file.fileno())}")
+            except FileNotFoundError as e:
+                raise FileNotFoundException(e, {"type": "redi_out"})
+        else:
+            self.output_file = None
 
     def builtin_exit(self, pipe="", args=[]):
         raise ExitException("Exitting...")
@@ -533,7 +565,7 @@ class MyShell:
 
     def builtin_term(self, pipe="", args=[]):
         not_in_list = []
-        if len(args)>=1:
+        if len(args) >= 1:
             for arg in args:
                 if arg not in self.jobs:
                     not_in_list.append(arg)
@@ -544,10 +576,9 @@ class MyShell:
                     os.kill(self.process[arg].pid, signal.SIGTERM)
                     del self.jobs[arg]
         else:
-            raise JobException(f"One or more arguments expected", {"type":"len"})
+            raise JobException(f"One or more arguments expected", {"type": "len"})
         if len(not_in_list):
             raise JobException(f"Cannot find jobs with number \"{not_in_list}\".", {"type": "key"})
-
 
     def builtin_sleep(self, pipe="", args=[]):
         # todo: raise
@@ -641,6 +672,19 @@ class MyShell:
                 # result = str(p.stdout)
                 log.debug(f"The result is \"{result}\" and \"{error}\"")
                 # waits for the process to end
+            elif self.input_file is not None or self.output_file is not None:
+                log.debug("Doing oi control")
+                log.debug(f"EXEC OI controller is: {self.input_file} and {self.output_file}")
+                p = subprocess.Popen(to_run, stdin=self.input_file, stdout=self.output_file, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+                self.subp = p
+
+                # p.wait()
+                # p.stdin.write("hello\n")
+                result, error = p.communicate()
+                # result = str(p.stdout)
+                log.debug(f"The result is \"{result}\" and \"{error}\"")
+                # waits for the process to end
+
             else:
                 log.debug("Just running in regular env")
                 p = subprocess.Popen(to_run, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
@@ -720,7 +764,7 @@ class MyShell:
             command["piping"] = False
 
         # to the command itself, it doesn't matter whether the input comes from a pipe or file
-        if command["redi_in"]:
+        if command["redi_in"] and command["exec"] != "exec":
             file_path = command["redi_in"]
             try:
                 # the function open will automatically raise FileNotFoundError
@@ -729,8 +773,19 @@ class MyShell:
                 raise FileNotFoundException(e, {"type": "redi_in"})
             pipe = f.read()
 
+        # if we've specified input file in some thing
+        if self.input_file is not None:
+            sys.stdin = self.input_file
+
+        # actual execution
         result = ""
-        if command["exec"] in self.builtins.keys():
+        if command["exec"] == "exec":
+            if len(command["args"]):
+                raise ArgCountException("exec command takes no argument")
+            # setting redi_files to arguments
+            # something might change
+            self.builtin_exec(args=[command["redi_in"], command["redi_out"]])
+        elif command["exec"] in self.builtins.keys():
             log.debug("This is a builtin command.")
             # executing as static method, calling with self variable
             result = self.builtins[command["exec"]](self, pipe=pipe, args=command['args'])
@@ -740,6 +795,8 @@ class MyShell:
                 result = self.subshell(pipe, command["exec"], command['args'], piping=command["piping"], io_control=command["io_control"])
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "subshell"})
+
+        sys.stdin = sys.__stdin__
 
         if command['redi_out']:
             log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
@@ -762,7 +819,7 @@ class MyShell:
             return result
 
         if result is not None:
-            print(result, end="" if result.endswith("\n") or not len(result) else "\n")
+            print(result, end="" if result.endswith("\n") or not len(result) else "\n", file=self.output_file)
         # return result # won't be used anymore
 
     def command_prompt(self):
@@ -770,7 +827,10 @@ class MyShell:
         # the input and readline prompt seems to be counting color char as one of the line chars
         # well it turns out to be a quirk of readline
         # we've fixed it in COLOR.py
-        command = input(self.prompt()).strip()
+        try:
+            command = input(self.prompt()).strip()
+        except EOFError:
+            return self.run_command("exit")
         # print(self.prompt(), end="")
         # command = input().strip()
         log.debug(f"Getting user input: {COLOR.BOLD(command)}")
@@ -833,22 +893,22 @@ class MyShell:
                 del self.process
                 del self.jobs
                 del self.status_dict
-                
+
                 clean_self = copy.deepcopy(self)
                 clean_self.queues = {}
                 clean_self.jobs = {}
                 clean_self.process = {}
                 clean_self.status_dict = {}
-                
+
                 self.queues = queues_bak
                 self.process = process_bak
                 self.jobs = jobs_bak
                 self.status_dict = status_dict_bak
 
                 p = Process(target=self.run_command_wrap, args=(str_cnt, clean_self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
-                
+
                 self.process[str_cnt] = p
-                
+
                 p.daemon = True
                 p.start()
                 self.job_counter += 1
@@ -950,6 +1010,10 @@ class MyShell:
             log.debug("Error during test command")
             log.info(f"Exception says: {e}")
             log.error(f"Unable to perform \"{command['exec']}\", please check your syntax and operator match. {e}")
+        except ArgCountException as e:
+            log.debug("Error number of arguments")
+            log.info(f"Exception says: {e}")
+            log.error(f"Unable to perform \"{command['exec']}\", please check your argument number. {e}")
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
         finally:
@@ -1157,4 +1221,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     reserved = ["-e", "-w", "-i", "-d", sys.argv[0]]
     filtered = [i for i in sys.argv if i not in reserved]
+    if not filtered:
+        filtered = [os.path.abspath(__file__)]
     main(args, filtered)
