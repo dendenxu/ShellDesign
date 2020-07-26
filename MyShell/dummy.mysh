@@ -20,7 +20,7 @@ echo $LINE
 
 echo "Hello, my name is $SHELL"
 set hello_msg="Hello, my name is"
-echo "$hello_msg $USER, and I live in $HOME"
+echo -r "$hello_msg $USER, and I live in $HOME"
 echo "Should print sha256sum of zy in the next line"
 echo "xz" | sha256sum | tr -d " -"
 echo "Should print 1 1 65 in the following line"

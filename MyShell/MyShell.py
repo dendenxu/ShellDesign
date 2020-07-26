@@ -1,24 +1,26 @@
 #!python
-import os
-import io
-import sys
-import re
-import time
-import platform
-import getpass
-import logging
-import coloredlogs
-import datetime
-import readline
-import subprocess
-import multiprocessing
-import traceback
-import argparse
-import codecs
-from subprocess import Popen, PIPE, STDOUT
-from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value
-from COLOR import COLOR
-from MyShellException import *
+import os # 大部分os相关功能来自此包
+import io # 用于构建一个stdin的wrapper以捕捉程序的输入/输出请求
+import sys # 一些系统调用/常数的来源包
+import re # 正则表达式
+import time # 用在builtin_sleep中，针对Windows系统的睡眠操作
+import platform # 获取平台信息
+import getpass # 获取用户信息
+import logging # 用于打印一些详细调试信息
+import coloredlogs # 用于打印带颜色的调试信息
+import datetime # 用于取得时间/日期，用于builtin_time
+import readline # 用于提供人性化的input函数操作，例如输入历史功能等
+import subprocess # 用于刷出/控制子进程
+import multiprocessing # 用于后台程序的运行/管理
+import traceback # 用于打印报错信息的调用堆栈
+import argparse # 用于解释本程序的命令行参数
+import codecs # 用于转义字符串，用于builtin_echo
+import signal
+
+from subprocess import Popen, PIPE, STDOUT # 子进程管理
+from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value # 多进程管理
+from COLOR import COLOR # 颜色信息
+from MyShellException import * # MyShell错误管理
 log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
@@ -133,6 +135,7 @@ class OnCallDict(dict):
 
 class MyShell:
     def __init__(self, dict_in={}, cmd_args=[]):
+        # os.setpgrp()
         self.builtin_prefix = "builtin_"
 
         builtins = MyShell.__dict__.items()
@@ -177,6 +180,8 @@ class MyShell:
         self.status_dict = Manager().dict()
         self.job_counter = 0
         self.queues = {}
+        self.process = {}
+        self.subp = None
 
         for key, value in dict_in.items():
             # user should not be tampering with the vars already defined
@@ -186,6 +191,7 @@ class MyShell:
         log.debug(f"SHELL var content: {self.vars['SHELL']}")
         log.debug(f"Built in command list: {self.builtins}")
         log.debug("MyShell is instanciated.")
+
 
     def __call__(self):
         log.debug("This is MyShell.")
@@ -596,14 +602,16 @@ class MyShell:
         if piping:
             log.debug("Piping in subprocess...")
             # log.debug(f"content of pipe varible {COLOR.BOLD(pipe)}")
-            p = subprocess.run(to_run, stdout=PIPE, input=pipe, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
-            result = str(p.stdout)
+            p = subprocess.Popen(to_run, stdin=PIPE, stdout=PIPE, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+            self.subp = p
+            result, error = p.communicate(pipe)
             # waits for the process to end
         elif io_control:
             # todo: cry
             log.debug("Doing io control")
             log.debug(f"Multiprocessing IO controller is: {sys.stdin}")
             p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+            self.subp = p
 
             # p.wait()
             # p.stdin.write("hello\n")
@@ -613,7 +621,9 @@ class MyShell:
             # waits for the process to end
         else:
             log.debug("Just running in regular env")
-            p = subprocess.run(to_run, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+            p = subprocess.Popen(to_run, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+            self.subp = p
+            p.wait()
             # here we're directing the IO straight to the command line, so no result is needed
             # waits for the process to end
         if p.returncode != 0:
@@ -624,11 +634,20 @@ class MyShell:
 
     def cleanup(self):
         keys = list(self.queues.keys())
+        
         log.debug(f"Queue is being cleaned, previous keys are {COLOR.BOLD(keys)}")
         for i in keys:
             if i not in self.jobs.keys():
                 del self.queues[i]
         log.debug(f"Queue is cleaned, keys are {COLOR.BOLD(self.queues.keys())}")
+        
+        keys = list(self.process.keys())
+
+        log.debug(f"Process is being cleaned, previous keys are {COLOR.BOLD(keys)}")
+        for i in keys:
+            if i not in self.jobs.keys():
+                del self.process[i]
+        log.debug(f"Process is cleaned, keys are {COLOR.BOLD(self.process.keys())}")
 
     def home(self):
         return os.environ['HOME']
@@ -727,6 +746,28 @@ class MyShell:
     @staticmethod
     def run_command_wrap(count, shell, args, job, queue, jobs, status_dict):
         log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
+        # os.setpgrp()
+        my_pid = os.getpid()
+
+        def exit_subp(sig, frame):
+            if shell.subp.pid is not None:
+                log.warning("Killing a still running subprocess...")
+                if os.name == "nt":
+                    os.kill(shell.subp.pid, signal.CTRL_BREAK_EVENT)
+                else:
+                    os.kill(shell.subp.pid, signal.SIGKILL)
+            log.warning(f"Getting signal: {COLOR.BOLD(sig)}")
+            log.warning(f"Are you: {COLOR.BOLD(signal.SIGTERM)}")
+            if sig == signal.SIGTERM:
+                log.warning("Terminating self")
+                if os.name == "nt":
+                    os.kill(my_pid, signal.CTRL_BREAK_EVENT)
+                else:
+                    os.kill(my_pid, signal.SIGKILL)
+                
+            # os.killpg(0, signal.SIGKILL)
+
+        signal.signal(signal.SIGTERM, exit_subp)
 
         if sys.stdin is not None:
             sys.stdin.close()
@@ -755,6 +796,8 @@ class MyShell:
                 self.queues[str_cnt] = Queue()
                 self.status_dict[str_cnt] = "running"
                 p = Process(target=self.run_command_wrap, args=(str_cnt, self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
+                self.process[str_cnt] = p
+                p.daemon = True
                 p.start()
                 self.job_counter += 1
                 log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
