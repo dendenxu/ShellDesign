@@ -295,8 +295,12 @@ class MyShell:
             raise FileNotFoundException(e, {"type": "dir"})
 
     def builtin_echo(self, pipe="", args=[]):
+        # ! if -r is provided, we won't do any escaping
         result = f"{' '.join(args)}\n"
-        result = codecs.escape_decode(bytes(result, "utf-8"))[0].decode("utf-8")
+        if len(args)>=1 and args[0] == "-r":
+            result = result[len("-r ")::]
+        else:
+            result = codecs.escape_decode(bytes(result, "utf-8"))[0].decode("utf-8")
         return result
 
     def builtin_exec(self, pipe="", args=[]):
@@ -933,7 +937,7 @@ class MyShell:
 
     def expand(self, string):
         # log.debug(f"The string to be expanded is: {COLOR.BOLD(string)}")
-        string = re.sub(r"(?<!\\)~", self.home(), string)
+        # string = re.sub(r"(?<!\\)~", self.home(), string)
         # string = string.replace("~", self.home())
         var_list = [(m.start(0), m.end(0)) for m in re.finditer(r"(?<!\\)\$\w+", string)]
         str_list = []
