@@ -14,6 +14,7 @@ import subprocess
 import multiprocessing
 import tempfile
 import traceback
+import argparse
 from subprocess import Popen, PIPE, STDOUT
 from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value
 from os import name
@@ -23,9 +24,8 @@ log = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
+
 # a decorator for logging function call
-
-
 def logger(func):
     def wrapper(*args, **kwargs):
         log.debug(f"CALLING FUNCTION: {COLOR.BOLD(func)}")
@@ -600,7 +600,7 @@ class MyShell:
             conda = os.environ["CONDA_DEFAULT_ENV"]
             prompt = f"({conda}) {prompt}"
         except KeyError:
-            pass
+            pass  # not a conda environment
         return prompt
 
     def execute(self, command, pipe=""):
@@ -670,7 +670,6 @@ class MyShell:
         # command = input().strip()
         log.debug(f"Getting user input: {COLOR.BOLD(command)}")
         result = self.run_command(command)
-        self.cleanup()
         return result
 
     @staticmethod
@@ -802,8 +801,9 @@ class MyShell:
             log.error(f"Unable to perform \"{command['exec']}\", please check your syntax and operator match. {e}")
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
+        finally:
+            self.cleanup()  # always clean up
 
-        # Returning exit signal
         return False
 
     def parse(self, command):
@@ -960,12 +960,45 @@ class MyShell:
         return parsed_command
 
 
-def main():
-    myshell = MyShell({"TEST": "echo \"echo $SHELL\""})
-    myshell()
+def main(args):
+
+    if args.e:
+        coloredlogs.set_level("ERROR")
+    if args.w:
+        coloredlogs.set_level("WARNING")
+    if args.i:
+        coloredlogs.set_level("INFO")
+    if args.d:
+        coloredlogs.set_level("DEBUG")
+
+    # myshell = MyShell({"TEST": "echo \"echo $SHELL\""})
+    myshell = MyShell()
+    log.debug(f"Getting user command line argument(s): {COLOR.BOLD(args)}")
+    # todo: batch process
+
+    if args.f:
+        try:
+            for file_name in args.f:
+                # ! using utf-8
+                f = open(file_name, encoding="utf-8")  # opending the file specified
+                for line in f:
+                    line = line.strip()
+                    myshell.run_command(line)  # execute line by line
+        except FileNotFoundError as e:
+            log.error(f"Cannot find the file specified for batch processing: \"{file_name}\". {e}")
+    else:
+        myshell()
 
 
 if __name__ == "__main__":
     # hello -n "world" < input.txt | tr -d -c "re"
     # echo "zy" | sha256sum | tr -d " -" | wc
-    main()
+    parser = argparse.ArgumentParser(description='MyShell by xudenden@gmail.com')
+    parser.add_argument('f', metavar='F', type=str, nargs='*', help='the batch file to be executed')
+    parser.add_argument('-e', help='enable error level debugging info log', action='store_true')
+    parser.add_argument('-w', help='enable warning level debugging info log', action='store_true')
+    parser.add_argument('-i', help='enable info level debugging info log', action='store_true')
+    parser.add_argument('-d', help='enable debug(verbose) level debugging info log', action='store_true')
+
+    args = parser.parse_args()
+    main(args)

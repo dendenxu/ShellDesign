@@ -1,0 +1,80 @@
+test ! -z ""
+date +%s
+time
+
+echo
+
+umask
+echo "Changing UMASK to 0o777"
+umask 777
+umask
+echo "Changing UMASK to 0o002"
+umask 002
+
+echo
+
+echo "Hello, my name is $SHELL"
+set hello_msg="Hello, my name is"
+echo "$hello_msg $USER, and I live in $HOME"
+echo "Should print sha256sum of zy in the next line"
+echo "xz" | sha256sum | tr -d " -"
+echo "Should print 1 1 65 in the following line"
+echo "zy" | sha256sum | tr -d " -" | wc
+
+echo
+
+dir
+pwd
+unset hello_msg
+echo "Should get empty output"
+echo $hello_msg
+
+echo
+
+echo "Should print /dev/null"
+ls /dev | grep null
+echo "Should print all files containing 1 in /tmp"
+ls /tmp | grep 1
+
+echo
+
+echo "Should make a file log.log"
+echo "Hello, I'm your logger." > log.log
+dir
+echo "Should see content of log.log"
+cat < log.log
+echo "Hello, again..." >> log.log
+echo "Should display content of log.log"
+cat log.log
+echo "Should display word count of log.log"
+wc < log.log
+
+echo
+
+echo "Opening some sleepy jobs"
+echo "And calling command jobs"
+sleep 3s &
+echo "waiting 0.5s"
+jobs
+sleep 0.5s
+sleep 3s &
+echo "waiting 0.5s"
+jobs
+sleep 0.5s
+sleep 3s &
+echo "waiting 0.5s"
+jobs
+sleep 0.5s
+sleep 3s &
+echo "waiting 0.5s"
+jobs
+sleep 0.5s
+sleep 3s &
+echo "Getting current runnning jobs..."
+jobs
+
+echo "Getting back to fore ground"
+echo "Waiting for background jobs to terminate"
+sleep 3s
+echo "Should produce empty content"
+jobs
