@@ -15,8 +15,8 @@ import multiprocessing  # 用于后台程序的运行/管理
 import traceback  # 用于打印报错信息的调用堆栈
 import argparse  # 用于解释本程序的命令行参数
 import codecs  # 用于转义字符串，用于builtin_echo
-import signal
-import copy
+import signal  # 用于在调用builtin_term后给multiprocessing传递信号
+import copy  # 用于复制MyShell以进行multiprocessing和任务管理
 
 from subprocess import Popen, PIPE, STDOUT  # 子进程管理
 from multiprocessing import Process, Queue, Pipe, Pool, Manager, Value  # 多进程管理
@@ -28,8 +28,10 @@ coloredlogs.install(level='DEBUG')  # Change this to DEBUG to see more info.
 
 
 # a decorator for logging function call
+# 装饰器：用于在函数调用之前打印相关信息，有助于调试或检查函数调用记录
 def logger(func):
     def wrapper(*args, **kwargs):
+        # 本装饰器中我们使用logging模块提供详细信息打印功能
         log.debug(f"CALLING FUNCTION: {COLOR.BOLD(func)}")
         return func(*args, **kwargs)
     return wrapper
@@ -37,143 +39,67 @@ def logger(func):
 
 # a class decorator that can modify all callable class method with a decorator
 # here we use this to log function call of sys.stdin wrapper
+# 一个带参数装饰器，用于对类进行修改：为类中的每一个可调用函数添加参数中所示的装饰器
 def for_all_methods(decorator):
     def decorate(cls):
         for attr in cls.__dict__:  # there's propably a better way to do this
             if callable(getattr(cls, attr)):
+                # 通过批量修改类的内容，避免重复代码，提高拓展性
                 setattr(cls, attr, decorator(getattr(cls, attr)))
         return cls
     return decorate
 
 
 # a dict that logs itself on every getting item operation
+# 一个会在调用__get_item__前打印相关信息的函数
 class LoggingDict(dict):
     def __getitem__(self, key):
         log.debug(f"GETTING DICT ITEM {COLOR.BOLD(key)}")
         return super().__getitem__(key)
 
 
-@for_all_methods(logger)  # using the full class logging system
-class StdinWrapper(io.TextIOWrapper):
-    def __init__(self, queue, count, job, status_dict, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.queue = queue
-        self.job = job
-        self.status_dict = status_dict
-        self.count = count
-        self.ok = False
-
-    def job_status(self, status):
-        self.status_dict[self.count] = status
-        print(f"{COLOR.BOLD(COLOR.YELLOW(f'[{self.count}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(self.job)}")
-
-    def isok(self):
-        if not self.ok:
-            log.debug("Aha! You want to read something? Wait on!")
-            self.job_status("suspended")
-
-            log.debug(f"WHAT IS SELF.STATUS_DICT: {self.status_dict}")
-            log.debug(f"WHAT IS SELF.COUNT: {self.count}")
-
-            content = self.queue.get()
-
-            log.debug(f"WHAT DID YOU GET: {content}")
-
-            self.isok = True
-
-            self.job_status("running")
-
-    def __getattribute__(self, name):
-        log.debug(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
-        return super().__getattribute__(name)
-
-    def fileno(self):
-        self.isok()
-        return super().fileno()
-
-
-class OnCallDict(dict):
-    unsupported = ["HOME", "USER", "LOCATION", "SHELL"] + [str(i) for i in range(10)]
-    reserved = unsupported + ["PATH", "PWD"]
-
-    def __getitem__(self, key):
-        value = super().__getitem__(key)
-        if callable(value):
-            log.debug(f"Accessing callable dict element: {COLOR.BOLD(key)}")
-            return value()
-        else:
-            log.debug(f"Accessing non-callable dict element: {COLOR.BOLD(key)}")
-            return value
-
-    def __setitem__(self, key, value):
-        if key not in self:
-            log.info(f"We might be copying current shell, setting value \"{value}\" to \"{key}\"")
-            super().__setitem__(key, value)
-            return
-        elif key == "PATH":
-            # for whatever reason, set this to a string (environment variables are meant to be strings)
-            # here we're actually setting the REAL environ so that user can call stuff more conveniently
-            # ? or should we
-            log.info(f"User set PATH to {COLOR.BOLD(value)}")
-            os.environ[key] = str(value)
-        elif key == "PWD":
-            # we're changing dir...
-            # ? or should we just set variable
-            log.info(f"User set PWD to {COLOR.BOLD(value)}")
-            os.chdir(value)
-        elif key in OnCallDict.unsupported:
-            log.warning(f"Sorry, we don't currently support setting \"{key}\", included in {COLOR.BOLD(OnCallDict.unsupported)}")
-        else:
-            super().__setitem__(key, value)
-
-    def __delitem__(self, key):
-        if key in OnCallDict.reserved:
-            log.warning(f"Sorry, we don't currently support deleting \"{key}\", included in {COLOR.BOLD(OnCallDict.reserved)}")
-            raise ReservedKeyException(f"\"{key}\" is reserved, along with {OnCallDict.reserved}")
-        else:
-            super().__delitem__(key)
-
-
 class MyShell:
     def __init__(self, dict_in={}, cmd_args=[]):
-        # os.setpgrp()
-        self.builtin_prefix = "builtin_"
+        # 所有的内置功能的函数开头都是builtin_
+        builtin_prefix = "builtin_"
 
-        builtins = MyShell.__dict__.items()
         # builtins is a simple dict containing functions (not called on access)
         self.builtins = {}
-        for key, value in builtins:
-            if key.startswith(self.builtin_prefix):
-                self.builtins[key[len(self.builtin_prefix)::]] = value
+        for key, value in MyShell.__dict__.items():
+            if key.startswith(builtin_prefix):
+                self.builtins[key[len(builtin_prefix)::]] = value
 
+        # 环境变量，用到了下面将要提到的OnCallDict的功能
         # we're using callable dict to evaluate values on call
-        self.vars = OnCallDict({
-            "SHELL": os.path.abspath(__file__),
-            "PWD": self.cwd,
-            "HOME": self.home,
-            "LOCATION": self.location,
-            "USER": self.user,
-            "PATH": self.path,
-            "PS1": "$"
+        self.vars = MyShell.OnCallDict({
+            "SHELL": os.path.abspath(__file__),  # 这个变量无法被修改，是MyShell的辨识信息
+            "PWD": self.cwd,  # 这个变量的修改会直接导致cd命令的调用，内容会在名利提示符显示
+            "HOME": self.home,  # 这个变量存储着当前用户的根目录，无法修改
+            "LOCATION": self.location,  # 这个变量的内容会在命令提示符显示，显示用户额外信息，无法修改
+            "USER": self.user,  # 储存使用者用户名，无法修改
+            "PATH": self.path,  # 储存path这一特殊环境变量，对它的修改会直接导致系统搜索目录的改变
+            "PS1": "$"  # 这一变量储存命令提示符内容，可以被修改
         })
-        # todo: implement cmd args
+
+        # 对于命令函参数，我们为了防止写太多重复代码，就使用了picklable_nested类来自动生成相关callable object
+        # ! pickle cannot handle nested function, however a simulating callable object is fine
+        # 由于Pickle无法处理nested function，我们使用类来实现相关功能
         self.cmd_args = cmd_args
 
         prev_level = coloredlogs.get_level()
         log.debug(f"Logging level is {COLOR.BOLD(prev_level)}")
+        # 由于这里会打印一些无用的INFO级别的调试信息（具体原因在于会通过非初始化的方式调用OnCallDict的内部方法）
         coloredlogs.set_level("WARNING")
         for i in range(10):
             self.vars[str(i)] = MyShell.picklable_nested(self, i)
         coloredlogs.set_level(prev_level)
 
-        self.level = {
-            "(": 0, ")": 0,
-            "-z": 1, "-n": 1,
-            "=": 2, "!=": 2, "-eq": 2, "-ge": 2, "-gt": 2, "-le": 2, "-lt": 2, "-ne": 2,
-            "!": 3,
-            "-a": 4, "-o": 4,
-        }
-
+        # update: 我们会在调用多线程/后台执行功能时清空这一部分的变量，能够解决的问题有：
+        # 1. queue can only be pass by inheritance
+        # 2. cannot pickle weakref object
+        # 3. cannot pickle thread lock object
+        # 4. for safety purpose, cannot pickle authentification string
+        # pickle无法正常处理含有multiprocessing.Manager的object，因此我们不会显示储存这样的变量
         # ! damn strange... when an object has a Manager, multiprocessing refuse to spawn it on Windows
         # self.job_manager = Manager()
         self.jobs = Manager().dict()
@@ -183,9 +109,12 @@ class MyShell:
         self.process = {}
         self.subp = None
 
+        # 用于builtin_exec对输入输出的调整
+        # None表示从原始输入/输出源接受相关信息
         self.input_file = None
         self.output_file = None
 
+        # 初始化MyShell时可以传入初始环境变量
         for key, value in dict_in.items():
             # user should not be tampering with the vars already defined
             # however we decided not to disturb them
@@ -195,13 +124,115 @@ class MyShell:
         log.debug(f"Built in command list: {self.builtins}")
         log.debug("MyShell is instanciated.")
 
+    # 我们考虑过直接使用系统的环境变量接口，但那样或许就少了很多提前控制功能，跨平台性也不一定会很好
+    # 所以MyShell会单独管理自己的变量（这里不一定要称为环境变量）
+    # 与MyShell配合使用，用于统一管理环境变量，并与真正的系统环境变量交互的字典
+    # 主要功能为，若字典value为可执行内容，则返回执行后的结果
+    class OnCallDict(dict):
+        unsupported = ["HOME", "USER", "LOCATION", "SHELL"] + [str(i) for i in range(10)]
+        reserved = unsupported + ["PATH", "PWD"]
+
+        def __getitem__(self, key):
+            value = super().__getitem__(key)
+            if callable(value):
+                # 对于可调用的字典元素，获取调用后的结果，否则返回原结果
+                log.debug(f"Accessing callable dict element: {COLOR.BOLD(key)}")
+                return value()
+            else:
+                log.debug(f"Accessing non-callable dict element: {COLOR.BOLD(key)}")
+                return value
+
+        def __setitem__(self, key, value):
+            # 由于环境变量的特殊性，我们对一些内容的设定操作进行了特殊处理
+            if key not in self:
+                # 在初始化时不进行任何特殊处理（配合pickle和copy函数）
+                log.info(f"We might be copying current shell, setting value \"{value}\" to \"{key}\"")
+                super().__setitem__(key, value)
+                return
+            elif key == "PATH":
+                # 对于PATH的改变会真的影响当前系统中的环境变量
+                # for whatever reason, set this to a string (environment variables are meant to be strings)
+                # here we're actually setting the REAL environ so that user can call stuff more conveniently
+                # ? or should we
+                log.info(f"User set PATH to {COLOR.BOLD(value)}")
+                os.environ[key] = str(value)
+            elif key == "PWD":
+                # 设定PWD环境变量会导致cd操作
+                # we're changing dir...
+                # ? or should we just set variable
+                log.info(f"User set PWD to {COLOR.BOLD(value)}")
+                os.chdir(value)
+            elif key in MyShell.OnCallDict.unsupported:
+                # 对于某些不方便设置的环境变量，我们采取保留操作
+                log.warning(f"Sorry, we don't currently support setting \"{key}\", included in {COLOR.BOLD(MyShell.OnCallDict.unsupported)}")
+            else:
+                super().__setitem__(key, value)
+
+        def __delitem__(self, key):
+            if key in MyShell.OnCallDict.reserved:
+                log.warning(f"Sorry, we don't currently support deleting \"{key}\", included in {COLOR.BOLD(MyShell.OnCallDict.reserved)}")
+                raise ReservedKeyException(f"\"{key}\" is reserved, along with {MyShell.OnCallDict.reserved}")
+            else:
+                super().__delitem__(key)
+
+    # StdinWrapper是一个继承自io.TextWrapper，是本类型对获取输入的job进行线程暂停的一种方式
+    # 我们考虑过直接使用系统调用，但跨平台性会很难保证，因此对于后台外部命令，我们会直接关闭输入PIPE
+    @for_all_methods(logger)  # using the full class logging system
+    class StdinWrapper(io.TextIOWrapper):
+        def __init__(self, queue, count, job, status_dict, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.queue = queue
+            self.job = job
+            self.status_dict = status_dict
+            self.count = count
+            self.ok = False
+
+        # 用于修改job状态并打印相关信息
+        def job_status(self, status):
+            self.status_dict[self.count] = status
+            print(f"{COLOR.BOLD(COLOR.YELLOW(f'[{self.count}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(self.job)}")
+
+        # 将第一次输入阻塞，等待主线程的fg命令
+        # there might exists a better way
+        def isok(self):
+            if not self.ok:
+                log.debug("Aha! You want to read something? Wait on!")
+                self.job_status("suspended")
+
+                log.debug(f"WHAT IS SELF.STATUS_DICT: {self.status_dict}")
+                log.debug(f"WHAT IS SELF.COUNT: {self.count}")
+
+                # queue的功能就是将本线程阻塞
+                content = self.queue.get()
+
+                log.debug(f"WHAT DID YOU GET: {content}")
+
+                self.isok = True
+
+                self.job_status("running")
+
+        # 为了方便调试，我们对很多内容的调用都内置了记录器
+        def __getattribute__(self, name):
+            log.debug(f"GETTING ATTRIBUTE: {COLOR.BOLD(name)}")
+            return super().__getattribute__(name)
+
+        def fileno(self):
+            self.isok()
+            return super().fileno()
+
+    # 以命令提示符方式执行MyShell
     def __call__(self):
         log.debug("This is MyShell.")
+
+        # 通过返回值方式传输退出信号
         exit_signal = False
         while not exit_signal:
             exit_signal = self.command_prompt()
 
+    # 用于模仿Nested Function的Object
+    # 可以被pickle
     class picklable_nested():
+        # 在我们的使用环境下，shell变量被直接传入了self，也就保留了指针，因此外部对cmd_args变量的改变也会使得这里的结果不同
         def __init__(self, shell, number):
             self.shell = shell
             self.number = number
@@ -209,105 +240,101 @@ class MyShell:
         def __call__(self):
             return self.shell.cmd_args[self.number]
 
-    def builtin_bg(self, pipe="", args=[]):
-        not_in_list = []
-        if not len(args):
-            raise JobException("Argument number is not correct, one or more expected.", {"type": "len"})
-        else:
-            for arg in args:
-                if arg not in self.jobs:
-                    not_in_list.append(arg)
-        if len(not_in_list):
-            raise JobException(f"Cannot find job with number \"{not_in_list}\".", {"type": "key"})
-
-        log.debug(f"Background is called with {COLOR.BOLD(args)}")
-        for job_number in args:
-            if self.status_dict[job_number] == "suspended":
-                print(self.job_status_fmt(job_number, "running", self.jobs[job_number]))
-                print(self.job_status_fmt(job_number, "suspended", self.jobs[job_number]))
-            elif self.status_dict[job_number] == "running":
-                log.warning(f"Job [{job_number}] is already running")
-
     def builtin_cd(self, pipe="", args=[]):
+        # 更换目录功能
+        # 对于多个参数的情况进行警告，并尝试进入第一个参数所示的功能
         if len(args):
             if len(args) > 1:
                 log.warning("Are you trying to cd into multiple dirs? We'll only accept the first argument.")
             target_dir = args[0]
         else:
+            # 在一般的shell中，无参数的cd调用会进入用户主目录
+            # 但我们根据作业要求实现了打印当前工作目录的功能
             # well, we'd like to stay in home
             # but the teacher says we should pwd instead
             # target_dir = self.home()
             return self.builtin_pwd(pipe=pipe, args=args)
 
+        # 若用户的输入开头为~符号，替换为用户主目录内容
         if target_dir.startswith("~"):
             target_dir = f"{self.home()}{target_dir[1::]}"
         # the dir might not exist
+        # 路径不存在则报错
         try:
             log.info(f"Changing CWD to {COLOR.BOLD(target_dir)}")
             os.chdir(target_dir)
         except FileNotFoundError as e:
             raise FileNotFoundException(e, {"type": "cd"})
 
+    # 清空屏幕功能
     def builtin_clr(self, pipe="", args=[]):
         # clear the screen
         # we're forced to do a system call here...
+        # Windows系统下为cls命令，而*nix下为clear
         if os.name == "nt":
             os.system("cls")
         else:
             os.system("clear")
         # return ""
 
-    def path(self):
-        return os.environ["PATH"]
-
-    def get_mode(self, permissions):
-        map_string = "rwxrwxrwx"
-        map_empty = "---------"
-        result = "".join([map_string[i] if permissions[i] else map_empty[i] for i in range(9)])
-        return result
-
     def builtin_dir(self, pipe="", args=[]):
-        if len(args):
-            if len(args) > 1:
-                log.warn("Are you trying to list content of multiple dirs? We'll only accept the first argument.")
-            target_dir = args[0]
-        else:
-            target_dir = "."
-        if target_dir.startswith("~"):
-            target_dir = f"{self.home()}{target_dir[1::]}"
-        # the dir might not exist
-        try:
-            result = []
-            log.debug(f"Listing dir {COLOR.BOLD(target_dir)}")
-            dir_list = os.listdir(target_dir)
-            for file_name in dir_list:
-                full_name = f"{target_dir}/{file_name}"
-                file_stat = os.stat(full_name)
-                # only getting the lower part
-                file_mode = file_stat.st_mode
-                # time
-                file_time = file_stat.st_mtime
-                # guess we're not using this...
-                type_code = file_mode >> 12
-                permissions = [(file_mode >> bit) & 1 for bit in range(9 - 1, -1, -1)]
-                mode_str = self.get_mode(permissions)
-                time_str = datetime.datetime.fromtimestamp(file_time).strftime("%Y-%m-%d %H:%M:%S")
-                # print(time_str)
-                file_line = f"{mode_str} {time_str} "
-                if os.path.isdir(full_name):
-                    # path is a directory
-                    file_line += COLOR.BLUE(COLOR.BOLD(file_name))
-                else:
-                    # todo: maybe we can recognize char block or others
-                    # this is brutal
-                    if os.access(full_name, os.X_OK):
-                        file_line += COLOR.RED(COLOR.BOLD(file_name))
+        # 内置get_mode函数，用于获取文件劝降
+        def get_mode(permissions):
+            map_string = "rwxrwxrwx"
+            map_empty = "---------"
+            # 我们使用列表生成器对bit列表进行判断
+            result = "".join([map_string[i] if permissions[i] else map_empty[i] for i in range(9)])
+            return result
+
+        # 没有参数时，处理当前目录
+        if not len(args):
+            args.append(".")
+
+        not_in_list = []
+        result = []
+
+        for target_dir in args:
+            result.append(target_dir)
+            if target_dir.startswith("~"):
+                target_dir = f"{self.home()}{target_dir[1::]}"
+            # the dir might not exist
+            try:
+                log.debug(f"Listing dir {COLOR.BOLD(target_dir)}")
+                dir_list = os.listdir(target_dir)
+                for file_name in dir_list:
+                    full_name = f"{target_dir}/{file_name}"
+                    file_stat = os.stat(full_name)
+                    # only getting the lower part
+                    file_mode = file_stat.st_mode
+                    # time
+                    file_time = file_stat.st_mtime
+                    # guess we're not using this...
+                    type_code = file_mode >> 12
+                    permissions = [(file_mode >> bit) & 1 for bit in range(9 - 1, -1, -1)]
+                    mode_str = get_mode(permissions)
+                    time_str = datetime.datetime.fromtimestamp(file_time).strftime("%Y-%m-%d %H:%M:%S")
+                    # print(time_str)
+                    file_line = f"{mode_str} {time_str} "
+                    if os.path.isdir(full_name):
+                        # path is a directory
+                        file_line += COLOR.BLUE(COLOR.BOLD(file_name))
                     else:
-                        file_line += COLOR.BOLD(file_name)
-                result.append(file_line)
-            return "\n".join(result)
-        except FileNotFoundError as e:
-            raise FileNotFoundException(e, {"type": "dir"})
+                        # todo: maybe we can recognize char block or others
+                        # this is brutal
+                        if os.access(full_name, os.X_OK):
+                            file_line += COLOR.RED(COLOR.BOLD(file_name))
+                        else:
+                            file_line += COLOR.BOLD(file_name)
+                    result.append(file_line)
+                result.append("")
+            except FileNotFoundError as e:
+                not_in_list.append(str(e))
+
+        if len(not_in_list):
+            joined = '\n'.join(not_in_list)
+            raise FileNotFoundException(f"Cannot find: \n{joined}", {"type": "dir"})
+
+        return "\n".join(result)
 
     def builtin_echo(self, pipe="", args=[]):
         # ! if -r is provided, we won't do any escaping
@@ -356,25 +383,6 @@ class MyShell:
     def builtin_environ(self, pipe="", args=[]):
         return "\n".join([f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars])
 
-    def builtin_fg(self, pipe="", args=[]):
-        if len(args) != 1:
-            raise JobException("Argument number is not correct, only one expected.", {"type": "len"})
-        elif args[0] not in self.jobs:
-            raise JobException(f"Cannot find job is jobs number \"{args[0]}\".", {"type": "key"})
-
-        log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
-        self.queues[args[0]].put("dummy")
-
-        log.info("Waiting for foreground task to finish...")
-
-        self.queues[args[0]].get()
-        log.debug("Continuing main process")
-        # del self.queues[args[0]]
-        # del self.jobs[args[0]]
-
-    def builtin_help(self, pipe="", args=[]):
-        pass
-
     @staticmethod
     def job_status_fmt(job_number, status, content):
         return f"{COLOR.BOLD(COLOR.YELLOW(f'[{job_number}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(content)}"
@@ -397,6 +405,63 @@ class MyShell:
         log.debug("Trying to get all queues")
         log.info(f"Content of queues {COLOR.BOLD(self.queues)}")
         return str(self.queues)
+
+    def builtin_fg(self, pipe="", args=[]):
+        if len(args) != 1:
+            raise JobException("Argument number is not correct, only one expected.", {"type": "len"})
+        elif args[0] not in self.jobs:
+            raise JobException(f"Cannot find job is jobs number \"{args[0]}\".", {"type": "key"})
+
+        log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
+        self.queues[args[0]].put("dummy")
+
+        log.info("Waiting for foreground task to finish...")
+
+        self.queues[args[0]].get()
+        log.debug("Continuing main process")
+        # del self.queues[args[0]]
+        # del self.jobs[args[0]]
+
+    # 继续执行后台job
+    def builtin_bg(self, pipe="", args=[]):
+        not_in_list = []
+        # 处理相关参数调用
+        if not len(args):
+            raise JobException("Argument number is not correct, one or more expected.", {"type": "len"})
+        else:
+            for arg in args:
+                if arg not in self.jobs:
+                    not_in_list.append(arg)
+        if len(not_in_list):
+            raise JobException(f"Cannot find job with number \"{not_in_list}\".", {"type": "key"})
+
+        log.debug(f"Background is called with {COLOR.BOLD(args)}")
+        for job_number in args:
+            if self.status_dict[job_number] == "suspended":
+                print(self.job_status_fmt(job_number, "running", self.jobs[job_number]))
+                print(self.job_status_fmt(job_number, "suspended", self.jobs[job_number]))
+            elif self.status_dict[job_number] == "running":
+                log.warning(f"Job [{job_number}] is already running")
+
+    def builtin_term(self, pipe="", args=[]):
+        not_in_list = []
+        if len(args) >= 1:
+            for arg in args:
+                if arg not in self.jobs:
+                    not_in_list.append(arg)
+                else:
+                    log.debug("Terminating...")
+                    # if self.status_dict[arg] == "suspended":
+                    #     self.queues[arg].put("dummy")
+                    os.kill(self.process[arg].pid, signal.SIGTERM)
+                    del self.jobs[arg]
+        else:
+            raise JobException(f"One or more arguments expected", {"type": "len"})
+        if len(not_in_list):
+            raise JobException(f"Cannot find jobs with number \"{not_in_list}\".", {"type": "key"})
+
+    def builtin_help(self, pipe="", args=[]):
+        pass
 
     def builtin_pwd(self, pipe="", args=[]):
         cwd = self.cwd()
@@ -447,107 +512,114 @@ class MyShell:
 
         log.debug(f"Now cmd_args are {COLOR.BOLD(self.cmd_args)}")
 
-    @staticmethod
-    def test_unary(operator, operand):
-        if operator == "-z":
-            return not len(str(operand))
-        if operator == "-n":
-            return len(str(operand))
-        if operator == "!":
-            return not bool(operand)
+    def builtin_test(self, pipe="", args=[]):
 
-        # todo: raise
-        log.critical("Unrecoginized operator in a place it shouldn't be")
-        raise TestException(f"Unrecognized unary operator \"{operator}\"")
+        # builtin_test功能中使用到的等级函数
+        # 主要用于对操作符进行分类，方便调用，例如1，3为单目运算符
+        level = {
+            "(": 0, ")": 0,
+            "-z": 1, "-n": 1,
+            "=": 2, "!=": 2, "-eq": 2, "-ge": 2, "-gt": 2, "-le": 2, "-lt": 2, "-ne": 2,
+            "!": 3,
+            "-a": 4, "-o": 4,
+        }
+        def test_unary(operator, operand):
+            if operator == "-z":
+                return not len(str(operand))
+            if operator == "-n":
+                return len(str(operand))
+            if operator == "!":
+                return not bool(operand)
 
-    @staticmethod
-    def test_binary(op, lhs, rhs):
-        if op == "=":
-            return str(lhs) == str(rhs)
-        if op == "!=":
-            return str(lhs) != str(rhs)
-        if op == "-eq":
-            # todo: exception
-            return int(lhs) == int(rhs)
-        if op == "-ge":
-            return int(lhs) >= int(rhs)
-        if op == "-gt":
-            return int(lhs) > int(rhs)
-        if op == "-le":
-            return int(lhs) <= int(rhs)
-        if op == "-lt":
-            return int(lhs) < int(rhs)
-        if op == "-ne":
-            return int(lhs) != int(rhs)
-        if op == "-a":
-            return bool(lhs) and bool(rhs)
-        elif op == "-o":
-            return bool(lhs) or bool(rhs)
+            # todo: raise
+            log.critical("Unrecoginized operator in a place it shouldn't be")
+            raise TestException(f"Unrecognized unary operator \"{operator}\"")
 
-        # todo: raise
-        log.critical("Unrecoginized operator in a place it shouldn't be")
-        raise TestException(f"Unrecognized binary operator \"{operator}\"")
+        def test_binary(op, lhs, rhs):
+            if op == "=":
+                return str(lhs) == str(rhs)
+            if op == "!=":
+                return str(lhs) != str(rhs)
+            if op == "-eq":
+                # todo: exception
+                return int(lhs) == int(rhs)
+            if op == "-ge":
+                return int(lhs) >= int(rhs)
+            if op == "-gt":
+                return int(lhs) > int(rhs)
+            if op == "-le":
+                return int(lhs) <= int(rhs)
+            if op == "-lt":
+                return int(lhs) < int(rhs)
+            if op == "-ne":
+                return int(lhs) != int(rhs)
+            if op == "-a":
+                return bool(lhs) and bool(rhs)
+            elif op == "-o":
+                return bool(lhs) or bool(rhs)
 
-    def expand_expr(self, args):
-        # ! we combine from the right, that is the right most value are evaluated first
-        try:
+            # todo: raise
+            log.critical("Unrecoginized operator in a place it shouldn't be")
+            raise TestException(f"Unrecognized binary operator \"{operator}\"")
+
+        def expand_expr(args):
+            # ! we combine from the right, that is the right most value are evaluated first
+            try:
+                ind = 0
+                if len(args) == 1:
+                    return args[0]
+
+                if args[ind] not in level:
+                    lhs = args[ind]
+                    # not possible
+                    # if ind == len(args)-1:
+                    #     return lhs
+                    op = args[ind+1]
+                    rhs = expand_expr(args[ind+2::])
+                    return test_binary(op, lhs, rhs)
+
+                # match parentheses
+                if args[ind] == "(":
+                    org = ind
+                    while args[ind] != ")":
+                        ind += 1
+                    lhs = expand_expr(args[org+1:ind])
+                    if ind == len(args)-1:
+                        return lhs
+                    op = args[ind+1]
+                    rhs = expand_expr(args[ind+2::])
+                    return test_binary(op, lhs, rhs)
+
+                if level[args[ind]] in [1, 3]:
+                    op = args[ind]
+                    oa, ind = get_one(args[ind+1::])
+                    lhs = test_unary(op, oa)
+                    if ind == len(args)-1:
+                        return lhs
+                    op = args[ind+1]
+                    rhs = expand_expr(args[ind+2::])
+                    return test_binary(op, lhs, rhs)
+
+            except (ValueError, KeyError) as e:
+                # log.error(f"{e}")
+                raise TestException(e)
+
+        def get_one(args):
+
             ind = 0
-            if len(args) == 1:
-                return args[0]
+            if len(args) == 1 or args[ind] not in level:
+                return args[0], 1
 
-            if args[ind] not in self.level:
-                lhs = args[ind]
-                # not possible
-                # if ind == len(args)-1:
-                #     return lhs
-                op = args[ind+1]
-                rhs = self.expand_expr(args[ind+2::])
-                return self.test_binary(op, lhs, rhs)
-
-            # match parentheses
             if args[ind] == "(":
                 org = ind
                 while args[ind] != ")":
                     ind += 1
-                lhs = self.expand_expr(args[org+1:ind])
-                if ind == len(args)-1:
-                    return lhs
-                op = args[ind+1]
-                rhs = self.expand_expr(args[ind+2::])
-                return self.test_binary(op, lhs, rhs)
+                return expand_expr(args[org+1:ind]), ind+1
 
-            if self.level[args[ind]] in [1, 3]:
+            if level[args[ind]] in [1, 3]:
                 op = args[ind]
-                oa, ind = self.get_one(args[ind+1::])
-                lhs = self.test_unary(op, oa)
-                if ind == len(args)-1:
-                    return lhs
-                op = args[ind+1]
-                rhs = self.expand_expr(args[ind+2::])
-                return self.test_binary(op, lhs, rhs)
-
-        except (ValueError, KeyError) as e:
-            # log.error(f"{e}")
-            raise TestException(e)
-
-    def get_one(self, args):
-
-        ind = 0
-        if len(args) == 1 or args[ind] not in self.level:
-            return args[0], 1
-
-        if args[ind] == "(":
-            org = ind
-            while args[ind] != ")":
-                ind += 1
-            return self.expand_expr(args[org+1:ind]), ind+1
-
-        if self.level[args[ind]] in [1, 3]:
-            op = args[ind]
-            oa, ind = self.get_one(args[ind+1::])
-            return self.test_unary(op, oa), ind + 1
-
-    def builtin_test(self, pipe="", args=[]):
+                oa, ind = get_one(args[ind+1::])
+                return test_unary(op, oa), ind + 1
         # we can only use print to pass values
 
         tf = {
@@ -555,30 +627,13 @@ class MyShell:
             False: "False",
         }
 
-        return tf[bool(self.expand_expr(args))]
+        return tf[bool(expand_expr(args))]
         # todo: fill in the hole
         # try:
         #     self.subshell(target="test", args=args, pipe=pipe, piping=True)
         #     return "True"
         # except CalledProcessException as e:
         #     return "False"
-
-    def builtin_term(self, pipe="", args=[]):
-        not_in_list = []
-        if len(args) >= 1:
-            for arg in args:
-                if arg not in self.jobs:
-                    not_in_list.append(arg)
-                else:
-                    log.debug("Terminating...")
-                    # if self.status_dict[arg] == "suspended":
-                    #     self.queues[arg].put("dummy")
-                    os.kill(self.process[arg].pid, signal.SIGTERM)
-                    del self.jobs[arg]
-        else:
-            raise JobException(f"One or more arguments expected", {"type": "len"})
-        if len(not_in_list):
-            raise JobException(f"Cannot find jobs with number \"{not_in_list}\".", {"type": "key"})
 
     def builtin_sleep(self, pipe="", args=[]):
         # todo: raise
@@ -727,6 +782,10 @@ class MyShell:
                 del self.status_dict[i]
         log.debug(f"Status Dict is cleaned, keys are {COLOR.BOLD(self.status_dict.keys())}")
 
+    # callable PATH function，随着系统变量的改变而改变
+    def path(self):
+        return os.environ["PATH"]
+
     def home(self):
         return os.environ['HOME']
 
@@ -861,7 +920,7 @@ class MyShell:
             sys.stdin.close()
         stdin = open(0)
         buffer = stdin.detach()
-        wrapper = StdinWrapper(queue, count, job, status_dict, buffer)
+        wrapper = MyShell.StdinWrapper(queue, count, job, status_dict, buffer)
         sys.stdin = wrapper
 
         try:

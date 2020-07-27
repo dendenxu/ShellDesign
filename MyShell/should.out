@@ -1,0 +1,140 @@
+1595857028
+Hello, I'm your logger.
+Hello, again...
+False
+2020-07-27 21:37:08.231617
+[1m[34m##############################################################[0m
+0o002
+Changing UMASK to 0o777
+0o777
+Changing UMASK to 0o002
+[1m[34m##############################################################[0m
+Hello, my name is /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+Hello, my name is xuzh, and I live in /home/xuzh
+Should print sha256sum of zy in the next line
+b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1
+Should print 1 1 65 in the following line
+      1       1      65
+[1m[34m##############################################################[0m
+.
+rw-rw-r-- 2020-07-27 21:25:40 [1mlog.log[0m
+rw-rw-r-- 2020-07-27 21:23:15 [1mshould.out[0m
+rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
+rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
+rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
+rwxrwxr-x 2020-07-27 21:36:48 [31m[1mMyShell.py[0m[0m
+rw-rw-r-- 2020-07-27 21:37:08 [1mcurrent.out[0m
+rw-rw-r-- 2020-07-26 16:34:22 [1mdummy.mysh[0m
+rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
+rw-rw-r-- 2020-07-26 14:09:59 [1mMyShellException.py[0m
+rwxrwxr-x 2020-07-26 14:11:48 [34m[1m__pycache__[0m[0m
+~/Projects/ShellDesign/MyShell
+Should get empty output
+
+[1m[34m##############################################################[0m
+Should print /dev/null
+null
+Should print all files containing 1 in /tmp
+clr-debug-pipe-5083-302601-in
+clr-debug-pipe-5083-302601-out
+dotnet-diagnostic-5083-302601-socket
+ssh-3Dl1dZ2MVhMN
+systemd-private-32fa36ac417343a4813881b03c5a5a50-bolt.service-9WJsxv
+systemd-private-32fa36ac417343a4813881b03c5a5a50-colord.service-qxRv3v
+systemd-private-32fa36ac417343a4813881b03c5a5a50-fwupd.service-d3ZCSa
+systemd-private-32fa36ac417343a4813881b03c5a5a50-ModemManager.service-w89ayg
+systemd-private-32fa36ac417343a4813881b03c5a5a50-rtkit-daemon.service-ebfv3E
+systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-resolved.service-G0nqb0
+systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-timesyncd.service-eKPsiD
+tmp-4888SvW5tl218E4j.tpl
+vmware-root_1361-3988687315
+vscode-ipc-846c3b8a-cd23-429d-aa84-b71bb5acbe7b.sock
+vscode-ipc-cb722aa7-90c1-4b82-b595-52d2e62b5d98.sock
+[1m[34m##############################################################[0m
+Should make a file log.log
+.
+rw-rw-r-- 2020-07-27 21:37:08 [1mlog.log[0m
+rw-rw-r-- 2020-07-27 21:23:15 [1mshould.out[0m
+rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
+rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
+rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
+rwxrwxr-x 2020-07-27 21:36:48 [31m[1mMyShell.py[0m[0m
+rw-rw-r-- 2020-07-27 21:37:08 [1mcurrent.out[0m
+rw-rw-r-- 2020-07-26 16:34:22 [1mdummy.mysh[0m
+rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
+rw-rw-r-- 2020-07-26 14:09:59 [1mMyShellException.py[0m
+rwxrwxr-x 2020-07-26 14:11:48 [34m[1m__pycache__[0m[0m
+Should see content of log.log
+Hello, I'm your logger.
+Should display content of log.log
+Should display word count of log.log
+      2       6      40
+[1m[34m##############################################################[0m
+Opening some sleepy jobs
+And calling command jobs
+waiting 0.25s
+[1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+waiting 0.25s
+[1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
+waiting 0.25s
+[1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
+[1m[33m[2][0m[0m [1mrunning[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
+waiting 0.25s
+[1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
+[1m[33m[2][0m[0m [1mrunning[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
+[1m[33m[3][0m[0m [1mrunning[0m env [1msleep 2s &[0m
+Sleeping in dummy.mysh
+[1m[33m[0][0m[0m [1mfinished[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+This is some job management
+[1m[33m[1][0m[0m [1mfinished[0m env [1msleep 2s | echo "This is some job management" &[0m
+MyShell is /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+[1m[33m[2][0m[0m [1mfinished[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
+[1m[33m[3][0m[0m [1mfinished[0m env [1msleep 2s &[0m
+[1m[33m[4][0m[0m [1mfinished[0m env [1msleep 2s &[0m
+Getting current runnning jobs...
+[1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
+[1m[33m[2][0m[0m [1mrunning[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
+[1m[33m[3][0m[0m [1mrunning[0m env [1msleep 2s &[0m
+[1m[33m[4][0m[0m [1mrunning[0m env [1msleep 2s &[0m
+Getting back to fore ground
+Waiting for background jobs to terminate
+At the same time I can still do other things like testing...
+True
+True
+Should produce empty content
+Jobs are done ~
+[1m[34m##############################################################[0m
+Arg 0 is: dummy.mysh
+Arg 1 is: foo
+Arg 2 is: bar
+Arg 3 is: foobar
+Arg 4 is: hello
+Arg 5 is: world
+Arg 6 is: linux
+Arg 7 is: linus
+Arg 8 is: PyTorch
+Arg 9 is: CS231n
+Shifting #1
+Arg 0 is: dummy.mysh
+Arg 1 is: bar
+Arg 2 is: foobar
+Arg 3 is: hello
+Arg 4 is: world
+Arg 5 is: linux
+Arg 6 is: linus
+Arg 7 is: PyTorch
+Arg 8 is: CS231n
+Arg 9 is: 
+Shifting #2
+Arg 1 is: foobar
+Shifting #3
+Arg 1 is: hello
+Shifting #4
+Arg 1 is: world
+Shifting #5
+Arg 1 is: linux
+[1mBye![0m
