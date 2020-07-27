@@ -277,6 +277,18 @@ class MyShell:
             os.system("clear")
         # return ""
 
+    def builtin_pwd(self, pipe="", args=[]):
+        # 打印当前目录，如果使用了-a参数会打印完整的目录（将~符号替换为self.home()的值）
+        cwd = self.cwd() # 通过系统调用获得当前路径
+
+        # 根据参数判断
+        if len(args):
+            if args[0] == "-a" and cwd.startswith("~"):
+                    cwd = f"{self.home()}{cwd[1::]}"
+            else:
+                raise ArgCountException("pwd only accepts -a as argument, otherwise don't give any argument")
+        return cwd
+
     def builtin_dir(self, pipe="", args=[]):
         # 内置get_mode函数，用于获取文件劝降
         def get_mode(permissions):
@@ -359,15 +371,162 @@ class MyShell:
         return "\n".join(result)
 
     def builtin_echo(self, pipe="", args=[]):
-        # 我们支持-r参数，只能放在开头，如果用户使用了-r: raw input就不会对输入的内容进行转义翻译
-        # 否则我们会尝试转义某些escape code
+        # 我们支持-r参数，只能放在开头，如果用户使用了-r: raw input就不会对输入的特殊内容进行转义翻译
+        # 但是相应的shell内置参数还是会被尝试替换，例如变量或者表示用户根目录的~符号，这不是echo函数所能控制的
+        # 没有-r我们会尝试转义其他的escape code
         # ! if -r is provided, we won't do any escaping
         result = f"{' '.join(args)}\n"
         if len(args) >= 1 and args[0] == "-r":
             result = result[len("-r ")::]
         else:
+            # 通过codecs包实现较易于拓展的转义功能
             result = codecs.escape_decode(bytes(result, "utf-8"))[0].decode("utf-8")
         return result
+
+    def builtin_exit(self, pipe="", args=[]):
+        # 我们通过异常退出
+        raise ExitException("Exitting...")
+
+    def builtin_quit(self, pipe="", args=[]):
+        # 我们通过异常退出
+        raise ExitException("Quitting...")
+
+    # 后台工作的相关内容
+    @staticmethod
+    def job_status_fmt(job_number, status, content):
+        # 以统一的形式获得后台工作的样式
+        return f"{COLOR.BOLD(COLOR.YELLOW(f'[{job_number}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(content)}"
+
+    def job_status(self, job_number, status=None):
+        # 设定后台工作的状态并返回统一的打印样式
+        if status is not None:
+            self.status_dict[job_number] = status
+        else:
+            status = self.status_dict[job_number]
+        return self.job_status_fmt(job_number, status, self.jobs[job_number])
+
+    def builtin_jobs(self, pipe="", args=[]):
+        # 打印当前所有后台工作的执行情况
+        log.debug("Trying to get all jobs")
+        log.info(f"Content of jobs {COLOR.BOLD(self.jobs)}")
+        log.info(f"Content of status_dict {COLOR.BOLD(self.status_dict)}")
+        result = [self.job_status(key) for key in self.jobs.keys()]
+        return '\n'.join(result)
+
+    def builtin_queues(self, pipe="", args=[]):
+        # 开发者测试用命令，检查内存泄漏用
+        log.debug("Trying to get all queues")
+        log.info(f"Content of queues {COLOR.BOLD(self.queues)}")
+        return str(self.queues)
+
+    def builtin_fg(self, pipe="", args=[]):
+        # 将因为尝试获取用户输入而挂起的工作提到前台执行
+
+        # 数量检查
+        if len(args) != 1:
+            raise JobException("Argument number is not correct, only one expected.", {"type": "len"})
+        elif args[0] not in self.jobs:
+            raise JobException(f"Cannot find job is jobs number \"{args[0]}\".", {"type": "key"})
+
+        # 通过multiprocessin.Queue进行沟通
+        # ! 注意，外部命令的读取请求不会被处理，因为在后台执行的subshell中PIPE会被关闭
+        log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
+        print(self.job_status_fmt(job_number, "continued", self.jobs[job_number]))
+        self.queues[args[0]].put("dummy")
+
+        log.info("Waiting for foreground task to finish...")
+
+        # 挂起主线程，等待后台程序执行完毕
+        self.queues[args[0]].get()
+        log.debug("Continuing main process")
+
+    # 继续执行后台job
+    def builtin_bg(self, pipe="", args=[]):
+        # 处理相关参数调用
+        if not len(args):
+            raise JobException("Argument number is not correct, one or more expected.", {"type": "len"})
+
+        not_in_list = [arg for arg in args if arg not in self.jobs]
+        args = [arg for arg in args if arg in self.jobs]
+
+        log.debug(f"Background is called with {COLOR.BOLD(args)}")
+        for job_number in args:
+            if self.status_dict[job_number] == "suspended":
+                print(self.job_status_fmt(job_number, "continued", self.jobs[job_number]))
+                print(self.job_status_fmt(job_number, "suspended", self.jobs[job_number]))
+            elif self.status_dict[job_number] == "running":
+                log.warning(f"Job [{job_number}] is already running")
+
+        # 找不到的后台工作会被反馈给用户
+        if len(not_in_list):
+            raise JobException(f"Cannot find job with number \"{not_in_list}\".", {"type": "key"})
+
+
+    def builtin_term(self, pipe="", args=[]):
+        # 处理相关参数调用
+        if not len(args):
+            raise JobException("Argument number is not correct, one or more expected.", {"type": "len"})
+
+        not_in_list = [arg for arg in args if arg not in self.jobs]
+        args = [arg for arg in args if arg in self.jobs]
+
+        for job_number in args:
+            log.debug("Terminating...")
+            os.kill(self.process[job_number].pid, signal.SIGTERM)
+            print(self.job_status_fmt(job_number, "terminated", self.jobs[job_number]))
+            del self.jobs[job_number]
+
+        if len(not_in_list):
+            raise JobException(f"Cannot find jobs with number \"{not_in_list}\".", {"type": "key"})
+
+
+    def builtin_environ(self, pipe="", args=[]):
+        return "\n".join([f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars])
+
+    def builtin_set(self, pipe="", args=[]):
+        # we'd like the user to use the equal sign
+        # and we'd like to treat varibles only as string
+        for arg in args:
+            split = arg.split("=")
+            if len(split) != 2:
+                raise SetPairUnmatchedException(f"Cannot match argument {arg}.", {"type": "set"})
+            key, value = split
+            log.debug(f"Setting \"{key}\" in environment variables to \"{value}\"")
+
+            try:
+                # might be error since self.vars is not a simple dict
+                self.vars[key] = value
+            except (FileNotFoundError, NotADirectoryError) as e:
+                raise FileNotFoundException(e, {"type": "set", "arg_pair": [key, value]})
+        return None
+
+    def builtin_unset(self, pipe="", args=[]):
+        keys = []
+        for key in args:
+            try:
+                del self.vars[key]
+            except (KeyError, ReservedKeyException):
+                keys.append(key)
+        if len(keys):
+            raise UnsetKeyException("Cannot find/unset these keys.", {"keys": keys})
+
+    def builtin_umask(self, pipe="", args=[]):
+        if len(args) > 1:
+            raise UmaskException("Argument number is not correct, only one or zero expected.", {"type": "len"})
+        elif len(args) == 1:
+            try:
+                log.debug(f"Value of ARG: {COLOR.BOLD(args[0])}")
+                umask = int(args[0], 8)
+                log.debug(f"Value of ARG in int of 8: {COLOR.BOLD(umask)}")
+                os.umask(umask)
+            except ValueError as e:
+                raise UmaskException(e, {"type": "value"})
+        else:
+            # dummy parameter
+            old = os.umask(0)
+            log.debug(f"Value of OLD: {COLOR.BOLD(old)}")
+            os.umask(old)
+            return "0o{:03o}".format(old)
 
     def builtin_exec(self, pipe="", args=[]):
         if len(args) != 2:
@@ -400,118 +559,6 @@ class MyShell:
                 raise FileNotFoundException(e, {"type": "redi_out"})
         else:
             self.output_file = None
-
-    def builtin_exit(self, pipe="", args=[]):
-        raise ExitException("Exitting...")
-
-    def builtin_environ(self, pipe="", args=[]):
-        return "\n".join([f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars])
-
-    @staticmethod
-    def job_status_fmt(job_number, status, content):
-        return f"{COLOR.BOLD(COLOR.YELLOW(f'[{job_number}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(content)}"
-
-    def job_status(self, job_number, status=None):
-        if status is not None:
-            self.status_dict[job_number] = status
-        else:
-            status = self.status_dict[job_number]
-        return self.job_status_fmt(job_number, status, self.jobs[job_number])
-
-    def builtin_jobs(self, pipe="", args=[]):
-        log.debug("Trying to get all jobs")
-        log.info(f"Content of jobs {COLOR.BOLD(self.jobs)}")
-        log.info(f"Content of status_dict {COLOR.BOLD(self.status_dict)}")
-        result = [self.job_status(key) for key in self.jobs.keys()]
-        return '\n'.join(result)
-
-    def builtin_queues(self, pipe="", args=[]):
-        log.debug("Trying to get all queues")
-        log.info(f"Content of queues {COLOR.BOLD(self.queues)}")
-        return str(self.queues)
-
-    def builtin_fg(self, pipe="", args=[]):
-        if len(args) != 1:
-            raise JobException("Argument number is not correct, only one expected.", {"type": "len"})
-        elif args[0] not in self.jobs:
-            raise JobException(f"Cannot find job is jobs number \"{args[0]}\".", {"type": "key"})
-
-        log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
-        self.queues[args[0]].put("dummy")
-
-        log.info("Waiting for foreground task to finish...")
-
-        self.queues[args[0]].get()
-        log.debug("Continuing main process")
-        # del self.queues[args[0]]
-        # del self.jobs[args[0]]
-
-    # 继续执行后台job
-    def builtin_bg(self, pipe="", args=[]):
-        not_in_list = []
-        # 处理相关参数调用
-        if not len(args):
-            raise JobException("Argument number is not correct, one or more expected.", {"type": "len"})
-        else:
-            for arg in args:
-                if arg not in self.jobs:
-                    not_in_list.append(arg)
-        if len(not_in_list):
-            raise JobException(f"Cannot find job with number \"{not_in_list}\".", {"type": "key"})
-
-        log.debug(f"Background is called with {COLOR.BOLD(args)}")
-        for job_number in args:
-            if self.status_dict[job_number] == "suspended":
-                print(self.job_status_fmt(job_number, "running", self.jobs[job_number]))
-                print(self.job_status_fmt(job_number, "suspended", self.jobs[job_number]))
-            elif self.status_dict[job_number] == "running":
-                log.warning(f"Job [{job_number}] is already running")
-
-    def builtin_term(self, pipe="", args=[]):
-        not_in_list = []
-        if len(args) >= 1:
-            for arg in args:
-                if arg not in self.jobs:
-                    not_in_list.append(arg)
-                else:
-                    log.debug("Terminating...")
-                    # if self.status_dict[arg] == "suspended":
-                    #     self.queues[arg].put("dummy")
-                    os.kill(self.process[arg].pid, signal.SIGTERM)
-                    del self.jobs[arg]
-        else:
-            raise JobException(f"One or more arguments expected", {"type": "len"})
-        if len(not_in_list):
-            raise JobException(f"Cannot find jobs with number \"{not_in_list}\".", {"type": "key"})
-
-    def builtin_help(self, pipe="", args=[]):
-        pass
-
-    def builtin_pwd(self, pipe="", args=[]):
-        cwd = self.cwd()
-        if len(args) and args[0] == "-a" and cwd.startswith("~"):
-            cwd = f"{self.home()}{cwd[1::]}"
-        return cwd
-
-    def builtin_quit(self, pipe="", args=[]):
-        raise ExitException("Quitting...")
-
-    def builtin_set(self, pipe="", args=[]):
-        # we'd like the user to use the equal sign
-        # and we'd like to treat varibles only as string
-        for arg in args:
-            split = arg.split("=")
-            if len(split) != 2:
-                raise SetPairUnmatchedException(f"Cannot match argument {arg}.", {"type": "set"})
-            key, value = split
-            log.debug(f"Setting \"{key}\" in environment variables to \"{value}\"")
-
-            try:
-                # might be error since self.vars is not a simple dict
-                self.vars[key] = value
-            except (FileNotFoundError, NotADirectoryError) as e:
-                raise FileNotFoundException(e, {"type": "set", "arg_pair": [key, value]})
-        return None
 
     def builtin_shift(self, pipe="", args=[]):
         log.debug(f"Shift args are {COLOR.BOLD(args)}")
@@ -671,34 +718,6 @@ class MyShell:
     def builtin_time(self, pipe="", args=[]):
         return str(datetime.datetime.now())
 
-    def builtin_umask(self, pipe="", args=[]):
-        if len(args) > 1:
-            raise UmaskException("Argument number is not correct, only one or zero expected.", {"type": "len"})
-        elif len(args) == 1:
-            try:
-                log.debug(f"Value of ARG: {COLOR.BOLD(args[0])}")
-                umask = int(args[0], 8)
-                log.debug(f"Value of ARG in int of 8: {COLOR.BOLD(umask)}")
-                os.umask(umask)
-            except ValueError as e:
-                raise UmaskException(e, {"type": "value"})
-        else:
-            # dummy parameter
-            old = os.umask(0)
-            log.debug(f"Value of OLD: {COLOR.BOLD(old)}")
-            os.umask(old)
-            return "0o{:03o}".format(old)
-
-    def builtin_unset(self, pipe="", args=[]):
-        keys = []
-        for key in args:
-            try:
-                del self.vars[key]
-            except (KeyError, ReservedKeyException):
-                keys.append(key)
-        if len(keys):
-            raise UnsetKeyException("Cannot find/unset these keys.", {"keys": keys})
-
     def builtin_dummy(self, pipe="", args=[]):
         # result = sys.stdin.readline()
         print("builtin_dummy: before any input requirements")
@@ -724,6 +743,9 @@ class MyShell:
                     log.error(f"The job of pid \"{pid}\" is continued.")
             except:
                 break
+
+    def builtin_help(self, pipe="", args=[]):
+        pass
 
     def subshell(self, pipe="", target="", args=[], piping=False, io_control=False):
         if not target:
@@ -933,10 +955,10 @@ class MyShell:
             if shell.subp is not None:
                 log.warning("Killing a still running subprocess...")
                 os.kill(shell.subp.pid, signal.SIGKILL)
-            log.warning(f"Getting signal: {COLOR.BOLD(sig)}")
-            log.warning(f"Are you: {COLOR.BOLD(signal.SIGTERM)}")
+            log.debug(f"Getting signal: {COLOR.BOLD(sig)}")
+            log.debug(f"Are you: {COLOR.BOLD(signal.SIGTERM)}")
             if sig == signal.SIGTERM:
-                log.warning("Terminating self")
+                log.warning("Terminating job")
                 os.kill(my_pid, signal.SIGKILL)
 
         signal.signal(signal.SIGTERM, exit_subp)

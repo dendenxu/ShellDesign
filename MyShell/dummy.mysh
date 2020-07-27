@@ -2,6 +2,7 @@ test ! -z ""
 date +%s
 time
 set BOLD="\033[1m"
+set RED="\033[31m"
 set BLUE="\033[34m"
 set RESET="\033[0m"
 
@@ -91,6 +92,20 @@ jobs
 
 
 echo "Jobs are done ~"
+
+echo "Spawning dummy built_in job that is trying to read from user (will suspend)"
+
+dummy &
+dummy &
+dummy &
+dummy &
+
+echo "Counting jobs"
+jobs
+
+echo "$RED$BOLD""WE'RE ONLY TERMINATING JOB 5 AND 6, YOU SHOULD SEE WARMING IF -w. NO ZOMBIE""$RESET"
+
+term 5 6
 
 echo $LINE
 
