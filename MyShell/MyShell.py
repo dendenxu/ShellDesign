@@ -256,14 +256,14 @@ class MyShell:
             return self.builtin_pwd(pipe=pipe, args=args)
 
         # 若用户的输入开头为~符号，替换为用户主目录内容
-        if target_dir.startswith("~"):
-            target_dir = f"{self.home()}{target_dir[1::]}"
+        # if target_dir.startswith("~"):
+        #     target_dir = f"{self.home()}{target_dir[1::]}"
         # the dir might not exist
         # 路径不存在则报错
         try:
             log.info(f"Changing CWD to {COLOR.BOLD(target_dir)}")
             os.chdir(target_dir)
-        except FileNotFoundError as e:
+        except (FileNotFoundError, NotADirectoryError) as e:
             raise FileNotFoundException(e, {"type": "cd"})
 
     # 清空屏幕功能
@@ -290,53 +290,77 @@ class MyShell:
         if not len(args):
             args.append(".")
 
+        # 不存在的目录的报错信息集合（用于最后的raise检查，会被调用'\n'.join）
         not_in_list = []
+        # 储存将要打印的内容，最后会作为'\n'.join(result)的参数
         result = []
 
         for target_dir in args:
+            # 第一行是当前打印的目录的名称
             result.append(target_dir)
-            if target_dir.startswith("~"):
-                target_dir = f"{self.home()}{target_dir[1::]}"
+            # if target_dir.startswith("~"):
+            #     target_dir = f"{self.home()}{target_dir[1::]}"
             # the dir might not exist
             try:
+                # 可能会出现找不到文件的情况，将找不到的文件添加到not_in_list中，继续处理下一个目录的打印操作，并在最后raise
                 log.debug(f"Listing dir {COLOR.BOLD(target_dir)}")
+                # 通过os接口获得文件名称
                 dir_list = os.listdir(target_dir)
                 for file_name in dir_list:
+                    # 下面的stat等函数调用需要全路径
                     full_name = f"{target_dir}/{file_name}"
+
+                    # 文件的访问权限，最后修改时间等信息
                     file_stat = os.stat(full_name)
-                    # only getting the lower part
                     file_mode = file_stat.st_mode
-                    # time
                     file_time = file_stat.st_mtime
-                    # guess we're not using this...
-                    type_code = file_mode >> 12
+
+                    # # guess we're not using this...
+                    # type_code = file_mode >> 12
+
+                    # 提取整数的每一位，一共获取9位
                     permissions = [(file_mode >> bit) & 1 for bit in range(9 - 1, -1, -1)]
+
+                    # 将访问权限和目录信息转换为字符串
                     mode_str = get_mode(permissions)
                     time_str = datetime.datetime.fromtimestamp(file_time).strftime("%Y-%m-%d %H:%M:%S")
-                    # print(time_str)
+
+                    # 合并成为最终结果的一行的前半部分
                     file_line = f"{mode_str} {time_str} "
+
+                    # 根据文件的类型/是否位可执行文件，写入相关颜色
                     if os.path.isdir(full_name):
                         # path is a directory
                         file_line += COLOR.BLUE(COLOR.BOLD(file_name))
                     else:
+                        # ! os.access not working properly on windows
                         # todo: maybe we can recognize char block or others
                         # this is brutal
                         if os.access(full_name, os.X_OK):
+                            # 用红色显示可执行文件
                             file_line += COLOR.RED(COLOR.BOLD(file_name))
                         else:
+                            # 用普通粗体显示一般文件
                             file_line += COLOR.BOLD(file_name)
+
+                    # 添加到完整的result数组中
                     result.append(file_line)
+                # 若用户传入了多个参数，在不同的文件夹间打印一个换行（最终'\n'.join的效果）
                 result.append("")
-            except FileNotFoundError as e:
+            except (FileNotFoundError, NotADirectoryError) as e:
                 not_in_list.append(str(e))
 
+        # 找不到的目录（可能输入了一个文件）数量为非空
         if len(not_in_list):
             joined = '\n'.join(not_in_list)
             raise FileNotFoundException(f"Cannot find: \n{joined}", {"type": "dir"})
 
+        # 若一切正常则以字符串形式直接返回最终结果
         return "\n".join(result)
 
     def builtin_echo(self, pipe="", args=[]):
+        # 我们支持-r参数，只能放在开头，如果用户使用了-r: raw input就不会对输入的内容进行转义翻译
+        # 否则我们会尝试转义某些escape code
         # ! if -r is provided, we won't do any escaping
         result = f"{' '.join(args)}\n"
         if len(args) >= 1 and args[0] == "-r":
@@ -485,7 +509,7 @@ class MyShell:
             try:
                 # might be error since self.vars is not a simple dict
                 self.vars[key] = value
-            except FileNotFoundError as e:
+            except (FileNotFoundError, NotADirectoryError) as e:
                 raise FileNotFoundException(e, {"type": "set", "arg_pair": [key, value]})
         return None
 
@@ -523,6 +547,7 @@ class MyShell:
             "!": 3,
             "-a": 4, "-o": 4,
         }
+
         def test_unary(operator, operand):
             if operator == "-z":
                 return not len(str(operand))
@@ -1016,13 +1041,13 @@ class MyShell:
                 else:
                     log.error(f"Cannot open/write to file at command \"{command['exec']}\" of position {cidx} for updating output, check for file permission. {e}")
             elif e.errors["type"] == "cd":
-                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory changing. {e}")
+                log.error(f"Cannot find proper dir at command \"{command['exec']}\" of position {cidx} for directory changing. {e}")
             elif e.errors["type"] == "dir":
-                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for directory listing. {e}")
+                log.error(f"Cannot find proper dir at command \"{command['exec']}\" of position {cidx} for directory listing. {e}")
             elif e.errors["type"] == "subshell":
                 log.error(f"Cannot find an external or internal command \"{command['exec']}\" of position {cidx} for an external process spawning. {e}")
             elif e.errors["type"] == "set":
-                log.error(f"Setting environment {e.errors['arg_pair'][0]} to {e.errors['arg_pair'][1]} failed. You're probably setting PWD and we're unable to find a proper place to cd into... {e}")
+                log.warning(f"Setting environment {e.errors['arg_pair'][0]} to {e.errors['arg_pair'][1]} failed. You're probably setting PWD and we're unable to find a proper place to cd into... {e}")
         except QuoteUnmatchedException as e:
             log.debug("We've encountered quote unmatch error...")
             log.info(f"Exception says: {e}")
@@ -1187,13 +1212,54 @@ class MyShell:
             if prev == command[index]:
                 index += 1  # advance only if the var is unchanged
 
-        return command
+        def process_home_dollar(string):
+            def get_dollar_sign(key):
+                if key == "\\$":
+                    return "$"
+                else:
+                    return key
+
+            def get_home_sign(key):
+                if key == "\\~":
+                    return "~"
+                else:
+                    return key
+
+            string = self.sub_re(r"\\\$", string, get_dollar_sign)
+            string = self.sub_re(r"\\~", string, get_home_sign)
+            return string
+        return [process_home_dollar(i) for i in command ]
 
     def expand(self, string):
-        # log.debug(f"The string to be expanded is: {COLOR.BOLD(string)}")
-        # string = re.sub(r"(?<!\\)~", self.home(), string)
-        # string = string.replace("~", self.home())
-        var_list = [(m.start(0), m.end(0)) for m in re.finditer(r"(?<!\\)\$\w+", string)]
+        def get_key(key):
+            key = key[1::]
+            log.debug(f"Trying to get varible {COLOR.BOLD(key)}")
+            try:
+                var = self.vars[key]
+                log.debug(f"Got the varible {COLOR.BOLD(var)}")
+            except (KeyError, IndexError) as e:
+                log.warning(f"Unable to get the varible \"{key}\", assigning empty string")
+                var = ""
+            # splitting the expanded command since it might contain some information
+            return var
+
+        def get_home(key):
+            log.debug(f"GETTING HOME SIGN: {COLOR.BOLD(key)}")
+            if key == "~":
+                return self.home()
+            else:
+                return key
+
+
+        string = self.sub_re(r"(?<!\\)\$\w+", string, get_key)
+        string = self.sub_re(r"(?<!\\)~", string, get_home)
+
+        return string
+
+    # ! if you use re.sub on windows, strange things can happen
+    @staticmethod
+    def sub_re(pattern, string, method):
+        var_list = [(m.start(0), m.end(0)) for m in re.finditer(pattern, string)]
         str_list = []
         prev = [0, 0]
         for start, end in var_list:
@@ -1206,15 +1272,8 @@ class MyShell:
         # log.debug(f"The splitted vars are {COLOR.BOLD(str_list)}")
 
         for i in range(1, len(str_list), 2):
-            key = str_list[i][1::]
-            log.debug(f"Trying to get varible {COLOR.BOLD(key)}")
-            try:
-                var = self.vars[key]
-                log.debug(f"Got the varible {COLOR.BOLD(var)}")
-            except (KeyError, IndexError) as e:
-                log.warning(f"Unable to get the varible \"{key}\", assigning empty string")
-                var = ""
-            # splitting the expanded command since it might contain some information
+            key = str_list[i]
+            var = method(key)
             str_list[i] = var
             # to result in index staying the same
 
