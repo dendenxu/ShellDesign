@@ -279,12 +279,12 @@ class MyShell:
 
     def builtin_pwd(self, pipe="", args=[]):
         # 打印当前目录，如果使用了-a参数会打印完整的目录（将~符号替换为self.home()的值）
-        cwd = self.cwd() # 通过系统调用获得当前路径
+        cwd = self.cwd()  # 通过系统调用获得当前路径
 
         # 根据参数判断
         if len(args):
             if args[0] == "-a" and cwd.startswith("~"):
-                    cwd = f"{self.home()}{cwd[1::]}"
+                cwd = f"{self.home()}{cwd[1::]}"
             else:
                 raise ArgCountException("pwd only accepts -a as argument, otherwise don't give any argument")
         return cwd
@@ -357,13 +357,18 @@ class MyShell:
 
                     # 添加到完整的result数组中
                     result.append(file_line)
-                # 若用户传入了多个参数，在不同的文件夹间打印一个换行（最终'\n'.join的效果）
-                result.append("")
             except (FileNotFoundError, NotADirectoryError) as e:
                 not_in_list.append(str(e))
+            finally:
+                # 若用户传入了多个参数，在不同的文件夹间打印一个换行（最终'\n'.join的效果）
+                result.append("")
 
         # 找不到的目录（可能输入了一个文件）数量为非空
         if len(not_in_list):
+            # 打印可以打印的内容
+            # 由于raise会使函数停止继续执行，我们在此打印一些信息
+            # ! 注意，这种情况下我们不会返回结果，piping会停止
+            print("\n".join(result), file=self.output_file, end="")
             joined = '\n'.join(not_in_list)
             raise FileNotFoundException(f"Cannot find: \n{joined}", {"type": "dir"})
 
@@ -461,7 +466,6 @@ class MyShell:
         if len(not_in_list):
             raise JobException(f"Cannot find job with number \"{not_in_list}\".", {"type": "key"})
 
-
     def builtin_term(self, pipe="", args=[]):
         # 处理相关参数调用
         if not len(args):
@@ -472,16 +476,31 @@ class MyShell:
 
         for job_number in args:
             log.debug("Terminating...")
+            # 对multiprocessing的进程包发出signal.SIGTERM信号，给其机会处理相关内容（关闭subshell等）
+            # ! 在*nix上与subshell，run_command_wrap配合可避免zombie process
+            # ! Windows中由于接口不匹配的原因，无法完全清除zombie
             os.kill(self.process[job_number].pid, signal.SIGTERM)
+
             print(self.job_status_fmt(job_number, "terminated", self.jobs[job_number]))
+
+            # 我们以jobs数组为蓝本，判断jobs是否已完成或者被强行结束等
+            # 配合clean_up函数，status_dict和queues等其他数组会被正常清理
             del self.jobs[job_number]
 
+        # 找不到的后台工作会被反馈给用户
         if len(not_in_list):
             raise JobException(f"Cannot find jobs with number \"{not_in_list}\".", {"type": "key"})
 
-
     def builtin_environ(self, pipe="", args=[]):
-        return "\n".join([f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars])
+        # # 将MyShell的环境变量返回给用户
+        result = []
+        for key in self.vars:
+            try:
+                # 由于self.vars的特殊性，不能直接调用列表生成器
+                result.append(f"{key}={COLOR.BOLD(self.vars[key])}")
+            except IndexError:
+                pass
+        return "\n".join(result)
 
     def builtin_set(self, pipe="", args=[]):
         # we'd like the user to use the equal sign
@@ -1250,7 +1269,7 @@ class MyShell:
             string = self.sub_re(r"\\\$", string, get_dollar_sign)
             string = self.sub_re(r"\\~", string, get_home_sign)
             return string
-        return [process_home_dollar(i) for i in command ]
+        return [process_home_dollar(i) for i in command]
 
     def expand(self, string):
         def get_key(key):
@@ -1271,7 +1290,6 @@ class MyShell:
                 return self.home()
             else:
                 return key
-
 
         string = self.sub_re(r"(?<!\\)\$\w+", string, get_key)
         string = self.sub_re(r"(?<!\\)~", string, get_home)
