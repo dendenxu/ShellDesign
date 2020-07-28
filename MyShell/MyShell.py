@@ -499,6 +499,54 @@ class MyShell:
         if len(not_in_list):
             raise JobException(f"Cannot find jobs with number \"{not_in_list}\".", {"type": "key"})
 
+    def builtin_check_zombie(self, pipe="", args=[]):
+        # 开发者调试用函数
+        # 用于检查当前进程下的zombie process
+        any_process = -1
+        while True:
+            # This will raise an exception on Windows.  That's ok.
+            pid, status = os.waitpid(any_process, os.WNOHANG)
+            if pid == 0:
+                break
+            log.warning(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + ', ' + str(status))}")
+            if os.WIFEXITED(status):
+                log.warning(f"The process of pid \"{pid}\" is done.")
+            elif os.WIFSTOPPED(status):
+                log.warning(f"The process of pid \"{pid}\" is suspended.")
+            elif os.WIFCONTINUED(status):
+                log.warning(f"The process of pid \"{pid}\" is continued.")
+            else:
+                log.warning(f"The process of pid \"{pid}\" is of status {status}")
+
+    def cleanup_jobs(self):
+        # 对jobs命令的拓展
+        # 我们的任务管理系统以self.jobs字典为准，每次命令调用后都会刷新当前的数组内容以删除不必要的元素
+        # 管理：self.queues, self.status_dict, self.process
+        # 避免了内存泄漏
+        keys = list(self.queues.keys())
+
+        log.debug(f"Queue is being cleaned, previous keys are {COLOR.BOLD(keys)}")
+        for i in keys:
+            if i not in self.jobs.keys():
+                del self.queues[i]
+        log.debug(f"Queue is cleaned, keys are {COLOR.BOLD(self.queues.keys())}")
+
+        keys = list(self.process.keys())
+
+        log.debug(f"Process is being cleaned, previous keys are {COLOR.BOLD(keys)}")
+        for i in keys:
+            if i not in self.jobs.keys():
+                del self.process[i]
+        log.debug(f"Process is cleaned, keys are {COLOR.BOLD(self.process.keys())}")
+
+        keys = list(self.status_dict.keys())
+
+        log.debug(f"Status Dict is being cleaned, previous keys are {COLOR.BOLD(keys)}")
+        for i in keys:
+            if i not in self.jobs.keys():
+                del self.status_dict[i]
+        log.debug(f"Status Dict is cleaned, keys are {COLOR.BOLD(self.status_dict.keys())}")
+
     def builtin_environ(self, pipe="", args=[]):
         # # 将MyShell的环境变量返回给用户
         result = []
@@ -569,6 +617,8 @@ class MyShell:
             return "0o{:03o}".format(old)
 
     def builtin_printio(self, pipe="", args=[]):
+        # 开发者调试用命令，用于检查当前的exec文件重定向
+        # note: 由于我们要检查重定向，这里会直接打印到stdout而非输入输出文件
         result = []
         result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.input_file.fileno() if self.input_file is not None else sys.stdin.fileno())}, redirecting MyShell input to {COLOR.BOLD(self.input_file)}")
         result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.output_file.fileno() if self.output_file is not None else sys.stdout.fileno())}, redirecting MyShell output to {COLOR.BOLD(self.output_file)}")
@@ -794,25 +844,6 @@ class MyShell:
         print(input("dummy3> "))
         print(input("dummyend> "))
 
-    def builtin_check_zombie(self, pipe="", args=[]):
-        # 开发者调试用函数
-        # 用于检查当前进程下的zombie process
-        any_process = -1
-        while True:
-            # This will raise an exception on Windows.  That's ok.
-            pid, status = os.waitpid(any_process, os.WNOHANG)
-            if pid == 0:
-                break
-            log.warning(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + ', ' + str(status))}")
-            if os.WIFEXITED(status):
-                log.warning(f"The process of pid \"{pid}\" is done.")
-            elif os.WIFSTOPPED(status):
-                log.warning(f"The process of pid \"{pid}\" is suspended.")
-            elif os.WIFCONTINUED(status):
-                log.warning(f"The process of pid \"{pid}\" is continued.")
-            else:
-                log.warning(f"The process of pid \"{pid}\" is of status {status}")
-
     def builtin_help(self, pipe="", args=[]):
         # 在线帮助函数
         # todo: 写好在线帮助
@@ -834,6 +865,7 @@ class MyShell:
                 piping_in = True
             # waits for the process to end
             # 若需要通过管道传递相关内容，则使用PIPE
+            # ! windows中有些内置命令是无法通过subprocess调用的，例如type等cmd.exe内置命令
             p = subprocess.Popen(
                 to_run,
                 stdin=PIPE if piping_in else self.input_file,
@@ -847,58 +879,40 @@ class MyShell:
             if p.returncode != 0:
                 log.warning("The subprocess is not returning zero exit code")
                 raise CalledProcessException("None zero return code encountered")
-        except:
-            raise
         finally:
+            # 我们使用try block的原因在于无论如何都要清空一下self.subp
             self.subp = None
-        # log.debug(f"Raw string content: {COLOR.BOLD(result)}")
+
+        # 若通过subshell调用，则直接将结果以字符串形式返回
         return result
 
-    def cleanup(self):
-        keys = list(self.queues.keys())
-
-        log.debug(f"Queue is being cleaned, previous keys are {COLOR.BOLD(keys)}")
-        for i in keys:
-            if i not in self.jobs.keys():
-                del self.queues[i]
-        log.debug(f"Queue is cleaned, keys are {COLOR.BOLD(self.queues.keys())}")
-
-        keys = list(self.process.keys())
-
-        log.debug(f"Process is being cleaned, previous keys are {COLOR.BOLD(keys)}")
-        for i in keys:
-            if i not in self.jobs.keys():
-                del self.process[i]
-        log.debug(f"Process is cleaned, keys are {COLOR.BOLD(self.process.keys())}")
-
-        keys = list(self.status_dict.keys())
-
-        log.debug(f"Status Dict is being cleaned, previous keys are {COLOR.BOLD(keys)}")
-        for i in keys:
-            if i not in self.jobs.keys():
-                del self.status_dict[i]
-        log.debug(f"Status Dict is cleaned, keys are {COLOR.BOLD(self.status_dict.keys())}")
-
-    # callable PATH function，随着系统变量的改变而改变
     def path(self):
+        # callable PATH function，随着系统变量的改变而改变
         return os.environ["PATH"]
 
     def home(self):
+        # callable HOME function，随着系统变量的改变而改变
         return os.environ['HOME']
 
     def cwd(self):
+        # callable PWD function，随着系统变量的改变而改变
         cwd = os.getcwd()
         if cwd.startswith(self.home()):
             cwd = f"~{cwd[len(self.home())::]}"
         return cwd
 
     def user(self):
+        # callable USER function，随着系统变量的改变而改变
         return getpass.getuser()
 
     def location(self):
+        # callable LOCATION function，随着系统变量的改变而改变
         return platform.node()
 
     def prompt(self):
+        # 返回将要打印到屏幕的命令提示符
+        # 包含：用户@地点 当前目录 当前时间 提示符
+        # [conda_default_env] user@location /path/to/current/dir time_now PS1
         prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(datetime.datetime.now().strftime('%H:%M:%S'))} {COLOR.BOLD(COLOR.YELLOW(self.vars['PS1']))} "
         # log.debug(repr(prompt))
         try:
@@ -909,24 +923,32 @@ class MyShell:
         return prompt
 
     def execute(self, command, pipe=""):
+        # 执行一个已经被格式化的命令
+        # 命令以dict形式传入，其中exec代表命令本身，args代表命令参数
+        # 还有一些其他控制参数，例如重定向或者管道操作
+        # 本函数还包含了对于exec命令的特殊处理（我们会提前处理重定向操作，而非交给命令本身，因此需要特殊化参数才可正常传入）
         log.info(f"Executing command {COLOR.BOLD(command['exec'])}")
         log.info(f"Arguments are {COLOR.BOLD(command['args'])}")
-        # log.debug(f"Full content of command is {COLOR.BOLD(command)}")
+
+        # pipe或者重定向输入只能有一个
         if command["pipe_in"] and command["redi_in"]:
             raise MultipleInputException("Redirection and pipe are set as input at the same time.")
 
+        # piping_in/piping_out主要用于subshell的处理
         command["piping_in"] = command["pipe_in"] or command["redi_in"]
         command["piping_out"] = command["redi_out"] or command["pipe_out"]
 
+        # 处理输入重定向
         # to the command itself, it doesn't matter whether the input comes from a pipe or file
-        if command["redi_in"] and command["exec"] != "exec":
+        if command["redi_in"]:
             file_path = command["redi_in"]
             try:
                 # the function open will automatically raise FileNotFoundError
                 f = open(file_path, "r")
+                pipe = f.read()
+                f.close()
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "redi_in"})
-            pipe = f.read()
 
         # if we've specified input file in some thing
         if self.input_file is not None:
@@ -951,27 +973,30 @@ class MyShell:
                     result = self.subshell(pipe, command["exec"], command['args'], piping_in=command["piping_in"], piping_out=command["piping_out"], io_control=command["io_control"])
                 except FileNotFoundError as e:
                     raise FileNotFoundException(e, {"type": "subshell"})
-        except:
-            raise
         finally:
+            # 我们使用try block的原因在于无论如何都要清空一下self.subp
             sys.stdin = sys.__stdin__
 
+        # 处理输出重定向
         if command['redi_out']:
             log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
             if command["redi_append"]:
                 try:
                     f = open(command["redi_out"], "a")
                     f.write(result)
+                    f.close()
                 except FileNotFoundError as e:
                     raise FileNotFoundException(e, {"type": "redi_out", "redi_append": True})
             else:
                 try:
                     f = open(command["redi_out"], "w")
                     f.write(result)
+                    f.close()
                 except FileNotFoundError as e:
                     raise FileNotFoundException(e, {"type": "redi_out", "redi_append": False})
             return result
 
+        # 若用户需要进行管道操作，就不打印相关内容，直接以字符串返回获得的内容
         if command['pipe_out']:
             log.debug(f"User want to pipe the IO")
             return result
@@ -1107,86 +1132,14 @@ class MyShell:
                 log.warning(f"Your command is empty. Did you use an empty var? {e}")
             elif e.errors["type"] == "empty":
                 log.info(f"Your command is empty. {e}")
-        except MultipleInputException as e:
-            log.debug("Syntax error, user want to use input from pipe and redirection...")
-            log.info(f"Exception says: {e}")
-            log.error(f"Cannot handle multiple inputs at the same time. {e}")
-        except FileNotFoundException as e:
-            log.debug("IO error, cannot find the file specified")
-            log.info(f"Exception says: {e}")
-            if e.errors["type"] == "redi_in":
-                log.error(f"Cannot find file at command \"{command['exec']}\" of position {cidx} for input. {e}")
-            elif e.errors["type"] == "redi_out":
-                if e.errors["redi_append"]:
-                    log.error(f"Cannot find/write to file at command \"{command['exec']}\" of position {cidx} for appending output, check for file permission. {e}")
-                else:
-                    log.error(f"Cannot open/write to file at command \"{command['exec']}\" of position {cidx} for updating output, check for file permission. {e}")
-            elif e.errors["type"] == "cd":
-                log.error(f"Cannot find proper dir at command \"{command['exec']}\" of position {cidx} for directory changing. {e}")
-            elif e.errors["type"] == "dir":
-                log.error(f"Cannot find proper dir at command \"{command['exec']}\" of position {cidx} for directory listing. {e}")
-            elif e.errors["type"] == "subshell":
-                log.error(f"Cannot find an external or internal command \"{command['exec']}\" of position {cidx} for an external process spawning. {e}")
-            elif e.errors["type"] == "set":
-                log.warning(f"Setting environment {e.errors['arg_pair'][0]} to {e.errors['arg_pair'][1]} failed. You're probably setting PWD and we're unable to find a proper place to cd into... {e}")
-        except QuoteUnmatchedException as e:
-            log.debug("We've encountered quote unmatch error...")
-            log.info(f"Exception says: {e}")
-            # currently the command is still a string
-            log.error(f"Cannot match quote for command \"{command}\". {e}")
-        except CalledProcessException as e:
-            log.debug("We've encountered error in a subprocess")
-            log.info(f"Exception says: {e}")
-            # currently the command is still a string
-            log.warning(f"Cannot run process successfully with command \"{command['exec']}\". {e}")
-        except UnsetKeyException as e:
-            log.debug("Exception when unsetting keys")
-            log.info(f"Exception says: {e}")
-            # currently the command is still a string
-            log.warning(f"Cannot unset \"{e.errors['keys']}\" using command \"{command['exec']}\". {e}")
-        except SetPairUnmatchedException as e:
-            log.debug("Exception when unsetting keys")
-            log.info(f"Exception says: {e}")
-            if e.errors["type"] == "redi":
-                log.error(f"Cannot set redirection using command \"{command}\". {e}")
-            elif e.errors["type"] == "set":
-                log.error(f"Cannot set keys using command \"{command['exec']}\". {e}")
-        except UnexpectedAndException as e:
-            log.debug("Exception when parsing command")
-            log.info(f"Exception says: {e}")
-            # currently the command is still a string
-            log.error(f"Cannot interpret & sign in command \"{command}\". {e}")
-        except JobException as e:
-            log.debug("Exception when managing jobs")
-            log.info(f"Exception says: {e}")
-            if e.errors["type"] == "len":
-                log.error(f"Error number of argements in command \"{command['exec']}\", {e}")
-            elif e.errors["type"] == "key":
-                log.error(f"Error job number in command \"{command['exec']}\", {e}")
-        except UmaskException as e:
-            log.debug("Exception when managing jobs")
-            log.info(f"Exception says: {e}")
-            if e.errors["type"] == "len":
-                log.error(f"Error number of argements in command \"{command['exec']}\", {e}")
-            elif e.errors["type"] == "value":
-                log.error(f"Unable to interpret umask value in command \"{command['exec']}\", {e}")
-
-        except TestException as e:
-            log.debug("Error during test command")
-            log.info(f"Exception says: {e}")
-            log.error(f"Unable to perform \"{command['exec']}\", please check your syntax and operator match. {e}")
-        except ArgCountException as e:
-            log.debug("Error number of arguments")
-            log.info(f"Exception says: {e}")
-            log.error(f"Unable to perform \"{command['exec']}\", please check your argument number. {e}")
-        except SleepException as e:
-            log.debug("Error number of arguments")
-            log.info(f"Exception says: {e}")
-            log.error(f"Unable to perform \"{command['exec']}\", please check your argument. {e}")
+        except MyShellException as e:
+            error_cmd = command['exec'] if isinstance(command, dict) else command
+            line_end = "\n"
+            log.error(f"Cannot successfully execute command \"{error_cmd}\". Exception is: {line_end}{COLOR.BOLD(str(e) + line_end + str(e.errors))}")
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
         finally:
-            self.cleanup()  # always clean up
+            self.cleanup_jobs()  # always clean up
 
         return False
 
