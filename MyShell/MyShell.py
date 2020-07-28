@@ -444,7 +444,7 @@ class MyShell:
         # 通过multiprocessin.Queue进行沟通
         # ! 注意，外部命令的读取请求不会被处理，因为在后台执行的subshell中PIPE会被关闭
         log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
-        print(self.job_status_fmt(job_number, "continued", self.jobs[job_number]))
+        print(self.job_status_fmt(args[0], "continued", self.jobs[args[0]]))
         self.queues[args[0]].put("dummy")
 
         log.info("Waiting for foreground task to finish...")
@@ -980,20 +980,12 @@ class MyShell:
         # 处理输出重定向
         if command['redi_out']:
             log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
-            if command["redi_append"]:
-                try:
-                    f = open(command["redi_out"], "a")
-                    f.write(result)
-                    f.close()
-                except FileNotFoundError as e:
-                    raise FileNotFoundException(e, {"type": "redi_out", "redi_append": True})
-            else:
-                try:
-                    f = open(command["redi_out"], "w")
-                    f.write(result)
-                    f.close()
-                except FileNotFoundError as e:
-                    raise FileNotFoundException(e, {"type": "redi_out", "redi_append": False})
+            try:
+                f = open(command["redi_out"], "a" if command["redi_append"] else "w")
+                f.write(result)
+                f.close()
+            except FileNotFoundError as e:
+                raise FileNotFoundException(e, {"type": "redi_out", "redi_append": command["redi_append"]})
             return result
 
         # 若用户需要进行管道操作，就不打印相关内容，直接以字符串返回获得的内容
@@ -1006,6 +998,8 @@ class MyShell:
         # return result # won't be used anymore
 
     def command_prompt(self):
+        # 命令提示符打印
+        # note: readline quirk
         # strange error if we use input
         # the input and readline prompt seems to be counting color char as one of the line chars
         # well it turns out to be a quirk of readline
@@ -1013,22 +1007,33 @@ class MyShell:
         try:
             command = input(self.prompt()).strip()
         except EOFError:
+            # 在程序以交互模式运行，但是读入源非标准输入，就有可能在读完全部命令后得到EOFError
+            # 我们选择在这种情况下退出交互模式
+            # note: 这也意味着在普通的交互模式下输入Ctrl+D也会使shell退出
+            print()
             log.warning("Getting EOF from command prompt, exiting...")
             return self.run_command("exit")
-        # print(self.prompt(), end="")
-        # command = input().strip()
+
         log.debug(f"Getting user input: {COLOR.BOLD(command)}")
+        # 通过调用run_command来执行相关内容
         result = self.run_command(command)
         return result
 
     @staticmethod
     def run_command_wrap(count, shell, args, job, queue, jobs, status_dict):
+        # 用于后台程序管理
+        # 我们不仅可以后台运行外部命令，程序自身命令也可以后台执行
+        # 且管道，重定向等操作都由MyShell执行，这与直接刷出一个新的subprocess完全不同
+        # 我们没有在这种情况下借用已有shell的功能
         log.debug(f"Wrapper [{count}] called with {COLOR.BOLD(f'{shell} and {args}')}")
 
         # ! DOESN"T WORK ON WINDOWS!
         # ! WILL CREATE ZOMBIE PROCESS!
+
+        # 为了在信号处理过程中正确杀死自身进程
         my_pid = os.getpid()
 
+        # signal handler，遇到signal.SIGTERM后杀死可能正在运行的子进程
         def exit_subp(sig, frame):
             if shell.subp is not None:
                 log.warning("Killing a still running subprocess...")
@@ -1036,13 +1041,19 @@ class MyShell:
             log.debug(f"Getting signal: {COLOR.BOLD(sig)}")
             log.debug(f"Are you: {COLOR.BOLD(signal.SIGTERM)}")
             if sig == signal.SIGTERM:
+                # 杀死自身进程
                 log.warning(f"Terminating job [{count}] handler process by signal...")
                 os.kill(my_pid, signal.SIGKILL)
 
+        # 注册信号处理器
+        # note: multiprocessin.Process.daemon = True时，若父进程退出，该信号会被触发
         signal.signal(signal.SIGTERM, exit_subp)
 
+        # note: 正文
+        # 通过Wrapper来控制内部命令的suspension
         if sys.stdin is not None:
             sys.stdin.close()
+        # stdin的文件号
         stdin = open(0)
         buffer = stdin.detach()
         wrapper = MyShell.StdinWrapper(queue, count, job, status_dict, buffer)
@@ -1054,7 +1065,6 @@ class MyShell:
             print(shell.job_status_fmt(count, "finished", job))
             queue.put("dummy")
             del jobs[count]
-            del status_dict[count]
 
     def term_all(self):
         jobs = self.jobs
@@ -1078,22 +1088,30 @@ class MyShell:
                 process_bak = self.process
                 jobs_bak = self.jobs
                 status_dict_bak = self.status_dict
+                input_bak = self.input_file
+                output_bak = self.output_file
 
                 del self.queues
                 del self.process
                 del self.jobs
                 del self.status_dict
+                del self.input_file
+                del self.output_file
 
                 clean_self = copy.deepcopy(self)
                 clean_self.queues = {}
                 clean_self.jobs = {}
                 clean_self.process = {}
                 clean_self.status_dict = {}
+                clean_self.input_file = None
+                clean_self.output_file = None
 
                 self.queues = queues_bak
                 self.process = process_bak
                 self.jobs = jobs_bak
                 self.status_dict = status_dict_bak
+                self.input_file = input_bak
+                self.output_file = output_bak
 
                 p = Process(target=self.run_command_wrap, args=(str_cnt, clean_self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
 
@@ -1133,9 +1151,10 @@ class MyShell:
             elif e.errors["type"] == "empty":
                 log.info(f"Your command is empty. {e}")
         except MyShellException as e:
+            # this means that we've got a none zero return code / execution failure
             error_cmd = command['exec'] if isinstance(command, dict) else command
             line_end = "\n"
-            log.error(f"Cannot successfully execute command \"{error_cmd}\". Exception is: {line_end}{COLOR.BOLD(str(e) + line_end + str(e.errors))}")
+            log.error(f"Cannot successfully execute command \"{error_cmd}\". Exception is: {line_end}{COLOR.BOLD(str(e) + line_end + 'Extra info: ' + str(e.errors))}")
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
         finally:
