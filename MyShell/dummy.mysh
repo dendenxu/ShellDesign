@@ -103,9 +103,9 @@ dummy &
 echo "Counting jobs"
 jobs
 
-echo "$RED$BOLD""WE'RE ONLY TERMINATING JOB 5 AND 6, YOU SHOULD SEE WARMING IF -w. NO ZOMBIE""$RESET"
+echo "$RED$BOLD""WE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE""$RESET"
 
-term 5 6
+term 0 1
 
 echo $LINE
 

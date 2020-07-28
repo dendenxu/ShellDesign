@@ -1,8 +1,28 @@
-1595903498
+1595912998
+b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1
+      1       1      65
+null
+clr-debug-pipe-23005-2217022-in
+clr-debug-pipe-23005-2217022-out
+dotnet-diagnostic-23005-2217022-socket
+pymp-_11yjyxj
+ssh-3Dl1dZ2MVhMN
+systemd-private-32fa36ac417343a4813881b03c5a5a50-bolt.service-9WJsxv
+systemd-private-32fa36ac417343a4813881b03c5a5a50-colord.service-qxRv3v
+systemd-private-32fa36ac417343a4813881b03c5a5a50-ModemManager.service-w89ayg
+systemd-private-32fa36ac417343a4813881b03c5a5a50-rtkit-daemon.service-ebfv3E
+systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-resolved.service-G0nqb0
+systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-timesyncd.service-eKPsiD
+vmware-root_1361-3988687315
+vscode-ipc-77ad59b8-138f-4875-884e-368ed7e31e7d.sock
+vscode-ipc-846c3b8a-cd23-429d-aa84-b71bb5acbe7b.sock
+vscode-ipc-cb722aa7-90c1-4b82-b595-52d2e62b5d98.sock
+Hello, I'm your logger.
 Hello, I'm your logger.
 Hello, again...
+      2       6      40
 False
-2020-07-28 10:31:39.000623
+2020-07-28 13:09:58.955226
 [1m[34m##############################################################[0m
 0o002
 Changing UMASK to 0o777
@@ -12,62 +32,41 @@ Changing UMASK to 0o002
 Hello, my name is /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
 Hello, my name is xuzh, and I live in /home/xuzh
 Should print sha256sum of zy in the next line
-b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1
 Should print 1 1 65 in the following line
-      1       1      65
 [1m[34m##############################################################[0m
 .
-rw-rw-r-- 2020-07-27 23:53:24 [1mlog.log[0m
-rw-rw-r-- 2020-07-28 10:31:38 [1mshould.out[0m
+rw-rw-r-- 2020-07-28 13:09:43 [1mlog.log[0m
+rw-rw-r-- 2020-07-28 13:09:58 [1mshould.out[0m
 rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
 rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
 rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
-rwxrwxr-x 2020-07-28 10:31:32 [31m[1mMyShell.py[0m[0m
-rw-rw-r-- 2020-07-27 23:50:34 [1mdummy.mysh[0m
+rwxrwxr-x 2020-07-28 13:09:42 [31m[1mMyShell.py[0m[0m
+rw-rw-r-- 2020-07-28 13:07:54 [1mdummy.mysh[0m
 rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
-rw-rw-r-- 2020-07-26 14:09:59 [1mMyShellException.py[0m
-rwxrwxr-x 2020-07-26 14:11:48 [34m[1m__pycache__[0m[0m
+rw-rw-r-- 2020-07-28 11:27:53 [1mMyShellException.py[0m
+rwxrwxr-x 2020-07-28 11:29:58 [34m[1m__pycache__[0m[0m
 ~/Projects/ShellDesign/MyShell
 Should get empty output
 
 [1m[34m##############################################################[0m
 Should print /dev/null
-null
 Should print all files containing 1 in /tmp
-clr-debug-pipe-5083-302601-in
-clr-debug-pipe-5083-302601-out
-dotnet-diagnostic-5083-302601-socket
-pymp-b1nrfzs2
-ssh-3Dl1dZ2MVhMN
-systemd-private-32fa36ac417343a4813881b03c5a5a50-bolt.service-9WJsxv
-systemd-private-32fa36ac417343a4813881b03c5a5a50-colord.service-qxRv3v
-systemd-private-32fa36ac417343a4813881b03c5a5a50-fwupd.service-SxvAjJ
-systemd-private-32fa36ac417343a4813881b03c5a5a50-ModemManager.service-w89ayg
-systemd-private-32fa36ac417343a4813881b03c5a5a50-rtkit-daemon.service-ebfv3E
-systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-resolved.service-G0nqb0
-systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-timesyncd.service-eKPsiD
-tmp-4888SvW5tl218E4j.tpl
-vmware-root_1361-3988687315
-vscode-ipc-846c3b8a-cd23-429d-aa84-b71bb5acbe7b.sock
-vscode-ipc-cb722aa7-90c1-4b82-b595-52d2e62b5d98.sock
 [1m[34m##############################################################[0m
 Should make a file log.log
 .
-rw-rw-r-- 2020-07-28 10:31:39 [1mlog.log[0m
-rw-rw-r-- 2020-07-28 10:31:38 [1mshould.out[0m
+rw-rw-r-- 2020-07-28 13:09:58 [1mlog.log[0m
+rw-rw-r-- 2020-07-28 13:09:58 [1mshould.out[0m
 rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
 rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
 rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
-rwxrwxr-x 2020-07-28 10:31:32 [31m[1mMyShell.py[0m[0m
-rw-rw-r-- 2020-07-27 23:50:34 [1mdummy.mysh[0m
+rwxrwxr-x 2020-07-28 13:09:42 [31m[1mMyShell.py[0m[0m
+rw-rw-r-- 2020-07-28 13:07:54 [1mdummy.mysh[0m
 rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
-rw-rw-r-- 2020-07-26 14:09:59 [1mMyShellException.py[0m
-rwxrwxr-x 2020-07-26 14:11:48 [34m[1m__pycache__[0m[0m
+rw-rw-r-- 2020-07-28 11:27:53 [1mMyShellException.py[0m
+rwxrwxr-x 2020-07-28 11:29:58 [34m[1m__pycache__[0m[0m
 Should see content of log.log
-Hello, I'm your logger.
 Should display content of log.log
 Should display word count of log.log
-      2       6      40
 [1m[34m##############################################################[0m
 Opening some sleepy jobs
 And calling command jobs
@@ -108,13 +107,13 @@ Should produce empty content
 Jobs are done /home/xuzh
 Spawning dummy built_in job that is trying to read from user (will suspend)
 Counting jobs
-[1m[33m[5][0m[0m [1msuspended[0m env [1mdummy &[0m
-[1m[33m[6][0m[0m [1msuspended[0m env [1mdummy &[0m
-[1m[33m[7][0m[0m [1msuspended[0m env [1mdummy &[0m
-[1m[33m[8][0m[0m [1msuspended[0m env [1mdummy &[0m
-[31m[1mWE'RE ONLY TERMINATING JOB 5 AND 6, YOU SHOULD SEE WARMING IF -w. NO ZOMBIE[0m
-[1m[33m[5][0m[0m [1mterminated[0m env [1mdummy &[0m
-[1m[33m[6][0m[0m [1mterminated[0m env [1mdummy &[0m
+[1m[33m[0][0m[0m [1msuspended[0m env [1mdummy &[0m
+[1m[33m[1][0m[0m [1msuspended[0m env [1mdummy &[0m
+[1m[33m[2][0m[0m [1msuspended[0m env [1mdummy &[0m
+[1m[33m[3][0m[0m [1msuspended[0m env [1mdummy &[0m
+[31m[1mWE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE[0m
+[1m[33m[0][0m[0m [1mterminated[0m env [1mdummy &[0m
+[1m[33m[1][0m[0m [1mterminated[0m env [1mdummy &[0m
 [1m[34m##############################################################[0m
 Arg 0 is: dummy.mysh
 Arg 1 is: foo
@@ -126,7 +125,7 @@ Arg 6 is: linux
 Arg 7 is: linus
 Arg 8 is: PyTorch
 Arg 9 is: CS231n
-Shifting #1
+Shifting number 1
 Arg 0 is: dummy.mysh
 Arg 1 is: bar
 Arg 2 is: foobar
@@ -137,12 +136,12 @@ Arg 6 is: linus
 Arg 7 is: PyTorch
 Arg 8 is: CS231n
 Arg 9 is: 
-Shifting #2
+Shifting number 2
 Arg 1 is: foobar
-Shifting #3
+Shifting number 3
 Arg 1 is: hello
-Shifting #4
+Shifting number 4
 Arg 1 is: world
-Shifting #5
+Shifting number 5
 Arg 1 is: linux
 [1mBye![0m

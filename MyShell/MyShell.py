@@ -104,7 +104,6 @@ class MyShell:
         # self.job_manager = Manager()
         self.jobs = Manager().dict()
         self.status_dict = Manager().dict()
-        self.job_counter = 0
         self.queues = {}
         self.process = {}
         self.subp = None
@@ -124,10 +123,19 @@ class MyShell:
         log.debug(f"Built in command list: {self.builtins}")
         log.debug("MyShell is instanciated.")
 
+    @property
+    def job_counter(self):
+        keys = [int(key) for key in self.jobs.keys()]
+        count = 0
+        while count in keys:
+            count += 1
+        return str(count)
+
     # 我们考虑过直接使用系统的环境变量接口，但那样或许就少了很多提前控制功能，跨平台性也不一定会很好
     # 所以MyShell会单独管理自己的变量（这里不一定要称为环境变量）
     # 与MyShell配合使用，用于统一管理环境变量，并与真正的系统环境变量交互的字典
     # 主要功能为，若字典value为可执行内容，则返回执行后的结果
+
     class OnCallDict(dict):
         unsupported = ["HOME", "USER", "LOCATION", "SHELL"] + [str(i) for i in range(10)]
         reserved = unsupported + ["PATH", "PWD"]
@@ -574,7 +582,6 @@ class MyShell:
             log.critical("Internal error, builtin_exec should be executed with exactly two arguments")
             raise ArgCountException("Internal error, builtin_exec should be executed with exactly two arguments")
 
-
         log.debug(f"FILE NUMBER OF SYS.__STDIN__: {COLOR.BOLD(sys.__stdin__.fileno())}")
         log.debug(f"FILE NUMBER OF SYS.__STDOUT__: {COLOR.BOLD(sys.__stdout__.fileno())}")
         log.debug(f"FILE NUMBER OF SYS.__STDERR__: {COLOR.BOLD(sys.__stderr__.fileno())}")
@@ -814,6 +821,8 @@ class MyShell:
     def subshell(self, pipe="", target="", args=[], piping_in=False, piping_out=False, io_control=False):
         # 运行外部程序
         # 根据需要调整输入输出
+
+        # 是一个内部命令，通过调用subprocess的接口完成外部程序的调用
         if not target:
             raise EmptyException(f"Command \"{target}\" is empty", {"type": "subshell"})
         to_run = [target] + args
@@ -825,10 +834,16 @@ class MyShell:
                 piping_in = True
             # waits for the process to end
             # 若需要通过管道传递相关内容，则使用PIPE
-            p = subprocess.Popen(to_run, stdin=PIPE if piping_in else self.input_file, stdout=PIPE if piping_out else self.output_file, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
+            p = subprocess.Popen(
+                to_run,
+                stdin=PIPE if piping_in else self.input_file,
+                stdout=PIPE if piping_out else self.output_file,
+                stderr=STDOUT, encoding="utf-8",
+                env=dict(os.environ, PARENT=self.vars["SHELL"])
+            )
 
             self.subp = p
-            result, error = p.communicate(pipe)
+            result, error = p.communicate(pipe)  # 如果我们选择不使用PIPE，这里传入空字符串也不会有任何影响
             if p.returncode != 0:
                 log.warning("The subprocess is not returning zero exit code")
                 raise CalledProcessException("None zero return code encountered")
@@ -996,7 +1011,7 @@ class MyShell:
             log.debug(f"Getting signal: {COLOR.BOLD(sig)}")
             log.debug(f"Are you: {COLOR.BOLD(signal.SIGTERM)}")
             if sig == signal.SIGTERM:
-                log.warning("Terminating job")
+                log.warning(f"Terminating job [{count}] handler process by signal...")
                 os.kill(my_pid, signal.SIGKILL)
 
         signal.signal(signal.SIGTERM, exit_subp)
@@ -1059,9 +1074,12 @@ class MyShell:
 
                 self.process[str_cnt] = p
 
+                # ! so the multiprocessing process won't actually be totally gone if the main process is still around
+                # but it will be terminated if demanded so (ps command can see it as <defunc>, but not a zombie)
                 p.daemon = True
+
                 p.start()
-                self.job_counter += 1
+
                 log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
             else:
                 result = None  # so that the first piping is directly from stdin
