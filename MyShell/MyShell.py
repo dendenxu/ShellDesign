@@ -93,7 +93,7 @@ class MyShell:
         # 由于这里会打印一些无用的INFO级别的调试信息（具体原因在于会通过非初始化的方式调用OnCallDict的内部方法）
         coloredlogs.set_level("WARNING")
         for i in range(10):
-            self.vars[str(i)] = MyShell.picklable_nested(self, i)
+            self.vars[str(i)] = MyShell.picklable_cmd_args(self, i)
         coloredlogs.set_level(prev_level)
 
         # update: 我们会在调用多线程/后台执行功能时清空这一部分的变量，能够解决的问题有：
@@ -144,6 +144,7 @@ class MyShell:
 
         def __getitem__(self, key):
             value = super().__getitem__(key)
+
             if callable(value):
                 # 对于可调用的字典元素，获取调用后的结果，否则返回原结果
                 log.debug(f"Accessing callable dict element: {COLOR.BOLD(key)}")
@@ -158,7 +159,6 @@ class MyShell:
                 # 在初始化时不进行任何特殊处理（配合pickle和copy函数）
                 log.debug(f"We might be initializing current shell, setting initial value \"{value}\" to \"{key}\"")
                 super().__setitem__(key, value)
-                return
             elif key == "PATH":
                 # 对于PATH的改变会真的影响当前系统中的环境变量
                 # for whatever reason, set this to a string (environment variables are meant to be strings)
@@ -241,7 +241,7 @@ class MyShell:
 
     # 用于模仿Nested Function的Object
     # 可以被pickle
-    class picklable_nested():
+    class picklable_cmd_args():
         # 在我们的使用环境下，shell变量被直接传入了self，也就保留了指针，因此外部对cmd_args变量的改变也会使得这里的结果不同
         def __init__(self, shell, number):
             self.shell = shell
@@ -273,7 +273,7 @@ class MyShell:
         try:
             log.info(f"Changing CWD to {COLOR.BOLD(target_dir)}")
             os.chdir(target_dir)
-        except (FileNotFoundError, NotADirectoryError) as e:
+        except (FileNotFoundError, NotADirectoryError, PermissionError) as e:
             raise FileNotFoundException(e, {"type": "cd"})
 
     # 清空屏幕功能
@@ -367,7 +367,7 @@ class MyShell:
 
                     # 添加到完整的result数组中
                     result.append(file_line)
-            except (FileNotFoundError, NotADirectoryError) as e:
+            except (FileNotFoundError, NotADirectoryError, PermissionError) as e:
                 not_in_list.append(str(e))
             finally:
                 # 若用户传入了多个参数，在不同的文件夹间打印一个换行（最终'\n'.join的效果）
@@ -380,7 +380,7 @@ class MyShell:
             # ! 注意，这种情况下我们不会返回结果，piping会停止
             print("\n".join(result), file=self.output_file, end="")
             joined = '\n'.join(not_in_list)
-            raise FileNotFoundException(f"Cannot find: \n{joined}", {"type": "dir"})
+            raise FileNotFoundException(f"Cannot list director[y|ies]: \n{joined}", {"type": "dir"})
 
         # 若一切正常则以字符串形式直接返回最终结果
         return "\n".join(result)
@@ -447,7 +447,10 @@ class MyShell:
         # ! 注意，外部命令的读取请求不会被处理，因为在后台执行的subshell中PIPE会被关闭
         log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
         print(self.job_status_fmt(args[0], "continued", self.jobs[args[0]]))
-        self.queues[args[0]].put("dummy")
+        if self.status_dict[args[0]] == "suspended":
+            # ! only put into queue if already suspended
+            # else the main process will get what it just put into the queue
+            self.queues[args[0]].put("dummy")
 
         log.info("Waiting for foreground task to finish...")
 
@@ -578,7 +581,7 @@ class MyShell:
                 # 修改pwd时，可能会有找不到目录的错误
                 # might be error since self.vars is not a simple dict
                 self.vars[key] = value
-            except (FileNotFoundError, NotADirectoryError) as e:
+            except (FileNotFoundError, NotADirectoryError, PermissionError) as e:
                 raise FileNotFoundException(e, {"type": "set", "arg_pair": [key, value]})
 
     def builtin_unset(self, pipe="", args=[]):
