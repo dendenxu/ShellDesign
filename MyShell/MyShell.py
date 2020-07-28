@@ -140,12 +140,12 @@ class MyShell:
 
         def __setitem__(self, key, value):
             if key in self.unsupported:
-                raise ReservedKeyException(f"Key is reserved, along with \"{self.unsupported.keys()}\"")
+                raise ReservedKeyException(f"Key {key} is reserved, along with \"{list(self.unsupported.keys())}\"")
             return os.environ.__setitem__(key, value)
 
         def __delitem__(self, key):
             if key in self.unsupported:
-                raise ReservedKeyException(f"Key is reserved, along with \"{self.unsupported.keys()}\"")
+                raise ReservedKeyException(f"Key {key} is reserved, along with \"{list(self.unsupported.keys())}\"")
             return os.environ.__delitem__(key)
 
     # StdinWrapper是一个继承自io.TextWrapper，是本类型对获取输入的job进行线程暂停的一种方式
@@ -542,22 +542,15 @@ class MyShell:
 
     def builtin_unset(self, pipe="", args=[]):
         # 取消MyShell中一些已经设置好的变量
-        dont = [str(i) for i in range(10)] + ["PS1"]
         cannot_unset = []
-        reasons = []
         # 类似builtin_environ中的处理方式，为了跳过可能出错的变量，我们手动循环
         for key in args:
-            if key in dont:
-                cannot_unset.append(key)
-                reasons.append(f"{key} is reserved")
-                continue
             try:
                 del self.vars[key]
             except (KeyError, ReservedKeyException) as e:
                 cannot_unset.append(key)
-                reasons.append(str(e))
         if len(cannot_unset):
-            raise UnsetKeyException("Cannot find/unset these keys: \n" + '\n'.join(reasons), {"keys": cannot_unset})
+            raise UnsetKeyException(f"Cannot find/unset these keys: {cannot_unset}", {"keys": cannot_unset})
 
     def builtin_umask(self, pipe="", args=[]):
         # 设置系统umask的值
@@ -881,7 +874,7 @@ class MyShell:
         # 返回将要打印到屏幕的命令提示符
         # 包含：用户@地点 当前目录 当前时间 提示符
         # [conda_default_env] user@location /path/to/current/dir time_now PS1
-        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(datetime.datetime.now().strftime('%H:%M:%S'))} {COLOR.BOLD(COLOR.YELLOW(self.vars['PS1']))} "
+        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(datetime.datetime.now().strftime('%H:%M:%S'))} {COLOR.BOLD(COLOR.YELLOW(self.vars['PS1'] if 'PS1' in self.vars else '$'))} "
         # log.debug(repr(prompt))
         try:
             conda = os.environ["CONDA_DEFAULT_ENV"]
@@ -1154,7 +1147,7 @@ class MyShell:
             # this means that we've got a none zero return code / execution failure
             error_cmd = command['exec'] if isinstance(command, dict) else command
             line_end = "\n"
-            log.error(f"Cannot successfully execute command \"{error_cmd}\". Exception is: {line_end}{COLOR.BOLD(str(e) + line_end + 'Extra info: ' + str(e.errors))}")
+            log.error(f"Cannot successfully execute command \"{error_cmd}\". Exception is: {line_end}{COLOR.BOLD(type(e).__name__ + ': ' + str(e) + line_end + 'Extra info: ' + str(e.errors))}")
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
         finally:
