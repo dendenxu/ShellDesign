@@ -236,6 +236,7 @@ class MyShell:
         try:
             log.info(f"Changing CWD to {COLOR.BOLD(target_dir)}")
             os.chdir(target_dir)
+            self.vars["PWD"] = os.getcwd()
         except (FileNotFoundError, NotADirectoryError, PermissionError) as e:
             raise FileNotFoundException(e, {"type": "cd"})
 
