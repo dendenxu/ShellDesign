@@ -146,7 +146,7 @@ class MyShell:
             # 由于环境变量的特殊性，我们对一些内容的设定操作进行了特殊处理
             if key not in self:
                 # 在初始化时不进行任何特殊处理（配合pickle和copy函数）
-                log.info(f"We might be copying current shell, setting value \"{value}\" to \"{key}\"")
+                log.debug(f"We might be initializing current shell, setting initial value \"{value}\" to \"{key}\"")
                 super().__setitem__(key, value)
                 return
             elif key == "PATH":
@@ -497,12 +497,16 @@ class MyShell:
         for key in self.vars:
             try:
                 # 由于self.vars的特殊性，不能直接调用列表生成器
+                # 对于命令行参数，我们事先不知道有效参数的数量，因此只能单独尝试
                 result.append(f"{key}={COLOR.BOLD(self.vars[key])}")
             except IndexError:
                 pass
         return "\n".join(result)
 
     def builtin_set(self, pipe="", args=[]):
+        # 修改脚本变量，用户需要保证自己的输入内容被解释为一个完整的参数
+        # 用等于号分割变量名和变量的具体值
+        # 变量都以字符串的形式储存
         # we'd like the user to use the equal sign
         # and we'd like to treat varibles only as string
         for arg in args:
@@ -513,27 +517,35 @@ class MyShell:
             log.debug(f"Setting \"{key}\" in environment variables to \"{value}\"")
 
             try:
+                # 修改pwd时，可能会有找不到目录的错误
                 # might be error since self.vars is not a simple dict
                 self.vars[key] = value
             except (FileNotFoundError, NotADirectoryError) as e:
                 raise FileNotFoundException(e, {"type": "set", "arg_pair": [key, value]})
-        return None
 
     def builtin_unset(self, pipe="", args=[]):
-        keys = []
+        # 取消MyShell中一些已经设置好的变量
+        cannot_unset = []
+        # 类似builtin_environ中的处理方式，为了跳过可能出错的变量，我们手动循环
         for key in args:
             try:
                 del self.vars[key]
             except (KeyError, ReservedKeyException):
-                keys.append(key)
-        if len(keys):
-            raise UnsetKeyException("Cannot find/unset these keys.", {"keys": keys})
+                cannot_unset.append(key)
+        if len(cannot_unset):
+            raise UnsetKeyException("Cannot find/unset these keys.", {"keys": cannot_unset})
 
     def builtin_umask(self, pipe="", args=[]):
+        # 设置系统umask的值
+        # subshell中的命令也会继续采用这一umask
+        # 若没有任何参数，则直接打印umask
+        # ! 在Windows上无法正常修改umask
         if len(args) > 1:
+            # 参数数量为0或者1
             raise UmaskException("Argument number is not correct, only one or zero expected.", {"type": "len"})
         elif len(args) == 1:
             try:
+                # 用户输入的umask值不一定有效
                 log.debug(f"Value of ARG: {COLOR.BOLD(args[0])}")
                 umask = int(args[0], 8)
                 log.debug(f"Value of ARG in int of 8: {COLOR.BOLD(umask)}")
@@ -545,34 +557,45 @@ class MyShell:
             old = os.umask(0)
             log.debug(f"Value of OLD: {COLOR.BOLD(old)}")
             os.umask(old)
+            # 返回umask的时候采用补零3位8进制格式
             return "0o{:03o}".format(old)
 
     def builtin_exec(self, pipe="", args=[]):
+        # exec命令会修改MyShell命令的输入输出源
+        # note: 由于此命令的特殊性，我们会在该函数得到执行的上一层加入一些逻辑
         if len(args) != 2:
             log.critical("Internal error, builtin_exec should be executed with exactly two arguments")
             return
 
-        if self.input_file is not None:
-            self.input_file.close()
-        if self.output_file is not None:
-            self.output_file.close()
-
         log.debug(f"FILE NUMBER OF SYS.__STDIN__: {COLOR.BOLD(sys.__stdin__.fileno())}")
         log.debug(f"FILE NUMBER OF SYS.__STDOUT__: {COLOR.BOLD(sys.__stdout__.fileno())}")
         log.debug(f"FILE NUMBER OF SYS.__STDERR__: {COLOR.BOLD(sys.__stderr__.fileno())}")
-        if args[0]:
+
+        # 我们刚刚已经保证走到这一步的参数数量为2
+        if args[0]:  # 若非空，尝试设置输入流
             try:
                 # the function open will automatically raise FileNotFoundError
-                self.input_file = open(args[0], "r", encoding="utf-8")
+                new_file = open(args[0], "r", encoding="utf-8")
+
+                # 新文件打开没有出错时我们才会关闭/修改旧文件
+                # 无论如何，关闭原来已经打开的输入输出文件
+                if self.input_file is not None:
+                    self.input_file.close()
+                self.input_file = new_file
                 log.debug(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.input_file.fileno())}")
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "redi_in"})
         else:
             self.input_file = None
-        if args[1]:
+        if args[1]:  # 若非空，尝试设置输入流
             try:
                 # the function open will automatically raise FileNotFoundError
-                self.output_file = open(args[1], "w", encoding="utf-8")
+                new_file = open(args[1], "w", encoding="utf-8")
+
+                # 新文件打开没有出错时我们才会关闭/修改旧文件
+                if self.output_file is not None:
+                    self.output_file.close()
+                self.output_file = new_file
                 log.debug(f"FILE NUMBER OF OUTPUT FILE: {COLOR.BOLD(self.output_file.fileno())}")
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "redi_out"})
@@ -580,30 +603,37 @@ class MyShell:
             self.output_file = None
 
     def builtin_shift(self, pipe="", args=[]):
+        # 内置shift功能，在脚本调用时尤其有用
         log.debug(f"Shift args are {COLOR.BOLD(args)}")
         log.debug(f"Previously cmd_args are {COLOR.BOLD(self.cmd_args)}")
 
         if len(args) > 1:
             raise ArgCountException("Expecting zero or one arguments")
-
         elif not args:
+            # 空参数情况移动1位
             args.append(1)
 
+        # $0会被保留
         dollar_zero = self.cmd_args[0]
 
         try:
+            # 此时的shift时包含dollar_zero的
             self.cmd_args = self.cmd_args[args[0]::]
         except IndexError:
             pass
+
+        # 替换掉dollar_zero位置的元素
         if not len(self.cmd_args):
             self.cmd_args = [dollar_zero]
-
-        self.cmd_args[0] = dollar_zero
+        else:
+            self.cmd_args[0] = dollar_zero
 
         log.debug(f"Now cmd_args are {COLOR.BOLD(self.cmd_args)}")
 
     def builtin_test(self, pipe="", args=[]):
-
+        # ! test函数的结合方向是从右向左
+        # todo: 实现带运算符顺序处理的逆波兰表达式（现在对-a和-o是一视同仁的）
+        # 结合递归调用
         # builtin_test功能中使用到的等级函数
         # 主要用于对操作符进行分类，方便调用，例如1，3为单目运算符
         level = {
@@ -614,6 +644,7 @@ class MyShell:
             "-a": 4, "-o": 4,
         }
 
+        # 单目运算符操作
         def test_unary(operator, operand):
             if operator == "-z":
                 return not len(str(operand))
@@ -622,10 +653,10 @@ class MyShell:
             if operator == "!":
                 return not bool(operand)
 
-            # todo: raise
             log.critical("Unrecoginized operator in a place it shouldn't be")
             raise TestException(f"Unrecognized unary operator \"{operator}\"")
 
+        # 双目运算符操作
         def test_binary(op, lhs, rhs):
             if op == "=":
                 return str(lhs) == str(rhs)
@@ -649,7 +680,6 @@ class MyShell:
             elif op == "-o":
                 return bool(lhs) or bool(rhs)
 
-            # todo: raise
             log.critical("Unrecoginized operator in a place it shouldn't be")
             raise TestException(f"Unrecognized binary operator \"{operator}\"")
 
@@ -660,17 +690,17 @@ class MyShell:
                 if len(args) == 1:
                     return args[0]
 
+                # 非运算符，视为双目运算
                 if args[ind] not in level:
                     lhs = args[ind]
-                    # not possible
-                    # if ind == len(args)-1:
-                    #     return lhs
                     op = args[ind+1]
+                    # 这句话保证了从右向左结合
                     rhs = expand_expr(args[ind+2::])
                     return test_binary(op, lhs, rhs)
 
                 # match parentheses
                 if args[ind] == "(":
+                    # 对于小括号，我们将其视为一个整体
                     org = ind
                     while args[ind] != ")":
                         ind += 1
@@ -678,25 +708,30 @@ class MyShell:
                     if ind == len(args)-1:
                         return lhs
                     op = args[ind+1]
+                    # 这句话保证了从右向左结合
                     rhs = expand_expr(args[ind+2::])
                     return test_binary(op, lhs, rhs)
 
                 if level[args[ind]] in [1, 3]:
+                    # 对于单目运算符，我们也将其视为一个整体
                     op = args[ind]
                     oa, ind = get_one(args[ind+1::])
                     lhs = test_unary(op, oa)
                     if ind == len(args)-1:
                         return lhs
                     op = args[ind+1]
+                    # 这句话保证了从右向左结合
                     rhs = expand_expr(args[ind+2::])
                     return test_binary(op, lhs, rhs)
 
+            # note: 在此处理整个函数调用过程中可能的错误
+            # int，bool无法转换/解释等
             except (ValueError, KeyError) as e:
                 # log.error(f"{e}")
                 raise TestException(e)
 
         def get_one(args):
-
+            # 获取一位bool值，并返回下一个有效值的位置
             ind = 0
             if len(args) == 1 or args[ind] not in level:
                 return args[0], 1
@@ -710,31 +745,28 @@ class MyShell:
             if level[args[ind]] in [1, 3]:
                 op = args[ind]
                 oa, ind = get_one(args[ind+1::])
-                return test_unary(op, oa), ind + 1
-        # we can only use print to pass values
+                return test_unary(op, oa), ind+1
 
-        tf = {
-            True: "True",
-            False: "False",
-        }
-
-        return tf[bool(expand_expr(args))]
-        # todo: fill in the hole
-        # try:
-        #     self.subshell(target="test", args=args, pipe=pipe, piping=True)
-        #     return "True"
-        # except CalledProcessException as e:
-        #     return "False"
+        # we can only use string to pass values
+        # 返回布尔值的字符串表示
+        # return tf[bool(expand_expr(args))]
+        return str(bool(expand_expr(args)))
 
     def builtin_sleep(self, pipe="", args=[]):
-        # todo: raise
         if os.name == "nt":
-            if len(args) == 1 and args[0].endswith("s"):
-                time.sleep(float(args[0][0:-1]))
+            # ! Windows系统没有相应的sleep命令，但Python存在相应的接口
+            try:
+                if len(args) == 1 and args[0].endswith("s"):
+                    time.sleep(float(args[0][0:-1]))
+                else:
+                    raise ValueError
+            except ValueError as e:
+                raise SleepException(f"Unrecoginized sleep time format, are you on NT? Use second as unit and put s at the back of the time string. {e}")
         else:
             self.subshell(target="sleep", args=args, pipe=pipe)
 
     def builtin_time(self, pipe="", args=[]):
+        # 显示当前的时间
         return str(datetime.datetime.now())
 
     def builtin_dummy(self, pipe="", args=[]):
@@ -868,7 +900,7 @@ class MyShell:
         return platform.node()
 
     def prompt(self):
-        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(COLOR.YELLOW(self.vars['PS1']))} "
+        prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(datetime.datetime.now().strftime('%H:%M:%S'))} {COLOR.BOLD(COLOR.YELLOW(self.vars['PS1']))} "
         # log.debug(repr(prompt))
         try:
             conda = os.environ["CONDA_DEFAULT_ENV"]
@@ -1139,6 +1171,10 @@ class MyShell:
             log.debug("Error number of arguments")
             log.info(f"Exception says: {e}")
             log.error(f"Unable to perform \"{command['exec']}\", please check your argument number. {e}")
+        except SleepException as e:
+            log.debug("Error number of arguments")
+            log.info(f"Exception says: {e}")
+            log.error(f"Unable to perform \"{command['exec']}\", please check your argument. {e}")
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
         finally:
@@ -1211,6 +1247,9 @@ class MyShell:
         # mark: this structure makes it possible that the arg is keep in one place if using quote
         # by not brutally expanding on every possible environment variables
         command = command.split()
+        comment = [i for i, v in enumerate(command) if v.startswith("#")]
+        if len(comment):
+            command = command[0:comment[0]]
         quote_stack = []
         index = 0
         while index < len(command):

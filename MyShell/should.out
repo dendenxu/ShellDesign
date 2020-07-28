@@ -1,8 +1,8 @@
-1595865204
+1595903498
 Hello, I'm your logger.
 Hello, again...
 False
-2020-07-27 23:53:24.459501
+2020-07-28 10:31:39.000623
 [1m[34m##############################################################[0m
 0o002
 Changing UMASK to 0o777
@@ -17,13 +17,12 @@ Should print 1 1 65 in the following line
       1       1      65
 [1m[34m##############################################################[0m
 .
-rw-rw-r-- 2020-07-27 23:53:11 [1mlog.log[0m
-rw-rw-r-- 2020-07-27 23:53:24 [1mshould.out[0m
+rw-rw-r-- 2020-07-27 23:53:24 [1mlog.log[0m
+rw-rw-r-- 2020-07-28 10:31:38 [1mshould.out[0m
 rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
 rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
 rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
-rwxrwxr-x 2020-07-27 23:51:43 [31m[1mMyShell.py[0m[0m
-rw-rw-r-- 2020-07-27 23:52:00 [1mcurrent.out[0m
+rwxrwxr-x 2020-07-28 10:31:32 [31m[1mMyShell.py[0m[0m
 rw-rw-r-- 2020-07-27 23:50:34 [1mdummy.mysh[0m
 rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
 rw-rw-r-- 2020-07-26 14:09:59 [1mMyShellException.py[0m
@@ -38,9 +37,11 @@ Should print all files containing 1 in /tmp
 clr-debug-pipe-5083-302601-in
 clr-debug-pipe-5083-302601-out
 dotnet-diagnostic-5083-302601-socket
+pymp-b1nrfzs2
 ssh-3Dl1dZ2MVhMN
 systemd-private-32fa36ac417343a4813881b03c5a5a50-bolt.service-9WJsxv
 systemd-private-32fa36ac417343a4813881b03c5a5a50-colord.service-qxRv3v
+systemd-private-32fa36ac417343a4813881b03c5a5a50-fwupd.service-SxvAjJ
 systemd-private-32fa36ac417343a4813881b03c5a5a50-ModemManager.service-w89ayg
 systemd-private-32fa36ac417343a4813881b03c5a5a50-rtkit-daemon.service-ebfv3E
 systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-resolved.service-G0nqb0
@@ -52,13 +53,12 @@ vscode-ipc-cb722aa7-90c1-4b82-b595-52d2e62b5d98.sock
 [1m[34m##############################################################[0m
 Should make a file log.log
 .
-rw-rw-r-- 2020-07-27 23:53:24 [1mlog.log[0m
-rw-rw-r-- 2020-07-27 23:53:24 [1mshould.out[0m
+rw-rw-r-- 2020-07-28 10:31:39 [1mlog.log[0m
+rw-rw-r-- 2020-07-28 10:31:38 [1mshould.out[0m
 rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
 rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
 rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
-rwxrwxr-x 2020-07-27 23:51:43 [31m[1mMyShell.py[0m[0m
-rw-rw-r-- 2020-07-27 23:52:00 [1mcurrent.out[0m
+rwxrwxr-x 2020-07-28 10:31:32 [31m[1mMyShell.py[0m[0m
 rw-rw-r-- 2020-07-27 23:50:34 [1mdummy.mysh[0m
 rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
 rw-rw-r-- 2020-07-26 14:09:59 [1mMyShellException.py[0m
