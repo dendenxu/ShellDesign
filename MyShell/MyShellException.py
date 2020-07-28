@@ -76,6 +76,6 @@ class ArgCountException(MyShellException):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)
 
-class SleepExceptino(MyShellException):
+class SleepException(MyShellException):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)

@@ -560,12 +560,20 @@ class MyShell:
             # 返回umask的时候采用补零3位8进制格式
             return "0o{:03o}".format(old)
 
+    def builtin_printio(self, pipe="", args=[]):
+        result = []
+        result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.input_file.fileno() if self.input_file is not None else sys.stdin.fileno())}, redirecting MyShell input to {COLOR.BOLD(self.input_file)}")
+        result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.output_file.fileno() if self.output_file is not None else sys.stdout.fileno())}, redirecting MyShell output to {COLOR.BOLD(self.output_file)}")
+        # ! debugging command, no redirection
+        print("\n".join(result))
+
     def builtin_exec(self, pipe="", args=[]):
         # exec命令会修改MyShell命令的输入输出源
         # note: 由于此命令的特殊性，我们会在该函数得到执行的上一层加入一些逻辑
         if len(args) != 2:
             log.critical("Internal error, builtin_exec should be executed with exactly two arguments")
-            return
+            raise ArgCountException("Internal error, builtin_exec should be executed with exactly two arguments")
+
 
         log.debug(f"FILE NUMBER OF SYS.__STDIN__: {COLOR.BOLD(sys.__stdin__.fileno())}")
         log.debug(f"FILE NUMBER OF SYS.__STDOUT__: {COLOR.BOLD(sys.__stdout__.fileno())}")
@@ -586,6 +594,7 @@ class MyShell:
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "redi_in"})
         else:
+            log.debug(f"Setting input file to None: stdin")
             self.input_file = None
         if args[1]:  # 若非空，尝试设置输入流
             try:
@@ -600,6 +609,7 @@ class MyShell:
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "redi_out"})
         else:
+            log.debug(f"Setting output file to None: stdout")
             self.output_file = None
 
     def builtin_shift(self, pipe="", args=[]):
@@ -770,7 +780,7 @@ class MyShell:
         return str(datetime.datetime.now())
 
     def builtin_dummy(self, pipe="", args=[]):
-        # result = sys.stdin.readline()
+        # 一个内置的dummy命令，用于测试是否可以正常触发suspension
         print("builtin_dummy: before any input requirements")
         print(input("dummy1> "))
         print(input("dummy2> "))
@@ -778,73 +788,47 @@ class MyShell:
         print(input("dummyend> "))
 
     def builtin_check_zombie(self, pipe="", args=[]):
+        # 开发者调试用函数
+        # 用于检查当前进程下的zombie process
         any_process = -1
         while True:
-            try:
-                # This will raise an exception on Windows.  That's ok.
-                pid, status = os.waitpid(any_process, os.WNOHANG)
-                if pid == 0:
-                    break
-                log.error(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + ', ' + str(status))}")
-                if os.WIFEXITED(status):
-                    log.error(f"The job of pid \"{pid}\" is done.")
-                if os.WIFSTOPPED(status):
-                    log.error(f"The job of pid \"{pid}\" is suspended.")
-                if os.WIFCONTINUED(status):
-                    log.error(f"The job of pid \"{pid}\" is continued.")
-            except:
+            # This will raise an exception on Windows.  That's ok.
+            pid, status = os.waitpid(any_process, os.WNOHANG)
+            if pid == 0:
                 break
+            log.warning(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + ', ' + str(status))}")
+            if os.WIFEXITED(status):
+                log.warning(f"The process of pid \"{pid}\" is done.")
+            elif os.WIFSTOPPED(status):
+                log.warning(f"The process of pid \"{pid}\" is suspended.")
+            elif os.WIFCONTINUED(status):
+                log.warning(f"The process of pid \"{pid}\" is continued.")
+            else:
+                log.warning(f"The process of pid \"{pid}\" is of status {status}")
 
     def builtin_help(self, pipe="", args=[]):
+        # 在线帮助函数
+        # todo: 写好在线帮助
         pass
 
-    def subshell(self, pipe="", target="", args=[], piping=False, io_control=False):
+    def subshell(self, pipe="", target="", args=[], piping_in=False, piping_out=False, io_control=False):
+        # 运行外部程序
+        # 根据需要调整输入输出
         if not target:
             raise EmptyException(f"Command \"{target}\" is empty", {"type": "subshell"})
         to_run = [target] + args
         log.debug(f"Runnning in subprocess: {COLOR.BOLD(to_run)}")
         try:
+            log.debug(f"EXEC OI controller is: {self.input_file} and {self.output_file}")
             result = None
-            if piping:
-                log.debug("Piping in subprocess...")
-                # log.debug(f"content of pipe varible {COLOR.BOLD(pipe)}")
-                p = subprocess.Popen(to_run, stdin=PIPE, stdout=PIPE, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
-                self.subp = p
-                result, error = p.communicate(pipe)
-                # waits for the process to end
-            elif io_control:
-                # todo: cry
-                log.debug("Doing io control")
-                log.debug(f"Multiprocessing IO controller is: {sys.stdin}")
-                p = subprocess.Popen(to_run, stdin=PIPE, stdout=None, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
-                self.subp = p
+            if io_control:
+                piping_in = True
+            # waits for the process to end
+            # 若需要通过管道传递相关内容，则使用PIPE
+            p = subprocess.Popen(to_run, stdin=PIPE if piping_in else self.input_file, stdout=PIPE if piping_out else self.output_file, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
 
-                # p.wait()
-                # p.stdin.write("hello\n")
-                result, error = p.communicate()
-                # result = str(p.stdout)
-                log.debug(f"The result is \"{result}\" and \"{error}\"")
-                # waits for the process to end
-            elif self.input_file is not None or self.output_file is not None:
-                log.debug("Doing oi control")
-                log.debug(f"EXEC OI controller is: {self.input_file} and {self.output_file}")
-                p = subprocess.Popen(to_run, stdin=self.input_file, stdout=self.output_file, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
-                self.subp = p
-
-                # p.wait()
-                # p.stdin.write("hello\n")
-                result, error = p.communicate()
-                # result = str(p.stdout)
-                log.debug(f"The result is \"{result}\" and \"{error}\"")
-                # waits for the process to end
-
-            else:
-                log.debug("Just running in regular env")
-                p = subprocess.Popen(to_run, stderr=STDOUT, encoding="utf-8", env=dict(os.environ, PARENT=self.vars["SHELL"]))
-                self.subp = p
-                p.wait()
-                # here we're directing the IO straight to the command line, so no result is needed
-                # waits for the process to end
+            self.subp = p
+            result, error = p.communicate(pipe)
             if p.returncode != 0:
                 log.warning("The subprocess is not returning zero exit code")
                 raise CalledProcessException("None zero return code encountered")
@@ -915,10 +899,9 @@ class MyShell:
         # log.debug(f"Full content of command is {COLOR.BOLD(command)}")
         if command["pipe_in"] and command["redi_in"]:
             raise MultipleInputException("Redirection and pipe are set as input at the same time.")
-        if command["pipe_in"] or command["redi_in"] or command["redi_out"] or command["pipe_out"]:
-            command["piping"] = True
-        else:
-            command["piping"] = False
+
+        command["piping_in"] = command["pipe_in"] or command["redi_in"]
+        command["piping_out"] = command["redi_out"] or command["pipe_out"]
 
         # to the command itself, it doesn't matter whether the input comes from a pipe or file
         if command["redi_in"] and command["exec"] != "exec":
@@ -936,24 +919,27 @@ class MyShell:
 
         # actual execution
         result = ""
-        if command["exec"] == "exec":
-            if len(command["args"]):
-                raise ArgCountException("exec command takes no argument")
-            # setting redi_files to arguments
-            # something might change
-            self.builtin_exec(args=[command["redi_in"], command["redi_out"]])
-        elif command["exec"] in self.builtins.keys():
-            log.debug("This is a builtin command.")
-            # executing as static method, calling with self variable
-            result = self.builtins[command["exec"]](self, pipe=pipe, args=command['args'])
-        else:
-            log.debug("This is not a builtin command.")
-            try:
-                result = self.subshell(pipe, command["exec"], command['args'], piping=command["piping"], io_control=command["io_control"])
-            except FileNotFoundError as e:
-                raise FileNotFoundException(e, {"type": "subshell"})
-
-        sys.stdin = sys.__stdin__
+        try:
+            if command["exec"] == "exec":
+                if len(command["args"]):
+                    raise ArgCountException("exec command takes no argument")
+                # setting redi_files to arguments
+                # something might change
+                self.builtin_exec(args=[command["redi_in"], command["redi_out"]])
+            elif command["exec"] in self.builtins.keys():
+                log.debug("This is a builtin command.")
+                # executing as static method, calling with self variable
+                result = self.builtins[command["exec"]](self, pipe=pipe, args=command['args'])
+            else:
+                log.debug("This is not a builtin command.")
+                try:
+                    result = self.subshell(pipe, command["exec"], command['args'], piping_in=command["piping_in"], piping_out=command["piping_out"], io_control=command["io_control"])
+                except FileNotFoundError as e:
+                    raise FileNotFoundException(e, {"type": "subshell"})
+        except:
+            raise
+        finally:
+            sys.stdin = sys.__stdin__
 
         if command['redi_out']:
             log.debug(f"User want to redirect the output to {COLOR.BOLD(command['redi_out'])}")
@@ -987,6 +973,7 @@ class MyShell:
         try:
             command = input(self.prompt()).strip()
         except EOFError:
+            log.warning("Getting EOF from command prompt, exiting...")
             return self.run_command("exit")
         # print(self.prompt(), end="")
         # command = input().strip()
@@ -1028,6 +1015,12 @@ class MyShell:
             queue.put("dummy")
             del jobs[count]
             del status_dict[count]
+
+    def term_all(self):
+        jobs = self.jobs
+        for job in jobs:
+            os.kill(self.process[job].pid, signal.SIGTERM)
+            print(self.job_status_fmt(job, "terminated", jobs[job]))
 
     def run_command(self, command, io_control=False):
         try:
@@ -1085,10 +1078,7 @@ class MyShell:
             log.debug("User is exiting...")
             log.debug(f"Exception says: {e}")
             log.info("Bye")
-            for job in self.jobs:
-                os.kill(self.process[job].pid, signal.SIGTERM)
-                print(self.job_status_fmt(job, "terminated", self.jobs[job]))
-                # del self.jobs[job]
+            # self.term_all()
             return True
         except EmptyException as e:
             log.debug("The command is empty...")
