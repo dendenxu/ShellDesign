@@ -109,6 +109,9 @@ term 0 1
 
 echo $LINE
 
+echo "calling environ..."
+environ
+
 echo "Arg 0 is: $0"
 echo "Arg 1 is: $1"
 echo "Arg 2 is: $2"

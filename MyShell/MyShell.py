@@ -84,6 +84,8 @@ class MyShell:
         # 对于命令函参数，我们为了防止写太多重复代码，就使用了picklable_nested类来自动生成相关callable object
         # ! pickle cannot handle nested function, however a simulating callable object is fine
         # 由于Pickle无法处理nested function，我们使用类来实现相关功能
+        if not cmd_args:
+            cmd_args = [os.path.abspath(__file__)]
         self.cmd_args = cmd_args
 
         prev_level = coloredlogs.get_level()
@@ -859,7 +861,7 @@ class MyShell:
         to_run = [target] + args
         log.debug(f"Runnning in subprocess: {COLOR.BOLD(to_run)}")
         try:
-            log.debug(f"EXEC OI controller is: {self.input_file} and {self.output_file}")
+            log.debug(f"EXEC OI controller is: {COLOR.BOLD(str(self.input_file) + ' ' + str(self.output_file))}")
             result = None
             if io_control:
                 piping_in = True
@@ -1060,30 +1062,46 @@ class MyShell:
         sys.stdin = wrapper
 
         try:
+            # 真正的执行过程
+            # 详见run_command
+            # 包括解析命令/执行命令/错误处理
+            # 此时不会执行后台逻辑，跳过parse阶段
             shell.run_command(args, io_control=True)
         finally:
+            # 正常情况下不会出现raise的情况
+            # 无论如何，都要退出当前的job
             print(shell.job_status_fmt(count, "finished", job))
             queue.put("dummy")
             del jobs[count]
 
     def term_all(self):
+        # 杀死jobs数组中所有的剩余任务
         jobs = self.jobs
         for job in jobs:
             os.kill(self.process[job].pid, signal.SIGTERM)
+            # 我们会将job相关信息直接打印到屏幕上
             print(self.job_status_fmt(job, "terminated", jobs[job]))
 
     def run_command(self, command, io_control=False):
+        # 解析命令，执行命令，错误处理，后台任务
         try:
-            # todo: finish subprocess here...
+            # commands是一个command数组，包含具体的方便读取的命令格式信息
+            # 由于存在PIPE调用的可能性，我们对commands创建了数组
+            # parse会将命令字符串解释为完整的命令
             commands, is_bg = self.parse(command)
             if is_bg:
                 # ! changes made in subprocess is totally within the subprocess only
-                # todo: the counter might get significantly large
-                str_cnt = str(self.job_counter)
+
+                # job_counter实际上是一个函数
+                # 会获取当前没有被使用掉的最小的job编号，从0开始
+                str_cnt = self.job_counter
+
+                # 创建相关内容
                 self.jobs[str_cnt] = command
                 self.queues[str_cnt] = Queue()
                 self.status_dict[str_cnt] = "running"
 
+                # 备份相关内容以便deepcopy时删除
                 queues_bak = self.queues
                 process_bak = self.process
                 jobs_bak = self.jobs
@@ -1091,6 +1109,8 @@ class MyShell:
                 input_bak = self.input_file
                 output_bak = self.output_file
 
+                # note: 为了规避一些pickle error，我们会删除这里的：
+                # thread_lock, multiprocessing.Manager, multiproessing.Queue, Manager.dict, io.TextWrapper
                 del self.queues
                 del self.process
                 del self.jobs
@@ -1098,7 +1118,11 @@ class MyShell:
                 del self.input_file
                 del self.output_file
 
+                # 获取一个deepcopy的shell以供后台程序执行
                 clean_self = copy.deepcopy(self)
+
+                # 填充默认内容
+                # ! 我们默认后台程序不会尝试再次构建后台的后台指令
                 clean_self.queues = {}
                 clean_self.jobs = {}
                 clean_self.process = {}
@@ -1106,6 +1130,7 @@ class MyShell:
                 clean_self.input_file = None
                 clean_self.output_file = None
 
+                # 还原到deepcopy以前的状态
                 self.queues = queues_bak
                 self.process = process_bak
                 self.jobs = jobs_bak
@@ -1113,18 +1138,22 @@ class MyShell:
                 self.input_file = input_bak
                 self.output_file = output_bak
 
+                # 使用deepcopy初来的clean_self来构建新的进程
                 p = Process(target=self.run_command_wrap, args=(str_cnt, clean_self, command[0:-1], self.jobs[str_cnt], self.queues[str_cnt], self.jobs, self.status_dict), name=command)
 
+                # 添加到进程管理中，方便kill命令等的执行
                 self.process[str_cnt] = p
 
                 # ! so the multiprocessing process won't actually be totally gone if the main process is still around
                 # but it will be terminated if demanded so (ps command can see it as <defunc>, but not a zombie)
+                # 保证主进程退出后，下面的小进程也会退出
                 p.daemon = True
 
+                # 开始运行
                 p.start()
-
                 log.debug(f"We've spawned the job in a Process for command: {COLOR.BOLD(p.name)}")
             else:
+                # 一般命令的执行
                 result = None  # so that the first piping is directly from stdin
                 if io_control:
                     for command in commands:
@@ -1136,12 +1165,17 @@ class MyShell:
                     result = self.execute(command, pipe=result)
                     # log.debug(f"Getting result: {COLOR.BOLD(result)}")
         except ExitException as e:
+            # 我们通过异常来处理程序的退出命令
+            # 包括quit和exit
+            # 某种意义上Ctrl+D代表的EOF也是一种推出指令
             log.debug("User is exiting...")
             log.debug(f"Exception says: {e}")
             log.info("Bye")
-            # self.term_all()
+            self.term_all()
             return True
         except EmptyException as e:
+            # EmptyException较为特殊，需要单独处理
+            # 因为错误等级会根据type不同而变换
             log.debug("The command is empty...")
             log.info(f"Exception says: {e}")
             if e.errors["type"] == "pipe":
@@ -1158,12 +1192,19 @@ class MyShell:
         except Exception as e:
             log.error(f"Unhandled error. {traceback.format_exc()}")
         finally:
+            # 同步status_dict, queues, jobs
             self.cleanup_jobs()  # always clean up
 
+        # 不返回退出指令
         return False
 
     def parse(self, command):
+        # 命令解释器
+
+        # quote函数会处理引号/变量替换/特殊变量转义/~替换
         inputs = self.quote(command)  # splitting by whitespace and processing varibles, quotes
+
+        # 将命令分解，进行piping调用
         # splitting command of pipling
         commands = []
         command = []
@@ -1175,13 +1216,15 @@ class MyShell:
                 command = []
         commands.append(command)
 
-        # print(commands)
-
-        is_bg = False
+        # 对每一个个别的命令进行解析
+        is_bg = False  # 是否后台执行是整个命令的设置，只需要一个
         parsed_commands = []
-        parsed_command = self.parsed_clean()
 
         for cidx, command in enumerate(commands):
+            parsed_command = self.parsed_clean()
+            # 可能用户只是敲了一下回车
+            # 也可能用户的某一个管道环节是空的：这是不允许的
+            # 我们通过type传递相关信息
             if not len(command):
                 raise EmptyException(f"Command at position {cidx} is empty", {"type": "pipe" if len(commands) > 1 else "empty"})
             parsed_command["pipe_in"] = (cidx > 0)
@@ -1189,18 +1232,22 @@ class MyShell:
             index = 0
             while index < len(command):
                 if not index:  # this should have a larger priority
+                    # 整个命令的第一个词汇是执行目标
                     parsed_command["exec"] = command[index]
                 elif command[index] == "<":
+                    # 输入重定向
                     if index == len(command) - 1:
                         raise SetPairUnmatchedException("Cannot match redirection input file with < sign.", {"type": "redi"})
                     parsed_command["redi_in"] = command[index+1]
                     index += 1
                 elif command[index] == ">":
+                    # 输出重定向
                     if index == len(command) - 1:
                         raise SetPairUnmatchedException("Cannot match redirection output file with > sign.", {"type": "redi"})
                     parsed_command["redi_out"] = command[index+1]
                     index += 1
                 elif command[index] == ">>":
+                    # 输出重定向：添加型
                     if index == len(command) - 1:
                         raise SetPairUnmatchedException("Cannot match redirection output file with >> sign.", {"type": "redi"})
                     parsed_command["redi_out"] = command[index+1]
@@ -1218,38 +1265,50 @@ class MyShell:
                     parsed_command["args"].append(command[index])
                 index += 1
             parsed_commands.append(parsed_command)
-            parsed_command = self.parsed_clean()
 
         return parsed_commands, is_bg
 
     def quote(self, command, quote=True):
+        # 可以被递归调用的引号处理功能
         # command should already been splitted by word
         # mark: this structure makes it possible that the arg is keep in one place if using quote
         # by not brutally expanding on every possible environment variables
         command = command.split()
+        # 清除所有的注释
+        # note: 就像一般的shell，注释前面要有一个空格
         comment = [i for i, v in enumerate(command) if v.startswith("#")]
         if len(comment):
             command = command[0:comment[0]]
+
         quote_stack = []
         index = 0
         while index < len(command):
+
+            # 这一个if-else代码块保证所有内容被解析过一次，且仅解析一次，调用self.expand函数
+            # 并且若解析后的内容有引号，也不会影响程序的正常执行，因为我们是在处理引号后解析变量的
+            # note: 也就是说如果你的变量中存在着可以被解析为变量的内容，它们不会被解析，以防止无限递归解析
             if command[index].count("\"") >= 1:
                 # should remove all quotes here
                 quote_count = command[index].count("\"")
                 log.debug("Trying to remove quote...")
                 splitted = command[index].split("\"")
                 # there were not space at the beginning
+                # expand函数会进行变量和~的替换
+                # 我们会将读入的内容按照引号数量拆分，然后进行解析
+                # 最后合并成一个长字符串
+                # 并通过quote_count来和下面的代码沟通
                 command[index] = "".join([self.expand(split) for split in splitted])
-
             else:
+                command[index] = self.expand(command[index])
                 quote_count = 0
 
             if quote_count % 2:  # previous quote_count
+                # 引号分词中出现了空格
                 if quote_stack:
                     # except the last char
                     quote_stack.append(command[index])
                     # recursion to process $ and "" in the already processed ""
-                    command[index] = self.expand(" ".join(quote_stack))
+                    command[index] = " ".join(quote_stack)
                     quote_stack = ""
                     # index should continue to be added in the end
                 else:
@@ -1260,38 +1319,20 @@ class MyShell:
                     command = command[0:index] + command[index+1::]
                     index -= 1
             elif quote_stack:
+                # 引号分词没有空格，加入到上一个quote组中
                 # no quote but
                 quote_stack.append(command[index])
                 if index == len(command)-1:
                     raise QuoteUnmatchedException("Cannot match the quote for a series of arguments")
                 command = command[0:index] + command[index+1::]
                 index -= 1  # index should stay the same
+            index += 1
 
-            prev = command[index]
-            command[index] = self.expand(command[index])
-            if prev == command[index]:
-                index += 1  # advance only if the var is unchanged
-
-        def process_home_dollar(string):
-            def get_dollar_sign(key):
-                if key == "\\$":
-                    return "$"
-                else:
-                    return key
-
-            def get_home_sign(key):
-                if key == "\\~":
-                    return "~"
-                else:
-                    return key
-
-            string = self.sub_re(r"\\\$", string, get_dollar_sign)
-            string = self.sub_re(r"\\~", string, get_home_sign)
-            return string
-        return [process_home_dollar(i) for i in command]
+        return [i.replace("\\~", "~").replace("\\$", "$") for i in command]
 
     def expand(self, string):
         def get_key(key):
+            # 第一个字符$不能被用于寻找变量
             key = key[1::]
             log.debug(f"Trying to get varible {COLOR.BOLD(key)}")
             try:
@@ -1310,36 +1351,44 @@ class MyShell:
             else:
                 return key
 
+        # 通过调用regex的替换命令（其实是我们自己实现的）
+        # ! re.sub在处理utf-8字符串时有难以预料的错误
+        # ! if you use re.sub on windows, strange things can happen
+        # *nix可以正常运行，但Windows下报错
         string = self.sub_re(r"(?<!\\)\$\w+", string, get_key)
         string = self.sub_re(r"(?<!\\)~", string, get_home)
 
         return string
 
-    # ! if you use re.sub on windows, strange things can happen
     @staticmethod
     def sub_re(pattern, string, method):
+        # 根据regex寻找匹配子串，然后通过调用method函数进行替换的静态方法
+
+        # 所有的匹配结果
         var_list = [(m.start(0), m.end(0)) for m in re.finditer(pattern, string)]
+        
+        # 拆分为替换后的内容
         str_list = []
         prev = [0, 0]
         for start, end in var_list:
             str_list.append(string[prev[1]:start])
             str_list.append(string[start:end])
             prev = [start, end]
-
         str_list.append(string[prev[1]::])
+
 
         # log.debug(f"The splitted vars are {COLOR.BOLD(str_list)}")
 
+        # 对于每一个匹配成功的字串，进行method(key)的调用
         for i in range(1, len(str_list), 2):
-            key = str_list[i]
-            var = method(key)
-            str_list[i] = var
+            str_list[i] = method(str_list[i])            
             # to result in index staying the same
 
         string = "".join(str_list)
         return string
 
     def parsed_clean(self):
+        # 返回一个干净的指令
         parsed_command = {
             "exec": "",
             "args": [],
@@ -1352,8 +1401,23 @@ class MyShell:
         return parsed_command
 
 
-def main(args, cmd_args):
 
+if __name__ == "__main__":
+    # echo "zy" | sha256sum | tr -d " -" | wc
+    # ./MyShell.py -w dummy.mysh -a foo bar foobar hello world linux linus PyTorch CS231n
+
+    # 调用此脚本时候传入-h以查看帮助
+    parser = argparse.ArgumentParser(description='MyShell by xudenden@gmail.com')
+    parser.add_argument('f', metavar='F', type=str, nargs='?', help='the batch file to be executed')
+    parser.add_argument('-a', metavar='A', type=str, nargs='*', help='command line arguments to batch file')
+    parser.add_argument('-e', help='enable error level debugging info log', action='store_true')
+    parser.add_argument('-w', help='enable warning level debugging info log', action='store_true')
+    parser.add_argument('-i', help='enable info level debugging info log', action='store_true')
+    parser.add_argument('-d', help='enable debug(verbose) level debugging info log', action='store_true')
+
+    args = parser.parse_args()
+    # args为MyShell的命令行参数
+    # 处理MyShell的命令行参数
     if args.e:
         coloredlogs.set_level("ERROR")
     if args.w:
@@ -1363,11 +1427,14 @@ def main(args, cmd_args):
     if args.d:
         coloredlogs.set_level("DEBUG")
 
-    # myshell = MyShell({"TEST": "echo \"echo $SHELL\""})
+    # 命令行参数的第一个为当前脚本的路径（脚本模式），或MyShell的路径（交互模式）
+    cmd_args = [os.path.abspath(args.f) if args.f else os.path.abspath(__file__)]
+    if args.a is not None:
+        cmd_args += args.a
     myshell = MyShell(cmd_args=cmd_args)
     log.debug(f"Getting user command line argument(s): {COLOR.BOLD(args)}")
-    # todo: batch process
 
+    # ! 一次只准执行一个脚本
     if args.f:
         try:
             # ! using utf-8
@@ -1377,27 +1444,9 @@ def main(args, cmd_args):
                 result = myshell.run_command(line)  # execute line by line
                 if result:  # the execution of the file should be terminated
                     break
+            myshell.run_command("exit") # call exit at the end of the shell execution
         except FileNotFoundError as e:
             log.error(f"Cannot find the file specified for batch processing: \"{args.f}\". {e}")
     else:
+        # 直接使用交互模式
         myshell()
-
-
-if __name__ == "__main__":
-    # hello -n "world" < input.txt | tr -d -c "re"
-    # echo "zy" | sha256sum | tr -d " -" | wc
-    # ./MyShell.py -w dummy.mysh foo bar foobar hello world linux linus PyTorch CS231n
-    parser = argparse.ArgumentParser(description='MyShell by xudenden@gmail.com')
-    parser.add_argument('f', metavar='F', type=str, nargs='?', help='the batch file to be executed')
-    parser.add_argument('a', metavar='A', type=str, nargs='*', help='command line arguments to batch file')
-    parser.add_argument('-e', help='enable error level debugging info log', action='store_true')
-    parser.add_argument('-w', help='enable warning level debugging info log', action='store_true')
-    parser.add_argument('-i', help='enable info level debugging info log', action='store_true')
-    parser.add_argument('-d', help='enable debug(verbose) level debugging info log', action='store_true')
-
-    args = parser.parse_args()
-    reserved = ["-e", "-w", "-i", "-d", sys.argv[0]]
-    filtered = [i for i in sys.argv if i not in reserved]
-    if not filtered:
-        filtered = [os.path.abspath(__file__)]
-    main(args, filtered)

@@ -1,11 +1,8 @@
-1595912998
+1595927749
 b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1
       1       1      65
 null
-clr-debug-pipe-23005-2217022-in
-clr-debug-pipe-23005-2217022-out
-dotnet-diagnostic-23005-2217022-socket
-pymp-_11yjyxj
+pymp-i1l0r1ba
 ssh-3Dl1dZ2MVhMN
 systemd-private-32fa36ac417343a4813881b03c5a5a50-bolt.service-9WJsxv
 systemd-private-32fa36ac417343a4813881b03c5a5a50-colord.service-qxRv3v
@@ -13,7 +10,10 @@ systemd-private-32fa36ac417343a4813881b03c5a5a50-ModemManager.service-w89ayg
 systemd-private-32fa36ac417343a4813881b03c5a5a50-rtkit-daemon.service-ebfv3E
 systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-resolved.service-G0nqb0
 systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-timesyncd.service-eKPsiD
+tmp-320867ElnLjgo1750.tpl
 vmware-root_1361-3988687315
+vscode-ipc-705a4712-c1f7-43b0-9465-99c771a42a1d.sock
+vscode-ipc-76bfc346-b068-4fb1-8340-103432500cbb.sock
 vscode-ipc-77ad59b8-138f-4875-884e-368ed7e31e7d.sock
 vscode-ipc-846c3b8a-cd23-429d-aa84-b71bb5acbe7b.sock
 vscode-ipc-cb722aa7-90c1-4b82-b595-52d2e62b5d98.sock
@@ -22,7 +22,7 @@ Hello, I'm your logger.
 Hello, again...
       2       6      40
 False
-2020-07-28 13:09:58.955226
+2020-07-28 17:15:49.434782
 [1m[34m##############################################################[0m
 0o002
 Changing UMASK to 0o777
@@ -35,16 +35,15 @@ Should print sha256sum of zy in the next line
 Should print 1 1 65 in the following line
 [1m[34m##############################################################[0m
 .
-rw-rw-r-- 2020-07-28 13:09:43 [1mlog.log[0m
-rw-rw-r-- 2020-07-28 13:09:58 [1mshould.out[0m
+rw-rw-r-- 2020-07-28 17:15:49 [1mshould.out[0m
 rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
 rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
 rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
-rwxrwxr-x 2020-07-28 13:09:42 [31m[1mMyShell.py[0m[0m
-rw-rw-r-- 2020-07-28 13:07:54 [1mdummy.mysh[0m
+rwxrwxr-x 2020-07-28 17:13:56 [31m[1mMyShell.py[0m[0m
+rw-rw-r-- 2020-07-28 16:44:41 [1mdummy.mysh[0m
 rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
 rw-rw-r-- 2020-07-28 11:27:53 [1mMyShellException.py[0m
-rwxrwxr-x 2020-07-28 11:29:58 [34m[1m__pycache__[0m[0m
+rwxrwxr-x 2020-07-28 17:10:22 [34m[1m__pycache__[0m[0m
 ~/Projects/ShellDesign/MyShell
 Should get empty output
 
@@ -54,16 +53,16 @@ Should print all files containing 1 in /tmp
 [1m[34m##############################################################[0m
 Should make a file log.log
 .
-rw-rw-r-- 2020-07-28 13:09:58 [1mlog.log[0m
-rw-rw-r-- 2020-07-28 13:09:58 [1mshould.out[0m
+rw-rw-r-- 2020-07-28 17:15:49 [1mlog.log[0m
+rw-rw-r-- 2020-07-28 17:15:49 [1mshould.out[0m
 rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
 rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
 rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
-rwxrwxr-x 2020-07-28 13:09:42 [31m[1mMyShell.py[0m[0m
-rw-rw-r-- 2020-07-28 13:07:54 [1mdummy.mysh[0m
+rwxrwxr-x 2020-07-28 17:13:56 [31m[1mMyShell.py[0m[0m
+rw-rw-r-- 2020-07-28 16:44:41 [1mdummy.mysh[0m
 rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
 rw-rw-r-- 2020-07-28 11:27:53 [1mMyShellException.py[0m
-rwxrwxr-x 2020-07-28 11:29:58 [34m[1m__pycache__[0m[0m
+rwxrwxr-x 2020-07-28 17:10:22 [34m[1m__pycache__[0m[0m
 Should see content of log.log
 Should display content of log.log
 Should display word count of log.log
@@ -84,7 +83,7 @@ waiting 0.25s
 [1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
 [1m[33m[2][0m[0m [1mrunning[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
 [1m[33m[3][0m[0m [1mrunning[0m env [1msleep 2s &[0m
-Sleeping in dummy.mysh
+Sleeping in /home/xuzh/Projects/ShellDesign/MyShell/dummy.mysh
 [1m[33m[0][0m[0m [1mfinished[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
 This is some job management
 [1m[33m[1][0m[0m [1mfinished[0m env [1msleep 2s | echo "This is some job management" &[0m
@@ -115,7 +114,30 @@ Counting jobs
 [1m[33m[0][0m[0m [1mterminated[0m env [1mdummy &[0m
 [1m[33m[1][0m[0m [1mterminated[0m env [1mdummy &[0m
 [1m[34m##############################################################[0m
-Arg 0 is: dummy.mysh
+calling environ...
+SHELL=[1m/home/xuzh/Projects/ShellDesign/MyShell/MyShell.py[0m
+PWD=[1m~/Projects/ShellDesign/MyShell[0m
+HOME=[1m/home/xuzh[0m
+LOCATION=[1mubuntu[0m
+USER=[1mxuzh[0m
+PATH=[1m/home/xuzh/.vscode-server/bin/17299e413d5590b14ab0340ea477cdd86ff13daf/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/home/xuzh/.local/bin[0m
+PS1=[1m$[0m
+0=[1m/home/xuzh/Projects/ShellDesign/MyShell/dummy.mysh[0m
+1=[1mfoo[0m
+2=[1mbar[0m
+3=[1mfoobar[0m
+4=[1mhello[0m
+5=[1mworld[0m
+6=[1mlinux[0m
+7=[1mlinus[0m
+8=[1mPyTorch[0m
+9=[1mCS231n[0m
+BOLD=[1m\033[1m[0m
+RED=[1m\033[31m[0m
+BLUE=[1m\033[34m[0m
+RESET=[1m\033[0m[0m
+LINE=[1m\033[1m\033[34m##############################################################\033[0m[0m
+Arg 0 is: /home/xuzh/Projects/ShellDesign/MyShell/dummy.mysh
 Arg 1 is: foo
 Arg 2 is: bar
 Arg 3 is: foobar
@@ -126,7 +148,7 @@ Arg 7 is: linus
 Arg 8 is: PyTorch
 Arg 9 is: CS231n
 Shifting number 1
-Arg 0 is: dummy.mysh
+Arg 0 is: /home/xuzh/Projects/ShellDesign/MyShell/dummy.mysh
 Arg 1 is: bar
 Arg 2 is: foobar
 Arg 3 is: hello
@@ -145,3 +167,5 @@ Arg 1 is: world
 Shifting number 5
 Arg 1 is: linux
 [1mBye![0m
+[1m[33m[2][0m[0m [1mterminated[0m env [1mdummy &[0m
+[1m[33m[3][0m[0m [1mterminated[0m env [1mdummy &[0m
