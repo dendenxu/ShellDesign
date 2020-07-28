@@ -71,15 +71,10 @@ class MyShell:
 
         # 环境变量，用到了下面将要提到的OnCallDict的功能
         # we're using callable dict to evaluate values on call
-        self.vars = MyShell.OnCallDict({
-            "SHELL": os.path.abspath(__file__),  # 这个变量无法被修改，是MyShell的辨识信息
-            "PWD": self.cwd,  # 这个变量的修改会直接导致cd命令的调用，内容会在名利提示符显示
-            "HOME": self.home,  # 这个变量存储着当前用户的根目录，无法修改
-            "LOCATION": self.location,  # 这个变量的内容会在命令提示符显示，显示用户额外信息，无法修改
-            "USER": self.user,  # 储存使用者用户名，无法修改
-            "PATH": self.path,  # 储存path这一特殊环境变量，对它的修改会直接导致系统搜索目录的改变
-            "PS1": "$"  # 这一变量储存命令提示符内容，可以被修改
-        })
+        unsupported = {str(i): MyShell.PicklableCMDArgs(self, i) for i in range(10)}
+        self.vars = MyShell.OnCallDict(unsupported=unsupported)
+        self.vars["PS1"] = "$"
+        self.vars["SHELL"] = os.path.abspath(__file__)
 
         # 对于命令函参数，我们为了防止写太多重复代码，就使用了picklable_nested类来自动生成相关callable object
         # ! pickle cannot handle nested function, however a simulating callable object is fine
@@ -87,14 +82,6 @@ class MyShell:
         if not cmd_args:
             cmd_args = [os.path.abspath(__file__)]
         self.cmd_args = cmd_args
-
-        prev_level = coloredlogs.get_level()
-        log.debug(f"Logging level is {COLOR.BOLD(prev_level)}")
-        # 由于这里会打印一些无用的INFO级别的调试信息（具体原因在于会通过非初始化的方式调用OnCallDict的内部方法）
-        coloredlogs.set_level("WARNING")
-        for i in range(10):
-            self.vars[str(i)] = MyShell.picklable_cmd_args(self, i)
-        coloredlogs.set_level(prev_level)
 
         # update: 我们会在调用多线程/后台执行功能时清空这一部分的变量，能够解决的问题有：
         # 1. queue can only be pass by inheritance
@@ -137,53 +124,29 @@ class MyShell:
     # 所以MyShell会单独管理自己的变量（这里不一定要称为环境变量）
     # 与MyShell配合使用，用于统一管理环境变量，并与真正的系统环境变量交互的字典
     # 主要功能为，若字典value为可执行内容，则返回执行后的结果
-
-    class OnCallDict(dict):
-        unsupported = ["HOME", "USER", "LOCATION", "SHELL"] + [str(i) for i in range(10)]
-        reserved = unsupported + ["PATH", "PWD"]
+            
+    class OnCallDict():
+        def keys(self):
+            return os.environ.keys()
+        def __iter__(self):
+            return os.environ.__iter__()
+        def __init__(self, unsupported={}):
+            self.unsupported = unsupported
 
         def __getitem__(self, key):
-            value = super().__getitem__(key)
-
-            if callable(value):
-                # 对于可调用的字典元素，获取调用后的结果，否则返回原结果
-                log.debug(f"Accessing callable dict element: {COLOR.BOLD(key)}")
-                return value()
-            else:
-                log.debug(f"Accessing non-callable dict element: {COLOR.BOLD(key)}")
-                return value
+            if key in self.unsupported:
+                return self.unsupported[key]()
+            return os.environ.__getitem__(key)
 
         def __setitem__(self, key, value):
-            # 由于环境变量的特殊性，我们对一些内容的设定操作进行了特殊处理
-            if key not in self:
-                # 在初始化时不进行任何特殊处理（配合pickle和copy函数）
-                log.debug(f"We might be initializing current shell, setting initial value \"{value}\" to \"{key}\"")
-                super().__setitem__(key, value)
-            elif key == "PATH":
-                # 对于PATH的改变会真的影响当前系统中的环境变量
-                # for whatever reason, set this to a string (environment variables are meant to be strings)
-                # here we're actually setting the REAL environ so that user can call stuff more conveniently
-                # ? or should we
-                log.info(f"User set PATH to {COLOR.BOLD(value)}")
-                os.environ[key] = str(value)
-            elif key == "PWD":
-                # 设定PWD环境变量会导致cd操作
-                # we're changing dir...
-                # ? or should we just set variable
-                log.info(f"User set PWD to {COLOR.BOLD(value)}")
-                os.chdir(value)
-            elif key in MyShell.OnCallDict.unsupported:
-                # 对于某些不方便设置的环境变量，我们采取保留操作
-                log.warning(f"Sorry, we don't currently support setting \"{key}\", included in {COLOR.BOLD(MyShell.OnCallDict.unsupported)}")
-            else:
-                super().__setitem__(key, value)
+            if key in self.unsupported:
+                raise ReservedKeyException(f"Key is reserved, along with \"{self.unsupported.keys()}\"")
+            return os.environ.__setitem__(key, value)
 
         def __delitem__(self, key):
-            if key in MyShell.OnCallDict.reserved:
-                log.warning(f"Sorry, we don't currently support deleting \"{key}\", included in {COLOR.BOLD(MyShell.OnCallDict.reserved)}")
-                raise ReservedKeyException(f"\"{key}\" is reserved, along with {MyShell.OnCallDict.reserved}")
-            else:
-                super().__delitem__(key)
+            if key in self.unsupported:
+                raise ReservedKeyException(f"Key is reserved, along with \"{self.unsupported.keys()}\"")
+            return os.environ.__delitem__(key)
 
     # StdinWrapper是一个继承自io.TextWrapper，是本类型对获取输入的job进行线程暂停的一种方式
     # 我们考虑过直接使用系统调用，但跨平台性会很难保证，因此对于后台外部命令，我们会直接关闭输入PIPE
@@ -241,7 +204,7 @@ class MyShell:
 
     # 用于模仿Nested Function的Object
     # 可以被pickle
-    class picklable_cmd_args():
+    class PicklableCMDArgs():
         # 在我们的使用环境下，shell变量被直接传入了self，也就保留了指针，因此外部对cmd_args变量的改变也会使得这里的结果不同
         def __init__(self, shell, number):
             self.shell = shell
@@ -554,14 +517,7 @@ class MyShell:
 
     def builtin_environ(self, pipe="", args=[]):
         # # 将MyShell的环境变量返回给用户
-        result = []
-        for key in self.vars:
-            try:
-                # 由于self.vars的特殊性，不能直接调用列表生成器
-                # 对于命令行参数，我们事先不知道有效参数的数量，因此只能单独尝试
-                result.append(f"{key}={COLOR.BOLD(self.vars[key])}")
-            except IndexError:
-                pass
+        result = [f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars]
         return "\n".join(result)
 
     def builtin_set(self, pipe="", args=[]):
@@ -586,15 +542,22 @@ class MyShell:
 
     def builtin_unset(self, pipe="", args=[]):
         # 取消MyShell中一些已经设置好的变量
+        dont = [str(i) for i in range(10)] + ["PS1"]
         cannot_unset = []
+        reasons = []
         # 类似builtin_environ中的处理方式，为了跳过可能出错的变量，我们手动循环
         for key in args:
+            if key in dont:
+                cannot_unset.append(key)
+                reasons.append(f"{key} is reserved")
+                continue
             try:
                 del self.vars[key]
-            except (KeyError, ReservedKeyException):
+            except (KeyError, ReservedKeyException) as e:
                 cannot_unset.append(key)
+                reasons.append(str(e))
         if len(cannot_unset):
-            raise UnsetKeyException("Cannot find/unset these keys.", {"keys": cannot_unset})
+            raise UnsetKeyException("Cannot find/unset these keys: \n" + '\n'.join(reasons), {"keys": cannot_unset})
 
     def builtin_umask(self, pipe="", args=[]):
         # 设置系统umask的值
@@ -1331,7 +1294,7 @@ class MyShell:
                 index -= 1  # index should stay the same
             index += 1
 
-        return [i.replace("\\~", "~").replace("\\$", "$") for i in command]
+        return [i.replace("\\~", "~").replace("\\$", "$").replace("\\#", "#") for i in command]
 
     def expand(self, string):
         def get_key(key):
@@ -1369,7 +1332,7 @@ class MyShell:
 
         # 所有的匹配结果
         var_list = [(m.start(0), m.end(0)) for m in re.finditer(pattern, string)]
-        
+
         # 拆分为替换后的内容
         str_list = []
         prev = [0, 0]
@@ -1379,12 +1342,11 @@ class MyShell:
             prev = [start, end]
         str_list.append(string[prev[1]::])
 
-
         # log.debug(f"The splitted vars are {COLOR.BOLD(str_list)}")
 
         # 对于每一个匹配成功的字串，进行method(key)的调用
         for i in range(1, len(str_list), 2):
-            str_list[i] = method(str_list[i])            
+            str_list[i] = method(str_list[i])
             # to result in index staying the same
 
         string = "".join(str_list)
@@ -1402,7 +1364,6 @@ class MyShell:
             "redi_append": False,
         }
         return parsed_command
-
 
 
 if __name__ == "__main__":
@@ -1447,7 +1408,7 @@ if __name__ == "__main__":
                 result = myshell.run_command(line)  # execute line by line
                 if result:  # the execution of the file should be terminated
                     break
-            myshell.run_command("exit") # call exit at the end of the shell execution
+            myshell.run_command("exit")  # call exit at the end of the shell execution
         except FileNotFoundError as e:
             log.error(f"Cannot find the file specified for batch processing: \"{args.f}\". {e}")
     else:
