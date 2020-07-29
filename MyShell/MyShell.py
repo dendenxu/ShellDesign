@@ -812,7 +812,7 @@ class MyShell:
                     value = float(args[0][0:-1])
                 else:
                     value = float(args[0])
-                time.sleep()
+                time.sleep(value)
             except ValueError as e:
                 raise SleepException(f"Unrecoginized sleep time format, are you on NT? Use second as unit and put s at the back of the time string. {e}")
         else:

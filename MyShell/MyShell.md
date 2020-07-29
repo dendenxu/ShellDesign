@@ -61,7 +61,7 @@
 
 shell 或者命令行解释器是操作系统中最基本的用户接口。我们实现了一个跨平台的简单的shell 程序——**MyShell**，它具有以下属性：
 
-1. 支持的内部指令集：`cd, clr, pwd, dir, echo, exit, quit, jobs, fg, bg, term, environ, set, unset, umask, printio, exec, shift, test, sleep, time, help`
+1. 支持的内部指令集：`cd, clr, pwd, dir, echo, exit, quit, jobs, fg, bg, term, environ, set, unset, umask, printio, exec, shift, test, sleep, time, help, verbose`
 
    开发者调试指令集：`dummy, check_zombie, queue`
 
@@ -148,45 +148,115 @@ shell 或者命令行解释器是操作系统中最基本的用户接口。我�
      - 后台任务的格式为`[i] status env command`例如`[0] suspended env dummy &`
      - 已经被清除/已经完成的任务不会被显示
      - 尝试读取内容的外部后台程序会直接获得EOF
-
-   - `fg`
-
-     将后台任务提到前台执行
-
-     `fg job_number`
-
+  - 任务信息是管理性质的信息，所以我们会忽略`exec`命令的设置，将任务管理结果直接打印到屏幕上
+   
+- `fg`
+   
+  将后台任务提到前台执行
+   
+  `fg job_number`
+   
      - 只接受一个参数
      - 对于正在执行的后台任务，提到前台运行
      - 通过外部命令的刷出的后台任务仍然不能获取输入，尝试读取内容的外部后台程序会直接获得EOF
-     - 对于因为获取输入而暂停执行的命令，继续命令的执行并阻塞前台主线程
-
-   - `bg`
-
-     继续后台程序的执行
-
-     `bg [job_number [job_number ...]]`
-
+  - 对于因为获取输入而暂停执行的命令，继续命令的执行并阻塞前台主线程
+   
+- `bg`
+   
+  继续后台程序的执行
+   
+  `bg [job_number [job_number ...]]`
+   
      - 由于所有的暂停的后台任务都是因为尝试获取用户输入，继续在后台执行它们只会得到继续暂停的结果
-     - MyShell没有对快捷键操作进行处理，因此没有暂停正在运行的外部命令的功能
-
-   - `term`
-
-     终止后台任务的执行
-
-     `term [job_number [job_number ...]]`
-
+  - MyShell没有对快捷键操作进行处理，因此没有暂停正在运行的外部命令的功能
+   
+- `term`
+   
+  终止后台任务的执行
+   
+  `term [job_number [job_number ...]]`
+   
      - 对于后台任务进程（`multiprocessing.Process`），发出`SIGTERM`信号以终止运行；后台任务会自动处理信号并终止自身运行
-     - 若后台任务不是内部命令，会对其子进程发出`SIGKILL`信号以尝试终止运行
-
-   - `environ`
-
-     打印MyShell全部内部变量
-
-     `environ`
-
+  - 若后台任务不是内部命令，会对其子进程发出`SIGKILL`信号以尝试终止运行
+   
+- `environ`
+   
+  打印MyShell全部内部变量
+   
+  `environ`
+   
      - MyShell使用了内部的变量处理机制，在系统环境变量上加了一层额外的接口用以满足更严苛的测试环境。
      - `0, 1, 2, 3, 4, 5, 6, 7, 8, 9`是MyShell的保留变量，不能被修改和删除
-     - `PS1`是MyShell的保护变量，因为命令提示符中需要用到，所以不允许删除。
+     
+   - `set`
+   
+     修改环境变量/设置新的环境变量
+   
+     `set key=value [key=value ...]`
+   
+     - 键值对以等于号配对，等于号的周围不允许出现空格，否则无法正常赋值
+     - `0, 1, 2, 3, 4, 5, 6, 7, 8, 9`是MyShell的保留变量，不能被修改（它们实际上也不存在）
+     - 修改`PS1`变量会导致命令提示符的提示符号被修改，其默认值为`$`美元符号
+     - 修改`PWD`等不会导致当前目录发生改变，但调用`cd`命令进入别的命令后`PWD`变量就会被修改到目录改变后的地址下
+     - 修改`HOME`变量会导致程序处理`~`的方式发生改变
+     - 修改`USER`等变量不会对命令提示符样式有影响，但可能会对其他使用到这些变量的程序有影响
+     - 修改`PATH`可以改变程序搜索可执行文件的路径
+   
+   - `unset`
+   
+     删除环境变量
+   
+     `unset key [key ...]`
+   
+     - `0, 1, 2, 3, 4, 5, 6, 7, 8, 9`是MyShell的保留变量，不能被删除（它们实际上也不存在）
+     - 删除`PS1`变量会导致命令提示符采用默认值`$`
+     - 删除`HOME`变量会导致程序无法正确处理`~`
+     - 删除`USER`等变量不会对命令提示符样式有影响，但可能会对其他使用到这些变量的程序有影响
+   
+   - `umask`
+   
+     修改程序的`umask`值
+   
+     `umask [value]`
+   
+     - 在Windows上修改`umask`的效果较为奇怪
+     - 不传入参数的时候会显示当前的`umask`
+     - 传入新的`umask`会被尝试以八进制解释，并设置为新的`umask`值
+     - Linux上普通文本文件的默认权限是`0o666`，可执行文件为`0o777`
+     - 在MyShell修改的`umask`值会影响其后的文件创建
+   
+   - `printio`
+   
+     打印当前的输入输出重定向目标
+   
+     `printio`
+   
+     - 本命令没有参数
+   
+     - 本命令会打印当前MyShell的`exec`指令重定向目标
+   
+     - 例如执行`exec < dummy.mysh > result.out`后调用`printio`会打印
+   
+       ```shell
+       FILE NUMBER OF INPUT FILE: 3, redirecting MyShell input to <_io.TextIOWrapper name='dummy.mysh' mode='r' encoding='utf-8'>
+       FILE NUMBER OF INPUT FILE: 4, redirecting MyShell output to <_io.TextIOWrapper name='result.out' mode='w' encoding='utf-8'>
+       ```
+   
+     - 由于`printio`的意义就在于查看当前的重定向路径，我们不会将其输入输出重定向，而是直接打印到屏幕上
+   
+   - `shift`
+   
+     管理特殊环境变量`1...9`，移动变量的位置（管理命令行参数）
+   
+     `shift [shamt]`
+   
+     - 通过`$0...$9`可以访问脚本/程序执行时候的命令行参数
+     - `$0`存储的是当前脚本的路径（脚本模式）/当前MyShell的路径（交互模式）
+     - `$0...$9`不可以被修改/删除（他们实际上也不存在于环境变量中）
+     - 不带参数时，本命令可以让`$1...$9`获取下一个命令行参数，例如`$1`会获取`$2`的旧值
+     - 带参数时，移动一定的数量，例如传入参数1的效果与不传入相同，传入2会使得`$1`获得`$3`的原始值
+     - 调用`shift`命令不会修改`$0`的值
+     - 用户的参数必须要能够转换成整数类型
 
 ```
 
