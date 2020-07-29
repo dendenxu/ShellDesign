@@ -1,0 +1,239 @@
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m False
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m 1595994045
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m 2020-07-29 11:40:45.985092
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [1m[34m##############################################################[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m 0o002
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m Changing UMASK to 0o777
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m 0o777
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m Changing UMASK to 0o002
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:45[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[34m##############################################################[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Hello, my name is /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Hello, my name is xuzh, and I live in /home/xuzh
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should print sha256sum of zy in the next line
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should print 1 1 65 in the following line
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m       1       1      65
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[34m##############################################################[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m .
+rw-rw-r-- 2020-07-29 11:25:28 [1mlog.log[0m
+rw-rw-r-- 2020-07-29 11:23:39 [1mshould.out[0m
+rw-rw-r-- 2020-07-28 20:43:05 [1mMyShell.md[0m
+rw-rw-r-- 2020-07-29 11:40:46 [1mresult.out[0m
+rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
+rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
+rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
+rwxrwxr-x 2020-07-29 11:39:59 [31m[1mMyShell.py[0m[0m
+rw-rw-r-- 2020-07-29 11:40:13 [1mdummy.mysh[0m
+rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
+rw-rw-r-- 2020-07-29 10:43:24 [1mMyShellException.py[0m
+rwxrwxr-x 2020-07-29 10:44:47 [34m[1m__pycache__[0m[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m ~/Projects/ShellDesign/MyShell
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should get empty output
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m 2020-07-29 11:40:46 ubuntu __main__[56038] WARNING Unable to get the varible "hello_msg", assigning empty string
+
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[34m##############################################################[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should print /dev/null
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m null
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should print all files containing 1 in /tmp
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m clr-debug-pipe-39664-4916762-in
+clr-debug-pipe-39664-4916762-out
+clr-debug-pipe-49595-5419884-in
+clr-debug-pipe-49595-5419884-out
+dotnet-diagnostic-39664-4916762-socket
+dotnet-diagnostic-49595-5419884-socket
+pymp-i1l0r1ba
+pymp-k1egzu6g
+ssh-3Dl1dZ2MVhMN
+ssh-5opVjzIOSY1n
+ssh-F4yJVhHqoOo1
+systemd-private-32fa36ac417343a4813881b03c5a5a50-bolt.service-9WJsxv
+systemd-private-32fa36ac417343a4813881b03c5a5a50-colord.service-qxRv3v
+systemd-private-32fa36ac417343a4813881b03c5a5a50-fwupd.service-yU1XGV
+systemd-private-32fa36ac417343a4813881b03c5a5a50-ModemManager.service-w89ayg
+systemd-private-32fa36ac417343a4813881b03c5a5a50-rtkit-daemon.service-ebfv3E
+systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-resolved.service-G0nqb0
+systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-timesyncd.service-eKPsiD
+tmp-39491dQr8WhLTvsUN.tpl
+tmp-39491jOka6jkG1oB9.tpl
+tmp-39491TaDA1MVeV29d.tpl
+tmp-49381qEheP4iOzZu6.tpl
+tmp-49381tHN8VYnmkwR4.tpl
+tmp-49381Vn0IggqAIn0u.tpl
+vmware-root_1361-3988687315
+vscode-ipc-0e8469e9-1fc8-467e-b42c-f6a8519ab561.sock
+vscode-ipc-705a4712-c1f7-43b0-9465-99c771a42a1d.sock
+vscode-ipc-76bfc346-b068-4fb1-8340-103432500cbb.sock
+vscode-ipc-77ad59b8-138f-4875-884e-368ed7e31e7d.sock
+vscode-ipc-846c3b8a-cd23-429d-aa84-b71bb5acbe7b.sock
+vscode-ipc-cb722aa7-90c1-4b82-b595-52d2e62b5d98.sock
+vscode-ipc-efde013b-3ec4-4d77-9e0d-b10d25879dda.sock
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[34m##############################################################[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should make a file log.log
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m .
+rw-rw-r-- 2020-07-29 11:40:46 [1mlog.log[0m
+rw-rw-r-- 2020-07-29 11:23:39 [1mshould.out[0m
+rw-rw-r-- 2020-07-28 20:43:05 [1mMyShell.md[0m
+rw-rw-r-- 2020-07-29 11:40:46 [1mresult.out[0m
+rw-rw-r-- 2020-07-25 12:11:10 [1mdummy.py[0m
+rwxrwxr-x 2020-07-25 14:09:29 [31m[1mprocess.py[0m[0m
+rw-rw-r-- 2020-07-26 17:43:58 [1msleep10s.py[0m
+rwxrwxr-x 2020-07-29 11:39:59 [31m[1mMyShell.py[0m[0m
+rw-rw-r-- 2020-07-29 11:40:13 [1mdummy.mysh[0m
+rw-rw-r-- 2020-07-22 19:23:17 [1mCOLOR.py[0m
+rw-rw-r-- 2020-07-29 10:43:24 [1mMyShellException.py[0m
+rwxrwxr-x 2020-07-29 10:44:47 [34m[1m__pycache__[0m[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should see content of log.log
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Hello, I'm your logger.
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should display content of log.log
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Hello, I'm your logger.
+Hello, again...
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Should display word count of log.log
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m       2       6      40
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[34m##############################################################[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m Opening some sleepy jobs
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m And calling command jobs
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m waiting 0.25s
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m waiting 0.25s
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m waiting 0.25s
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
+[1m[33m[2][0m[0m [1mrunning[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m waiting 0.25s
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
+[1m[33m[2][0m[0m [1mrunning[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
+[1m[33m[3][0m[0m [1mrunning[0m env [1msleep 2s &[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:46[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m Getting current runnning jobs...
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m [1m[33m[0][0m[0m [1mrunning[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+[1m[33m[1][0m[0m [1mrunning[0m env [1msleep 2s | echo "This is some job management" &[0m
+[1m[33m[2][0m[0m [1mrunning[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
+[1m[33m[3][0m[0m [1mrunning[0m env [1msleep 2s &[0m
+[1m[33m[4][0m[0m [1mrunning[0m env [1msleep 2s &[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m Getting back to fore ground
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m Waiting for background jobs to terminate
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m At the same time I can still do other things like testing...
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m True
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m True
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:47[0m [1m[33m$[0m[0m Sleeping in /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+[1m[33m[0][0m[0m [1mfinished[0m env [1msleep 2s | echo "Sleeping in $0" &[0m
+This is some job management
+[1m[33m[1][0m[0m [1mfinished[0m env [1msleep 2s | echo "This is some job management" &[0m
+MyShell is /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+[1m[33m[2][0m[0m [1mfinished[0m env [1msleep 2s | echo "MyShell is $SHELL" &[0m
+[1m[33m[3][0m[0m [1mfinished[0m env [1msleep 2s &[0m
+[1m[33m[4][0m[0m [1mfinished[0m env [1msleep 2s &[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Should produce empty content
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Jobs are done /home/xuzh
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Spawning dummy built_in job that is trying to read from user (will suspend)
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Counting jobs
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [1m[33m[0][0m[0m [1msuspended[0m env [1mdummy &[0m
+[1m[33m[1][0m[0m [1msuspended[0m env [1mdummy &[0m
+[1m[33m[2][0m[0m [1msuspended[0m env [1mdummy &[0m
+[1m[33m[3][0m[0m [1msuspended[0m env [1mdummy &[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [31m[1mWE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56112] WARNING Terminating job [0] handler process by signal...
+2020-07-29 11:40:49 ubuntu __main__[56116] WARNING Terminating job [1] handler process by signal...
+[1m[33m[0][0m[0m [1mterminated[0m env [1mdummy &[0m
+[1m[33m[1][0m[0m [1mterminated[0m env [1mdummy &[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [1m[34m##############################################################[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m calling environ...
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m SSH_CONNECTION=[1m192.168.28.1 12000 192.168.28.146 22[0m
+LANG=[1men_US.UTF-8[0m
+OLDPWD=[1m/home/xuzh/Projects/ShellDesign/MyShell[0m
+XDG_SESSION_ID=[1m29[0m
+USER=[1mxuzh[0m
+PWD=[1m/home/xuzh/Projects/ShellDesign/MyShell[0m
+HOME=[1m/home/xuzh[0m
+SSH_CLIENT=[1m192.168.28.1 12000 22[0m
+MAIL=[1m/var/mail/xuzh[0m
+SHELL=[1m/home/xuzh/Projects/ShellDesign/MyShell/MyShell.py[0m
+SHLVL=[1m2[0m
+LOGNAME=[1mxuzh[0m
+DBUS_SESSION_BUS_ADDRESS=[1munix:path=/run/user/1000/bus[0m
+XDG_RUNTIME_DIR=[1m/run/user/1000[0m
+PATH=[1m/home/xuzh/.vscode-server/bin/91899dcef7b8110878ea59626991a18c8a6a1b3e/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/home/xuzh/.local/bin[0m
+_=[1m/home/xuzh/Projects/ShellDesign/MyShell/./MyShell.py[0m
+VSCODE_IPC_HOOK_CLI=[1m/tmp/vscode-ipc-c68bbcb4-98ba-4b70-93ad-d7708dab375b.sock[0m
+TERM_PROGRAM=[1mvscode[0m
+TERM_PROGRAM_VERSION=[1m1.47.3[0m
+COLORTERM=[1mtruecolor[0m
+VSCODE_GIT_IPC_HANDLE=[1m/run/user/1000/vscode-git-2fbb053fa5.sock[0m
+GIT_ASKPASS=[1m/home/xuzh/.vscode-server/bin/91899dcef7b8110878ea59626991a18c8a6a1b3e/extensions/git/dist/askpass.sh[0m
+VSCODE_GIT_ASKPASS_NODE=[1m/home/xuzh/.vscode-server/bin/91899dcef7b8110878ea59626991a18c8a6a1b3e/node[0m
+VSCODE_GIT_ASKPASS_MAIN=[1m/home/xuzh/.vscode-server/bin/91899dcef7b8110878ea59626991a18c8a6a1b3e/extensions/git/dist/askpass-main.js[0m
+TERM=[1mxterm-256color[0m
+ZSH=[1m/home/xuzh/.oh-my-zsh[0m
+PAGER=[1mless[0m
+LESS=[1m-R[0m
+LSCOLORS=[1mGxfxcxdxbxegedabagacad[0m
+LS_COLORS=[1mrs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:[0m
+SSH_AUTH_SOCK=[1m/tmp/ssh-iJGnYmKeShJ2/agent.51997[0m
+SSH_AGENT_PID=[1m51998[0m
+PS1=[1m$[0m
+PARENT=[1m/home/xuzh/Projects/ShellDesign/MyShell/MyShell.py[0m
+BOLD=[1m\033[1m[0m
+RED=[1m\033[31m[0m
+BLUE=[1m\033[34m[0m
+RESET=[1m\033[0m[0m
+LINE=[1m\033[1m\033[34m##############################################################\033[0m[0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Arg 0 is: /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "1", assigning empty string
+Arg 1 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "2", assigning empty string
+Arg 2 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "3", assigning empty string
+Arg 3 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "4", assigning empty string
+Arg 4 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "5", assigning empty string
+Arg 5 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "6", assigning empty string
+Arg 6 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "7", assigning empty string
+Arg 7 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "8", assigning empty string
+Arg 8 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "9", assigning empty string
+Arg 9 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Shifting number 1
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Arg 0 is: /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "1", assigning empty string
+Arg 1 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "2", assigning empty string
+Arg 2 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "3", assigning empty string
+Arg 3 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "4", assigning empty string
+Arg 4 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "5", assigning empty string
+Arg 5 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "6", assigning empty string
+Arg 6 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "7", assigning empty string
+Arg 7 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "8", assigning empty string
+Arg 8 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "9", assigning empty string
+Arg 9 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Shifting number 2
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "1", assigning empty string
+Arg 1 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Shifting number 3
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "1", assigning empty string
+Arg 1 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Shifting number 4
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "1", assigning empty string
+Arg 1 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m Shifting number 5
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Unable to get the varible "1", assigning empty string
+Arg 1 is: 
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m [1mBye![0m
+[36mxuzh@ubuntu[0m [1m[34m~/Projects/ShellDesign/MyShell[0m[0m [1m11:40:49[0m [1m[33m$[0m[0m 2020-07-29 11:40:49 ubuntu __main__[56038] WARNING Getting EOF from command prompt, exiting...
+2020-07-29 11:40:49 ubuntu __main__[56120] WARNING Terminating job [2] handler process by signal...
+2020-07-29 11:40:49 ubuntu __main__[56124] WARNING Terminating job [3] handler process by signal...
+
+[1m[33m[2][0m[0m [1mterminated[0m env [1mdummy &[0m
+[1m[33m[3][0m[0m [1mterminated[0m env [1mdummy &[0m

@@ -141,7 +141,7 @@ class MyShell:
                     var = self.unsupported[key]()
                 else:
                     var = os.environ.__getitem__(key)
-                log.debug(f"Got the varible {COLOR.BOLD(var)}")
+                log.debug(f"Got the varible {COLOR.BOLD(key + ' as ' + var)}")
             except (KeyError, IndexError) as e:
                 log.warning(f"Unable to get the varible \"{key}\", assigning empty string")
                 var = ""
@@ -172,7 +172,7 @@ class MyShell:
         # 用于修改job状态并打印相关信息
         def job_status(self, status):
             self.status_dict[self.count] = status
-            print(f"{COLOR.BOLD(COLOR.YELLOW(f'[{self.count}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(self.job)}")
+            print(f"{COLOR.BOLD(COLOR.YELLOW(f'[{self.count}]'))} {COLOR.BOLD(status)} env {COLOR.BOLD(self.job)}", file=sys.__stdout__)
 
         # 将第一次输入阻塞，等待主线程的fg命令
         # there might exists a better way
@@ -351,7 +351,7 @@ class MyShell:
             # 打印可以打印的内容
             # 由于raise会使函数停止继续执行，我们在此打印一些信息
             # ! 注意，这种情况下我们不会返回结果，piping会停止
-            print("\n".join(result), file=self.output_file, end="")
+            print("\n".join(result), end="")
             joined = '\n'.join(not_in_list)
             raise FileNotFoundException(f"Cannot list director[y|ies]: \n{joined}", {"type": "dir"})
 
@@ -419,7 +419,7 @@ class MyShell:
         # 通过multiprocessin.Queue进行沟通
         # ! 注意，外部命令的读取请求不会被处理，因为在后台执行的subshell中PIPE会被关闭
         log.debug(f"Foreground is called with {COLOR.BOLD(args)}")
-        print(self.job_status_fmt(args[0], "continued", self.jobs[args[0]]))
+        print(self.job_status_fmt(args[0], "continued", self.jobs[args[0]]), file=sys.__stdout__)
         if self.status_dict[args[0]] == "suspended":
             # ! only put into queue if already suspended
             # else the main process will get what it just put into the queue
@@ -443,8 +443,8 @@ class MyShell:
         log.debug(f"Background is called with {COLOR.BOLD(args)}")
         for job_number in args:
             if self.status_dict[job_number] == "suspended":
-                print(self.job_status_fmt(job_number, "continued", self.jobs[job_number]))
-                print(self.job_status_fmt(job_number, "suspended", self.jobs[job_number]))
+                print(self.job_status_fmt(job_number, "continued", self.jobs[job_number]), file=sys.__stdout__)
+                print(self.job_status_fmt(job_number, "suspended", self.jobs[job_number]), file=sys.__stdout__)
             elif self.status_dict[job_number] == "running":
                 log.warning(f"Job [{job_number}] is already running")
 
@@ -467,7 +467,7 @@ class MyShell:
             # ! Windows中由于接口不匹配的原因，无法完全清除zombie
             os.kill(self.process[job_number].pid, signal.SIGTERM)
 
-            print(self.job_status_fmt(job_number, "terminated", self.jobs[job_number]))
+            print(self.job_status_fmt(job_number, "terminated", self.jobs[job_number]), file=sys.__stdout__)
 
             # 我们以jobs数组为蓝本，判断jobs是否已完成或者被强行结束等
             # 配合clean_up函数，status_dict和queues等其他数组会被正常清理
@@ -507,7 +507,7 @@ class MyShell:
         for i in keys:
             if i not in self.jobs.keys():
                 del self.queues[i]
-        log.debug(f"Queue is cleaned, keys are {COLOR.BOLD(self.queues.keys())}")
+        log.debug(f"Queue is cleaned, keys are {COLOR.BOLD(list(self.queues.keys()))}")
 
         keys = list(self.process.keys())
 
@@ -515,7 +515,7 @@ class MyShell:
         for i in keys:
             if i not in self.jobs.keys():
                 del self.process[i]
-        log.debug(f"Process is cleaned, keys are {COLOR.BOLD(self.process.keys())}")
+        log.debug(f"Process is cleaned, keys are {COLOR.BOLD(list(self.process.keys()))}")
 
         keys = list(self.status_dict.keys())
 
@@ -523,7 +523,7 @@ class MyShell:
         for i in keys:
             if i not in self.jobs.keys():
                 del self.status_dict[i]
-        log.debug(f"Status Dict is cleaned, keys are {COLOR.BOLD(self.status_dict.keys())}")
+        log.debug(f"Status Dict is cleaned, keys are {COLOR.BOLD(list(self.status_dict.keys()))}")
 
     def builtin_environ(self, pipe="", args=[]):
         # # 将MyShell的环境变量返回给用户
@@ -594,7 +594,7 @@ class MyShell:
         result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.input_file.fileno() if self.input_file is not None else sys.stdin.fileno())}, redirecting MyShell input to {COLOR.BOLD(self.input_file)}")
         result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.output_file.fileno() if self.output_file is not None else sys.stdout.fileno())}, redirecting MyShell output to {COLOR.BOLD(self.output_file)}")
         # ! debugging command, no redirection
-        print("\n".join(result))
+        print("\n".join(result), file=sys.__stdout__)
 
     def builtin_exec(self, pipe="", args=[]):
         # exec命令会修改MyShell命令的输入输出源
@@ -621,13 +621,16 @@ class MyShell:
                 log.debug(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.input_file.fileno())}")
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "redi_in"})
+        elif args[0] is None:
+            log.debug("Doing nothing...")
         else:
             log.debug(f"Setting input file to None: stdin")
             self.input_file = None
+
         if args[1]:  # 若非空，尝试设置输入流
             try:
                 # the function open will automatically raise FileNotFoundError
-                new_file = open(args[1], "w", encoding="utf-8")
+                new_file = open(args[1],  "a" if args[2] else "w", encoding="utf-8")
 
                 # 新文件打开没有出错时我们才会关闭/修改旧文件
                 if self.output_file is not None:
@@ -635,10 +638,14 @@ class MyShell:
                 self.output_file = new_file
                 log.debug(f"FILE NUMBER OF OUTPUT FILE: {COLOR.BOLD(self.output_file.fileno())}")
             except FileNotFoundError as e:
-                raise FileNotFoundException(e, {"type": "redi_out"})
+                raise FileNotFoundException(e, {"type": "redi_out", "redi_append": args[2]})
+        elif args[0] is None:
+            log.debug("Doing nothing...")
         else:
             log.debug(f"Setting output file to None: stdout")
             self.output_file = None
+
+        self.builtin_printio()
 
     def builtin_shift(self, pipe="", args=[]):
         # 内置shift功能，在脚本调用时尤其有用
@@ -646,7 +653,7 @@ class MyShell:
         log.debug(f"Previously cmd_args are {COLOR.BOLD(self.cmd_args)}")
 
         if len(args) > 1:
-            raise ArgException("Expecting zero or one arguments")
+            raise ArgException(f"Expecting zero or one argument(s), got {len(args)}", {"args": args})
         elif not args:
             # 空参数情况移动1位
             args.append(1)
@@ -656,9 +663,14 @@ class MyShell:
 
         try:
             # 此时的shift时包含dollar_zero的
-            self.cmd_args = self.cmd_args[args[0]::]
+            int_val = int(args[0])
+            if int_val < 0:
+                raise ValueError("Non-negative int value expected")
+            self.cmd_args = self.cmd_args[int_val::]
         except IndexError:
             pass
+        except ValueError as e:
+            raise ArgException("Non-negative int convertible argument expected. {e}", {"args": args})
 
         # 替换掉dollar_zero位置的元素
         if not len(self.cmd_args):
@@ -794,10 +806,13 @@ class MyShell:
         if os.name == "nt":
             # ! Windows系统没有相应的sleep命令，但Python存在相应的接口
             try:
-                if len(args) == 1 and args[0].endswith("s"):
-                    time.sleep(float(args[0][0:-1]))
+                if len(args) != 1:
+                    raise ArgException("Exactly one argument expeceted")
+                if args[0].endswith("s"):
+                    value = float(args[0][0:-1])
                 else:
-                    raise ValueError
+                    value = float(args[0])
+                time.sleep()
             except ValueError as e:
                 raise SleepException(f"Unrecoginized sleep time format, are you on NT? Use second as unit and put s at the back of the time string. {e}")
         else:
@@ -943,6 +958,9 @@ class MyShell:
         # if we've specified input file in some thing
         if self.input_file is not None:
             sys.stdin = self.input_file
+        # if we've specified output file in some thing
+        if self.input_file is not None:
+            sys.stdout = self.output_file
 
         # actual execution
         result = ""
@@ -952,7 +970,7 @@ class MyShell:
                     raise ArgException("exec command takes no argument")
                 # setting redi_files to arguments
                 # something might change
-                self.builtin_exec(args=[command["redi_in"], command["redi_out"]])
+                self.builtin_exec(args=[command["redi_in"], command["redi_out"], command["redi_append"]])
             elif command["exec"] in self.builtins.keys():
                 log.debug("This is a builtin command.")
                 # executing as static method, calling with self variable
@@ -964,8 +982,9 @@ class MyShell:
                 except FileNotFoundError as e:
                     raise FileNotFoundException(e, {"type": "subshell"})
         finally:
-            # 我们使用try block的原因在于无论如何都要清空一下self.subp
+            # 我们使用try block的原因在于无论如何都要还原一下sys.stdin, sys.stdout
             sys.stdin = sys.__stdin__
+            sys.stdout = sys.__stdout__
 
         # 处理输出重定向
         if command['redi_out']:
@@ -1376,15 +1395,15 @@ class MyShell:
             "args": [],
             "pipe_in": False,
             "pipe_out": False,
-            "redi_in": "",
-            "redi_out": "",
+            "redi_in": None,
+            "redi_out": None,
             "redi_append": False,
         }
         return parsed_command
 
 
 if __name__ == "__main__":
-    # echo "zy" | sha256sum | tr -d " -" | wc
+    # cat < dummy.mysh | wc > /dev/tty | echo "zy" > result.out | sha256sum | tr -d " -" >> result.out | wc | cat result.out | wc | cat result.out
     # ./MyShell.py -w dummy.mysh -a foo bar foobar hello world linux linus PyTorch CS231n
 
     # 调用此脚本时候传入-h以查看帮助
