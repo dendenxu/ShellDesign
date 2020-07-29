@@ -124,19 +124,28 @@ class MyShell:
     # 所以MyShell会单独管理自己的变量（这里不一定要称为环境变量）
     # 与MyShell配合使用，用于统一管理环境变量，并与真正的系统环境变量交互的字典
     # 主要功能为，若字典value为可执行内容，则返回执行后的结果
-            
+
     class OnCallDict():
         def keys(self):
             return os.environ.keys()
+
         def __iter__(self):
             return os.environ.__iter__()
+
         def __init__(self, unsupported={}):
             self.unsupported = unsupported
 
         def __getitem__(self, key):
-            if key in self.unsupported:
-                return self.unsupported[key]()
-            return os.environ.__getitem__(key)
+            try:
+                if key in self.unsupported:
+                    var = self.unsupported[key]()
+                else:
+                    var = os.environ.__getitem__(key)
+                log.debug(f"Got the varible {COLOR.BOLD(var)}")
+            except (KeyError, IndexError) as e:
+                log.warning(f"Unable to get the varible \"{key}\", assigning empty string")
+                var = ""
+            return var
 
         def __setitem__(self, key, value):
             if key in self.unsupported:
@@ -260,7 +269,7 @@ class MyShell:
             if args[0] == "-a" and cwd.startswith("~"):
                 cwd = f"{self.home()}{cwd[1::]}"
             else:
-                raise ArgCountException("pwd only accepts -a as argument, otherwise don't give any argument")
+                raise ArgException("pwd only accepts -a as argument, otherwise don't give any argument")
         return cwd
 
     def builtin_dir(self, pipe="", args=[]):
@@ -592,7 +601,7 @@ class MyShell:
         # note: 由于此命令的特殊性，我们会在该函数得到执行的上一层加入一些逻辑
         if len(args) != 2:
             log.critical("Internal error, builtin_exec should be executed with exactly two arguments")
-            raise ArgCountException("Internal error, builtin_exec should be executed with exactly two arguments")
+            raise ArgException("Internal error, builtin_exec should be executed with exactly two arguments")
 
         log.debug(f"FILE NUMBER OF SYS.__STDIN__: {COLOR.BOLD(sys.__stdin__.fileno())}")
         log.debug(f"FILE NUMBER OF SYS.__STDOUT__: {COLOR.BOLD(sys.__stdout__.fileno())}")
@@ -637,7 +646,7 @@ class MyShell:
         log.debug(f"Previously cmd_args are {COLOR.BOLD(self.cmd_args)}")
 
         if len(args) > 1:
-            raise ArgCountException("Expecting zero or one arguments")
+            raise ArgException("Expecting zero or one arguments")
         elif not args:
             # 空参数情况移动1位
             args.append(1)
@@ -811,6 +820,25 @@ class MyShell:
         # todo: 写好在线帮助
         pass
 
+    def builtin_verbose(self, pipe="", args=[]):
+        # developer command: setting debug log printing level
+        supported = {
+            "-e": "ERROR",
+            "-w": "WARNING",
+            "-i": "INFO",
+            "-d": "DEBUG"
+        }
+        if len(args) > 1:
+            raise ArgException("This command takes zero or one argument.")
+        elif not args:
+            l = coloredlogs.get_level()
+            levels = [COLOR.BOLD(i) for i, k in coloredlogs.find_defined_levels().items() if k == l]
+            return "Current logging level: " + ", ".join(levels)
+        elif args[0] not in supported:
+            raise ArgException(f"Unrecognized argument: {args[0]}. We're supporting only {supported}.")
+
+        coloredlogs.set_level(supported[args[0]])
+
     def subshell(self, pipe="", target="", args=[], piping_in=False, piping_out=False, io_control=False):
         # 运行外部程序
         # 根据需要调整输入输出
@@ -850,11 +878,11 @@ class MyShell:
 
     def path(self):
         # callable PATH function，随着系统变量的改变而改变
-        return os.environ["PATH"]
+        return self.vars["PATH"]
 
     def home(self):
         # callable HOME function，随着系统变量的改变而改变
-        return os.environ['HOME']
+        return self.vars['HOME']
 
     def cwd(self):
         # callable PWD function，随着系统变量的改变而改变
@@ -921,7 +949,7 @@ class MyShell:
         try:
             if command["exec"] == "exec":
                 if len(command["args"]):
-                    raise ArgCountException("exec command takes no argument")
+                    raise ArgException("exec command takes no argument")
                 # setting redi_files to arguments
                 # something might change
                 self.builtin_exec(args=[command["redi_in"], command["redi_out"]])
@@ -1295,12 +1323,7 @@ class MyShell:
             # 第一个字符$不能被用于寻找变量
             key = key[1::]
             log.debug(f"Trying to get varible {COLOR.BOLD(key)}")
-            try:
-                var = self.vars[key]
-                log.debug(f"Got the varible {COLOR.BOLD(var)}")
-            except (KeyError, IndexError) as e:
-                log.warning(f"Unable to get the varible \"{key}\", assigning empty string")
-                var = ""
+            var = self.vars[key]
             # splitting the expanded command since it might contain some information
             return var
 
