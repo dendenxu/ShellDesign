@@ -405,7 +405,7 @@ class MyShell:
         # 开发者测试用命令，检查内存泄漏用
         log.debug("Trying to get all queues")
         log.info(f"Content of queues {COLOR.BOLD(self.queues)}")
-        return str(self.queues)
+        print(f"Existing multiprocessing.Queue s are: {COLOR.BOLD(self.queues)}", file=sys.__stdout__)
 
     def builtin_fg(self, pipe="", args=[]):
         # 将因为尝试获取用户输入而挂起的工作提到前台执行
@@ -486,15 +486,14 @@ class MyShell:
             pid, status = os.waitpid(any_process, os.WNOHANG)
             if pid == 0:
                 break
-            log.warning(f"I don't know wtf this is... {COLOR.BOLD(str(pid) + ', ' + str(status))}")
             if os.WIFEXITED(status):
-                log.warning(f"The process of pid \"{pid}\" is done.")
+                print(f"The process of pid \"{COLOR.BOLD(pid)}\" is exited.", file=sys.__stdout__)
             elif os.WIFSTOPPED(status):
-                log.warning(f"The process of pid \"{pid}\" is suspended.")
+                print(f"The process of pid \"{COLOR.BOLD(pid)}\" is stopped.", file=sys.__stdout__)
             elif os.WIFCONTINUED(status):
-                log.warning(f"The process of pid \"{pid}\" is continued.")
+                print(f"The process of pid \"{COLOR.BOLD(pid)}\" is continued.", file=sys.__stdout__)
             else:
-                log.warning(f"The process of pid \"{pid}\" is of status {status}")
+                print(f"The process of pid \"{COLOR.BOLD(pid)}\" is of status {COLOR.BOLD(status)}", file=sys.__stdout__)
 
     def cleanup_jobs(self):
         # 对jobs命令的拓展
@@ -527,7 +526,7 @@ class MyShell:
 
     def builtin_environ(self, pipe="", args=[]):
         # # 将MyShell的环境变量返回给用户
-        result = [f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars]
+        result = [f"{key}={COLOR.BOLD(self.vars[key])}" for key in self.vars] + [""] # for dummy line break
         return "\n".join(result)
 
     def builtin_set(self, pipe="", args=[]):
@@ -714,17 +713,17 @@ class MyShell:
                 return str(lhs) != str(rhs)
             if op == "-eq":
                 # todo: exception
-                return int(lhs) == int(rhs)
+                return float(lhs) == float(rhs)
             if op == "-ge":
-                return int(lhs) >= int(rhs)
+                return float(lhs) >= float(rhs)
             if op == "-gt":
-                return int(lhs) > int(rhs)
+                return float(lhs) > float(rhs)
             if op == "-le":
-                return int(lhs) <= int(rhs)
+                return float(lhs) <= float(rhs)
             if op == "-lt":
-                return int(lhs) < int(rhs)
+                return float(lhs) < float(rhs)
             if op == "-ne":
-                return int(lhs) != int(rhs)
+                return float(lhs) != float(rhs)
             if op == "-a":
                 return bool(lhs) and bool(rhs)
             elif op == "-o":
@@ -752,8 +751,13 @@ class MyShell:
                 if args[ind] == "(":
                     # 对于小括号，我们将其视为一个整体
                     org = ind
-                    while args[ind] != ")":
+                    count = 1
+                    while count:
                         ind += 1
+                        if args[ind] == "(":
+                            count += 1
+                        elif args[ind] == ")":
+                            count -= 1
                     lhs = expand_expr(args[org+1:ind])
                     if ind == len(args)-1:
                         return lhs
@@ -799,8 +803,11 @@ class MyShell:
 
         # we can only use string to pass values
         # 返回布尔值的字符串表示
-        # return tf[bool(expand_expr(args))]
-        return str(bool(expand_expr(args)))
+        try:
+            result = str(bool(expand_expr(args)))
+            return result
+        except IndexError as e:
+            raise TestException(f"Unrecognized test expression, check your syntax. {e}")
 
     def builtin_sleep(self, pipe="", args=[]):
         if os.name == "nt":
@@ -829,6 +836,8 @@ class MyShell:
         print(input("dummy2> "))
         print(input("dummy3> "))
         print(input("dummyend> "))
+        result = input("dummy_content> ")
+        return result
 
     def builtin_help(self, pipe="", args=[]):
         # 在线帮助函数
@@ -917,7 +926,7 @@ class MyShell:
     def prompt(self):
         # 返回将要打印到屏幕的命令提示符
         # 包含：用户@地点 当前目录 当前时间 提示符
-        # [conda_default_env] user@location /path/to/current/dir time_now PS1
+        # ($CONDA_DEFAULT_ENV) $USER@location $PWD time("%H:%M:%S") $PS1
         prompt = f"{COLOR.BEIGE(self.user()+'@'+self.location())} {COLOR.BOLD(COLOR.BLUE(self.cwd()))} {COLOR.BOLD(datetime.datetime.now().strftime('%H:%M:%S'))} {COLOR.BOLD(COLOR.YELLOW(self.vars['PS1'] if 'PS1' in self.vars else '$'))} "
         # log.debug(repr(prompt))
         try:
@@ -1404,6 +1413,8 @@ class MyShell:
 
 if __name__ == "__main__":
     # cat < dummy.mysh | wc > /dev/tty | echo "zy" > result.out | sha256sum | tr -d " -" >> result.out | wc | cat result.out | wc | cat result.out
+    # test ! -z "" -a ( -n "1" -o 1 -ge 1 ) -o 2 -ne 1 # False, -a -o from right to left
+    # test ( ! -z "" -a ( -n "1" -o 1 -ge 1 ) ) -o 2 -ne 1 # True
     # ./MyShell.py -w dummy.mysh -a foo bar foobar hello world linux linus PyTorch CS231n
 
     # 调用此脚本时候传入-h以查看帮助

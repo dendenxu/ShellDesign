@@ -84,7 +84,8 @@ echo "Waiting for background jobs to terminate"
 echo "At the same time I can still do other things like testing..."
 test "" -o "a"
 test ! -z "a" -a ( -n "1" -o 1 -ge 1 ) -a 2 -ne 1
-
+test ! -z "" -a ( -n "1" -o 1 -ge 1 ) -o 2 -ne 1 # False, -a -o from right to left
+test ( ! -z "" -a ( -n "1" -o 1 -ge 1 ) ) -o 2 -ne 1 # True
 sleep 2s
 
 echo "Should produce empty content"
