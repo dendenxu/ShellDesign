@@ -714,17 +714,17 @@ class MyShell:
                 return str(lhs) != str(rhs)
             if op == "-eq":
                 # todo: exception
-                return int(lhs) == int(rhs)
+                return float(lhs) == float(rhs)
             if op == "-ge":
-                return int(lhs) >= int(rhs)
+                return float(lhs) >= float(rhs)
             if op == "-gt":
-                return int(lhs) > int(rhs)
+                return float(lhs) > float(rhs)
             if op == "-le":
-                return int(lhs) <= int(rhs)
+                return float(lhs) <= float(rhs)
             if op == "-lt":
-                return int(lhs) < int(rhs)
+                return float(lhs) < float(rhs)
             if op == "-ne":
-                return int(lhs) != int(rhs)
+                return float(lhs) != float(rhs)
             if op == "-a":
                 return bool(lhs) and bool(rhs)
             elif op == "-o":
@@ -752,8 +752,13 @@ class MyShell:
                 if args[ind] == "(":
                     # 对于小括号，我们将其视为一个整体
                     org = ind
-                    while args[ind] != ")":
+                    count = 1
+                    while count:
                         ind += 1
+                        if args[ind] == "(":
+                            count += 1
+                        elif args[ind] == ")":
+                            count -= 1
                     lhs = expand_expr(args[org+1:ind])
                     if ind == len(args)-1:
                         return lhs
@@ -799,8 +804,11 @@ class MyShell:
 
         # we can only use string to pass values
         # 返回布尔值的字符串表示
-        # return tf[bool(expand_expr(args))]
-        return str(bool(expand_expr(args)))
+        try:
+            result = str(bool(expand_expr(args)))
+            return result
+        except IndexError as e:
+            raise TestException(f"Unrecognized test expression, check your syntax. {e}")
 
     def builtin_sleep(self, pipe="", args=[]):
         if os.name == "nt":
@@ -1404,6 +1412,8 @@ class MyShell:
 
 if __name__ == "__main__":
     # cat < dummy.mysh | wc > /dev/tty | echo "zy" > result.out | sha256sum | tr -d " -" >> result.out | wc | cat result.out | wc | cat result.out
+    # test ! -z "" -a ( -n "1" -o 1 -ge 1 ) -o 2 -ne 1 # False, -a -o from right to left
+    # test ( ! -z "" -a ( -n "1" -o 1 -ge 1 ) ) -o 2 -ne 1 # True
     # ./MyShell.py -w dummy.mysh -a foo bar foobar hello world linux linus PyTorch CS231n
 
     # 调用此脚本时候传入-h以查看帮助
