@@ -50,9 +50,9 @@
 
   - `Linux ubuntu 5.4.0-42-generic #46~18.04.1-Ubuntu SMP Fri Jul 10 07:21:24 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux`
   - `Linux aliecs 3.10.0-1127.13.1.el7.x86_64 #1 SMP Tue Jun 23 15:46:38 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux`
-  
+
   - `macOS Catalina 10.15.5`
-  
+
   - 系统命令有很大不同，但Shell可以基本正常运行的系统有：
   - `DESKTOP-XUZH Microsoft Windows 10 Pro 10.0.18363 N/A Build 18363`
   - 遗憾的是，我们没有经历测试全部的Python版本和所有可能的系统环境，但我们合理推断，在一般的`*nix`环境和`Python 3`下，MyShell都可以正常运行。在Windows环境下，MyShell的基本功能也可正常工作。
@@ -737,8 +737,6 @@ prog3 < file2
 
    echo "Should produce empty content"
    jobs
-   ```
-
 
    echo "Jobs are done ~"
 
@@ -785,8 +783,6 @@ prog3 < file2
    echo "Arg 8 is: $8"
    echo "Arg 9 is: $9"
 
-
-
    echo "Shifting number 2"
    shift
    echo "Arg 1 is: $1"
@@ -802,8 +798,6 @@ prog3 < file2
    echo "Shifting number 5"
    shift
    echo "Arg 1 is: $1"
-
-
    echo "$BOLD"Bye!"$RESET"
    ```
 
@@ -1173,36 +1167,34 @@ prog3 < file2
 
     echo "Should produce empty content"
     jobs
-    ```
-
 
     echo "Jobs are done ~"
-    
+
     echo "Spawning dummy built_in job that is trying to read from user (will suspend)"
-    
+
     dummy &
     dummy &
     dummy &
     dummy &
-    
+
     echo "Counting jobs"
     jobs
-    
+
     echo "$RED$BOLD""WE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE""$RESET"
-    
+
     term 0 1
-    
+
     echo $LINE
-    
+
     exit # should see termination message
     ```
-    
+
     ![image-20200730124935788](MyShell.assets/image-20200730124935788.png)
-    
+
     ![image-20200730124957096](MyShell.assets/image-20200730124957096.png)
-    
+
     ![image-20200730125026166](MyShell.assets/image-20200730125026166.png)
-    
+
     ```shell
     dummy &
     dummy &
@@ -1224,7 +1216,7 @@ prog3 < file2
     term 1
     jobs
     ```
-    
+
     ![image-20200730125252720](MyShell.assets/image-20200730125252720.png)
 
 12. `environ, set, unset`变量检查
@@ -1355,7 +1347,7 @@ prog3 < file2
 ### 完整源码
 
 ```python
-#!python
+#!/usr/bin/python
 import os  # 大部分os相关功能来自此包
 import io  # 用于构建一个stdin的wrapper以捕捉程序的输入/输出请求
 import sys  # 一些系统调用/常数的来源包
