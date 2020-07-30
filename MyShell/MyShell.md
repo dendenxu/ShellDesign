@@ -244,6 +244,18 @@ shell 或者命令行解释器是操作系统中最基本的用户接口。我�
 
    - `exec`
 
+     调整Shell的默认输入输出源
+
+     `exec [< input] [> output | >> output]`
+
+     - 调用本函数的效果是：若`exec < input > output`类似于在下面执行的每一条指令后都调用`programname < input > output`。但对于输出文件，输出的内容会被累积，而非像调用`> output`那样完全覆盖
+
+     - 单独调用`exec`不会对输入输出产生任何影响，仅仅会调用`printio`检测当前IO状态
+     - 若在某次调用中只有使用`[< input] [> output]`的其中之一，另一个不会被改变
+     - 用户可以通过`< ""`（传入空字符串）来清空输入源头，同样的，也可以用此方法清空输出源
+     - 值得注意的是，在手册中标注不会受到`exec`影响（保证打印到`sys.__stdout__`）的程序总是会打印到`sys.__stdout__`，例如任务管理工作`jobs`或者`exec, printio`本身等。
+     - 若使用的是`>>`符号，则会在原有的文件内容基础上添加新的输出内容。
+
    - `shift`
 
      管理特殊环境变量`1...9`，移动变量的位置（管理命令行参数）
@@ -429,11 +441,13 @@ shell 或者命令行解释器是操作系统中最基本的用户接口。我�
 
     使用`arg1`和`arg2`执行程序`programname`，输入文件流被替换为`inputfile`，输出文件流被替换为`outputfile`。
 
-    `stdout` 重定向应该支持除了在上面注明需要打印信息（后台任务管理，输入输出重定向查看等）的所有内部指令。
+    `stdout` 重定向持除了在上面注明需要打印信息（后台任务管理，输入输出重定向查看等）的所有内部指令。
 
     使用输出重定向时，如果重定向字符是`>`，则创建输出文件，如果存在则覆盖之；如果重定向字符为`>>`，也会创建输出文件，如果存在则添加到文件尾。
 
-    对于`exec`指令，使用重定向符号会导致MyShell的输入输出被调整到指定的文件
+    对于`exec`指令，使用重定向符号会导致MyShell的输入输出被调整到指定的文件。
+
+    MyShell在处理外部程序的调用时，为了方便用户观察结果和控制输入输出，会将`stderr`重定向到`stdout`一并打印到屏幕/定义的输出文件流。
 
 8. MyShell支持后台程序执行。如果在命令行后添加`&`字符，在加载完程序后需要立刻返回命令行提示符。
 
@@ -447,7 +461,7 @@ shell 或者命令行解释器是操作系统中最基本的用户接口。我�
 
 9. MyShell支持管道（“|”）操作。
 
-    管道操作可以和输出重定向同时使用而不冲突
+    在MyShell中管道和输出重定向可以同时使用而不冲突
 
     但输入管道和输入重定向不可同时使用
 
@@ -482,81 +496,834 @@ shell 或者命令行解释器是操作系统中最基本的用户接口。我�
 
 11. MyShell支持详细的调试信息打印，详见`verbose`命令的帮助手册
 
-     一般来说我们有四种类型的信息打印：
+      一般来说我们有四种类型的信息打印：
 
-     1. `DEBUG`调试信息：非开发者可以忽略的调试信息，用于监测MyShell内部运行状态
-     2. `INFO`一般信息：一般性的记录信息，大部分情况下可以忽略
-     3. `WARNING`警告信息：一般在警告中出现，子进程非零退出，进程管理以及找不到的环境变量等
-     4. `ERROR`错误信息：指令格式/运行时错误
+      1. `DEBUG`调试信息：非开发者可以忽略的调试信息，用于监测MyShell内部运行状态
+      2. `INFO`一般信息：一般性的记录信息，大部分情况下可以忽略
+      3. `WARNING`警告信息：一般在警告中出现，子进程非零退出，进程管理以及找不到的环境变量等
+      4. `ERROR`错误信息：指令格式/运行时错误
 
-     可以在开启MyShell时通过传入命令行参数开关`-e, -w, -i, -d`来调整等级。
+      可以在开启MyShell时通过传入命令行参数开关`-e, -w, -i, -d`来调整等级。
 
-     也可以在MyShell运行时通过调用`verbose`指令来实现
+      也可以在MyShell运行时通过调用`verbose`指令来实现
 
 12. MyShell支持颜色/字体调整，我们会调整输出颜色等，使其尽量容易辨识，做到用户友好
 
-     例如在命令提示符中，我们会用不同的颜色/字体区分提示符的不同部分
+      例如在命令提示符中，我们会用不同的颜色/字体区分提示符的不同部分
 
-     值得注意的是，用户的终端需要支持颜色输出才能正常显示相关字符，否则会有难以预料的输出错误
+      值得注意的是，用户的终端需要支持颜色输出才能正常显示相关字符，否则会有难以预料的输出错误
 
-     我们的测试基本都是在Visual Studio Code通过SSH连接Ubuntu下执行的颜色信息的显示较为友好
+      我们的测试基本都是在Visual Studio Code通过SSH连接Ubuntu下执行的颜色信息的显示较为友好
 
-     ![image-20200729151150618](MyShell.assets/image-20200729151150618.png)
+      ![image-20200729151150618](MyShell.assets/image-20200729151150618.png)
 
 13. MyShell支持定制化指令：我们使用Python实现MyShell。并在内部指令中做了统一的接口
 
-     ```python
-     def builtin_foo(self, pipe="", args=[]):
-         # do something
-         # print things that doesn't go to pipe
-         # print to sys.__stdout__ to always print to STDOUT
-         # return strings that go into the pipe
-         return result
-     ```
+      ```python
+      def builtin_foo(self, pipe="", args=[]):
+          # do something
+          # print things that doesn't go to pipe
+          # print to sys.__stdout__ to always print to STDOUT
+          # return strings that go into the pipe
+          return result
+      ```
 
-     用户只需要定义新的以`builtin_`（注意下划线）开头的MyShell方法（包含`pipe`和`args`参数）即可添加内部指令，并无缝融入程序的运行中。
+      用户只需要定义新的以`builtin_`（注意下划线）开头的MyShell方法（包含`pipe`和`args`参数）即可添加内部指令，并无缝融入程序的运行中。
 
-     例如：
+      例如：
 
-     ```python
-     def builtin_dummy(self, pipe="", args=[]):
-         # 一个内置的dummy命令，用于测试是否可以正常触发suspension
-         print("builtin_dummy: before any input requirements")
-         print(input("dummy1> "))
-         print(input("dummy2> "))
-         print(input("dummy3> "))
-         print(input("dummyend> "))
-         result = input("dummy_content> ")
-         return result
-     ```
+      ```python
+      def builtin_dummy(self, pipe="", args=[]):
+          # 一个内置的dummy命令，用于测试是否可以正常触发suspension
+          print("builtin_dummy: before any input requirements")
+          print(input("dummy1> "))
+          print(input("dummy2> "))
+          print(input("dummy3> "))
+          print(input("dummyend> "))
+          result = input("dummy_content> ")
+          return result
+      ```
 
 14. MyShell本体可以跨平台运行，后台任务的主体功能也可以在Windows上运行。
 
-     可以运行的环境信息在本报告的前半部分已经列举过
+      可以运行的环境信息在本报告的前半部分已经列举过
 
-     在第一次运行时Python 3或许会抱怨有一些包找不到，此时请通过`pip`来安装相关缺失的内容
+      在第一次运行时Python 3或许会抱怨有一些包找不到，此时请通过`pip`来安装相关缺失的内容
 
-     若`pip`速度过慢，用户可以使用[清华源](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/)来提速。
+      若`pip`速度过慢，用户可以使用[清华源](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/)来提速
 
-     ![image-20200729151859473](MyShell.assets/image-20200729151859473.png)
+     MyShell在Windows上运行的情况：
 
-     ![image-20200729151920384](MyShell.assets/image-20200729151920384.png)
+      ![image-20200729151859473](MyShell.assets/image-20200729151859473.png)
+
+      ![image-20200729151920384](MyShell.assets/image-20200729151920384.png)
+
+15. MyShell有较为完备的内置报错系统
+
+     在用户调用的命令出错时，我们会通过`exception`机制快速定位错误源头，并通过`logging`模块以人性化的方式打印相关信息
+
+     ![image-20200730113911630](MyShell.assets/image-20200730113911630.png)
+    
+16. MyShell支持以`#`开头的注释，注意==注释符号前必须是空白字符==
+
+     ![image-20200730123428209](MyShell.assets/image-20200730123428209.png)
 
 ### 用户手册
 
+#### 程序IO重定向
 
+Linux中的命令行程序以输入输出为主要信息交互方式，shell是Linux系列系统的基本接口之一，用户经常需要在各种各样的shell下运行不同的程序，并观察他们的输入输出结果。因此控制输入输出是shell的基本功能之一。
 
-## 设计思想
+一般情况下，程序会从连接到终端的键盘设备（`stdin: /dev/tty`）读取用户的输入内容，并将输出内容打印到终端的屏幕上（`stdout: /dev/tty`）。
 
+但若用户并不希望某个在shell环境下运行的程序从标准输入中`stdin: /dev/tty`读入内容，它可以通过==输入重定向符号==`<`来改变shell下程序的输入源。类似的，shell也提供==输出重定向==功能。一般的，若程序以`programname args < inputfile > outputfile`的形式被调用，它会从`inputfile`中读取内容，并将标准输出导入到`outputfile`中。
 
+对于输入文件流，不同于通过键盘读取的标准输出，在`inputfile`的内容被读完时，程序将会获得`EOF`信号，而非被停止并等待输入。
 
-## 功能模块
+对于输出文件流，若使用的重定向符号为`>`，则会创建新的`outputfile`文件/覆盖原有内容。若为`>>`，则在`outputfile`已经存在或有文件内容的情况下，会在保留原有文件的基础上在文件末尾添加新的内容。
 
+#### 程序管道
 
+正如上面所说的，管道其实也是输入输出重定向的一种。
+
+不同于引导输入输出到文件，程序管道直接将上一个程序的输出作为本程序的输入，而本程序的输出会被看作下一个程序的输出。
+
+类似的，输入内容耗尽时会获得`EOF`。
+
+相对于通过文件进行交互，程序管道无需显式地对文件进行操作：这意味着其运行速度会快于通过重定向到文件。
+
+`prog1 | prog2 | prog3`的调用效果相当于：
+
+```shell
+prog1 > file1
+prog2 < file1 > file2
+prog3 < file2
+```
+
+#### 程序的运行环境
+
+在操作系统中，程序的运行环境也是控制程序运行方式的一种重要方式。
+
+例如，我们熟悉的`PATH`环境变量就可以指导shell到相应的文件夹中寻找可执行文件来运行。
+
+在一些深度学习环境中，`CUDA`相关环境变量可以控制相应程序对Nvidia CUDA的操作方式。
+
+`HOME`环境变量还控制着shell对`~`符号的解释。
+
+在Linux相关的shell脚本中，这些环境变量还被当作一般的变量来使用。例如我们可以将一些特殊的颜色字符储存到一个环境变量中，在以后调用相关程序需要打印相关颜色时，可以直接使用`$COLOR`
+
+#### 后台程序执行
+
+许多Linux Shell支持基于任务管理的多线程程序执行功能。我们可以通过在程序命令行末尾添加`&`来让程序在后台执行（特别是一些需要较长时间才能完成的程序），而立刻返回到可交互的命令行来输入其他命令。在程序完成后/状态发生改变时在shell中以一定的方式提示用户。
+
+这种方式理论上可以管理无限多的后台程序。用户可以通过`jobs, bg, fg`等命令来查看/管理正在后台执行的程序。
+
+在一些较为完备的shell中，键盘快捷键得到了很好的支持，用户可以通过<kbd>Ctrl+Z</kbd>来暂停/挂起正在执行的程序，并通过`bg`让其在后台恢复运行/`fg`让其恢复运行并提到前台。并且支持根据输入的程序暂停功能：在程序读取输入流时自动挂起。
 
 ## 运行结果
 
+1. 复杂重定向和管道操作
 
+   ```shell
+   cat < dummy.mysh | wc > /dev/tty | echo "zy" > result.out | sha256sum | tr -d " -" >> result.out | wc | cat result.out | wc | cat result.out
+   ```
+
+   ![image-20200730122730737](MyShell.assets/image-20200730122730737.png)
+
+2. 脚本执行
+
+   ```shell
+   ./MyShell.py -w dummy.mysh -a foo bar foobar hello world linux linus PyTorch CS231n
+   ```
+
+   脚本内容`dummy.mysh`：
+
+   ```shell
+   test ! -z ""
+   date +%s
+   time
+   set BOLD="\033[1m"
+   set RED="\033[31m"
+   set BLUE="\033[34m"
+   set RESET="\033[0m"
+   
+   set LINE="$BOLD$BLUE##############################################################$RESET"
+   
+   echo $LINE
+   
+   umask
+   echo "Changing UMASK to 0o777"
+   umask 777
+   umask
+   echo "Changing UMASK to 0o002"
+   umask 002
+   
+   echo $LINE
+   
+   echo "Hello, my name is $SHELL"
+   set hello_msg="Hello, my name is"
+   echo -r "$hello_msg $USER, and I live in $HOME"
+   echo "Should print sha256sum of zy in the next line"
+   echo "xz" | sha256sum | tr -d " -"
+   echo "Should print 1 1 65 in the following line"
+   echo "zy" | sha256sum | tr -d " -" | wc
+   
+   echo $LINE
+   
+   dir
+   pwd
+   unset hello_msg
+   echo "Should get empty output"
+   echo $hello_msg
+   
+   echo $LINE
+   
+   echo "Should print /dev/null"
+   ls /dev | grep null
+   echo "Should print all files containing 1 in /tmp"
+   ls /tmp | grep 1
+   
+   echo $LINE
+   
+   echo "Should make a file log.log"
+   echo "Hello, I'm your logger." > log.log
+   dir
+   echo "Should see content of log.log"
+   cat < log.log
+   echo "Hello, again..." >> log.log
+   echo "Should display content of log.log"
+   cat log.log
+   echo "Should display word count of log.log"
+   wc < log.log
+   
+   echo $LINE
+   
+   echo "Opening some sleepy jobs"
+   echo "And calling command jobs"
+   sleep 2s | echo "Sleeping in $0" &
+   echo "waiting 0.25s"
+   jobs
+   sleep 0.25s
+   sleep 2s | echo "This is some job management" &
+   echo "waiting 0.25s"
+   jobs
+   sleep 0.25s
+   sleep 2s | echo "MyShell is $SHELL" &
+   echo "waiting 0.25s"
+   jobs
+   sleep 0.25s
+   sleep 2s &
+   echo "waiting 0.25s"
+   jobs
+   sleep 0.25s
+   sleep 2s &
+   echo "Getting current runnning jobs..."
+   jobs
+   
+   echo "Getting back to fore ground"
+   echo "Waiting for background jobs to terminate"
+   echo "At the same time I can still do other things like testing..."
+   test "" -o "a"
+   test ! -z "a" -a ( -n "1" -o 1 -ge 1 ) -a 2 -ne 1
+   test ! -z "" -a ( -n "1" -o 1 -ge 1 ) -o 2 -ne 1 # False, -a -o from right to left
+   test ( ! -z "" -a ( -n "1" -o 1 -ge 1 ) ) -o 2 -ne 1 # True
+   sleep 2s
+   
+   echo "Should produce empty content"
+   jobs
+   
+   
+   echo "Jobs are done ~"
+   
+   echo "Spawning dummy built_in job that is trying to read from user (will suspend)"
+   
+   dummy &
+   dummy &
+   dummy &
+   dummy &
+   
+   echo "Counting jobs"
+   jobs
+   
+   echo "$RED$BOLD""WE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE""$RESET"
+   
+   term 0 1
+   
+   echo $LINE
+   
+   echo "calling environ..."
+   environ
+   
+   echo "Arg 0 is: $0"
+   echo "Arg 1 is: $1"
+   echo "Arg 2 is: $2"
+   echo "Arg 3 is: $3"
+   echo "Arg 4 is: $4"
+   echo "Arg 5 is: $5"
+   echo "Arg 6 is: $6"
+   echo "Arg 7 is: $7"
+   echo "Arg 8 is: $8"
+   echo "Arg 9 is: $9"
+   
+   echo "Shifting number 1"
+   shift
+   echo "Arg 0 is: $0"
+   echo "Arg 1 is: $1"
+   echo "Arg 2 is: $2"
+   echo "Arg 3 is: $3"
+   echo "Arg 4 is: $4"
+   echo "Arg 5 is: $5"
+   echo "Arg 6 is: $6"
+   echo "Arg 7 is: $7"
+   echo "Arg 8 is: $8"
+   echo "Arg 9 is: $9"
+   
+   
+   
+   echo "Shifting number 2"
+   shift
+   echo "Arg 1 is: $1"
+   
+   echo "Shifting number 3"
+   shift
+   echo "Arg 1 is: $1"
+   
+   echo "Shifting number 4"
+   shift
+   echo "Arg 1 is: $1"
+   
+   echo "Shifting number 5"
+   shift
+   echo "Arg 1 is: $1"
+   
+   
+   echo "$BOLD"Bye!"$RESET"
+   ```
+
+   执行结果：
+
+   ![image-20200730122940610](MyShell.assets/image-20200730122940610.png)
+
+   …
+
+   ```
+   False
+   1596083355
+   2020-07-30 12:29:15.712186
+   ##############################################################
+   0o002
+   Changing UMASK to 0o777
+   0o777
+   Changing UMASK to 0o002
+   ##############################################################
+   Hello, my name is /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+   Hello, my name is xuzh, and I live in /home/xuzh
+   Should print sha256sum of zy in the next line
+   b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1
+   Should print 1 1 65 in the following line
+         1       1      65
+   ##############################################################
+   .
+   rwxrwxr-x 2020-07-30 12:08:45 hello
+   rw-rw-r-- 2020-07-29 14:28:40 log.log
+   rw-rw-r-- 2020-07-29 12:57:15 should.out
+   rw-rw-r-- 2020-07-29 12:36:49 MyShell.md
+   rw-rw-r-- 2020-07-30 12:26:17 result.out
+   rw-rw-r-- 2020-07-25 12:11:10 dummy.py
+   rwxrwxr-x 2020-07-25 14:09:29 process.py
+   rw-rw-r-- 2020-07-30 12:08:43 hello.c
+   rw-rw-r-- 2020-07-26 17:43:58 sleep10s.py
+   rwxrwxr-x 2020-07-29 14:52:17 MyShell.py
+   rw-rw-r-- 2020-07-29 12:56:43 dummy.mysh
+   rw-rw-r-- 2020-07-22 19:23:17 COLOR.py
+   rw-rw-r-- 2020-07-29 10:43:24 MyShellException.py
+   rwxrwxr-x 2020-07-29 12:42:10 __pycache__
+   ~/Projects/ShellDesign/MyShell
+   Should get empty output
+   2020-07-30 12:29:15 ubuntu __main__[66739] WARNING Unable to get the varible "hello_msg", assigning empty string
+   
+   ##############################################################
+   Should print /dev/null
+   null
+   Should print all files containing 1 in /tmp
+   clr-debug-pipe-64261-7288941-in
+   clr-debug-pipe-64261-7288941-out
+   dotnet-diagnostic-64261-7288941-socket
+   pymp-1yf6wit3
+   pymp-i1l0r1ba
+   ssh-3Dl1dZ2MVhMN
+   ssh-5opVjzIOSY1n
+   ssh-F4yJVhHqoOo1
+   ssh-ssJdLj12gJhT
+   systemd-private-32fa36ac417343a4813881b03c5a5a50-bolt.service-9WJsxv
+   systemd-private-32fa36ac417343a4813881b03c5a5a50-colord.service-qxRv3v
+   systemd-private-32fa36ac417343a4813881b03c5a5a50-fwupd.service-WNl3wS
+   systemd-private-32fa36ac417343a4813881b03c5a5a50-ModemManager.service-w89ayg
+   systemd-private-32fa36ac417343a4813881b03c5a5a50-rtkit-daemon.service-ebfv3E
+   systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-resolved.service-G0nqb0
+   systemd-private-32fa36ac417343a4813881b03c5a5a50-systemd-timesyncd.service-N7TNbO
+   tmp-64015c9VBFgG4O3ca.tpl
+   tmp-64015EunG2vwQ362u.tpl
+   tmp-64015jJWFioLuj9YL.tpl
+   vmware-root_1361-3988687315
+   vscode-ipc-0e8469e9-1fc8-467e-b42c-f6a8519ab561.sock
+   vscode-ipc-705a4712-c1f7-43b0-9465-99c771a42a1d.sock
+   vscode-ipc-76bfc346-b068-4fb1-8340-103432500cbb.sock
+   vscode-ipc-77ad59b8-138f-4875-884e-368ed7e31e7d.sock
+   vscode-ipc-846c3b8a-cd23-429d-aa84-b71bb5acbe7b.sock
+   vscode-ipc-a1c81be6-faa1-49b2-8a12-38a172ae37e9.sock
+   vscode-ipc-cb722aa7-90c1-4b82-b595-52d2e62b5d98.sock
+   vscode-ipc-e9b20dcd-2866-4d0b-bd69-426b2dc6b153.sock
+   vscode-ipc-efde013b-3ec4-4d77-9e0d-b10d25879dda.sock
+   vscode-typescript1000
+   ##############################################################
+   Should make a file log.log
+   .
+   rwxrwxr-x 2020-07-30 12:08:45 hello
+   rw-rw-r-- 2020-07-30 12:29:15 log.log
+   rw-rw-r-- 2020-07-29 12:57:15 should.out
+   rw-rw-r-- 2020-07-29 12:36:49 MyShell.md
+   rw-rw-r-- 2020-07-30 12:26:17 result.out
+   rw-rw-r-- 2020-07-25 12:11:10 dummy.py
+   rwxrwxr-x 2020-07-25 14:09:29 process.py
+   rw-rw-r-- 2020-07-30 12:08:43 hello.c
+   rw-rw-r-- 2020-07-26 17:43:58 sleep10s.py
+   rwxrwxr-x 2020-07-29 14:52:17 MyShell.py
+   rw-rw-r-- 2020-07-29 12:56:43 dummy.mysh
+   rw-rw-r-- 2020-07-22 19:23:17 COLOR.py
+   rw-rw-r-- 2020-07-29 10:43:24 MyShellException.py
+   rwxrwxr-x 2020-07-29 12:42:10 __pycache__
+   Should see content of log.log
+   Hello, I'm your logger.
+   Should display content of log.log
+   Hello, I'm your logger.
+   Hello, again...
+   Should display word count of log.log
+         2       6      40
+   ##############################################################
+   Opening some sleepy jobs
+   And calling command jobs
+   waiting 0.25s
+   [0] running env sleep 2s | echo "Sleeping in $0" &
+   waiting 0.25s
+   [0] running env sleep 2s | echo "Sleeping in $0" &
+   [1] running env sleep 2s | echo "This is some job management" &
+   waiting 0.25s
+   [0] running env sleep 2s | echo "Sleeping in $0" &
+   [1] running env sleep 2s | echo "This is some job management" &
+   [2] running env sleep 2s | echo "MyShell is $SHELL" &
+   waiting 0.25s
+   [0] running env sleep 2s | echo "Sleeping in $0" &
+   [1] running env sleep 2s | echo "This is some job management" &
+   [2] running env sleep 2s | echo "MyShell is $SHELL" &
+   [3] running env sleep 2s &
+   Getting current runnning jobs...
+   [0] running env sleep 2s | echo "Sleeping in $0" &
+   [1] running env sleep 2s | echo "This is some job management" &
+   [2] running env sleep 2s | echo "MyShell is $SHELL" &
+   [3] running env sleep 2s &
+   [4] running env sleep 2s &
+   Getting back to fore ground
+   Waiting for background jobs to terminate
+   At the same time I can still do other things like testing...
+   True
+   True
+   False
+   True
+   Sleeping in /home/xuzh/Projects/ShellDesign/MyShell/dummy.mysh
+   [0] finished env sleep 2s | echo "Sleeping in $0" &
+   This is some job management
+   [1] finished env sleep 2s | echo "This is some job management" &
+   MyShell is /home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+   [2] finished env sleep 2s | echo "MyShell is $SHELL" &
+   [3] finished env sleep 2s &
+   [4] finished env sleep 2s &
+   Should produce empty content
+   Jobs are done /home/xuzh
+   Spawning dummy built_in job that is trying to read from user (will suspend)
+   builtin_dummy: before any input requirements
+   [0] suspended env dummy &
+   builtin_dummy: before any input requirements
+   [1] suspended env dummy &
+   builtin_dummy: before any input requirements
+   [2] suspended env dummy &
+   builtin_dummy: before any input requirements
+   [3] suspended env dummy &
+   Counting jobs
+   [0] suspended env dummy &
+   [1] suspended env dummy &
+   [2] suspended env dummy &
+   [3] suspended env dummy &
+   WE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE
+   [0] terminated env dummy &
+   2020-07-30 12:29:18 ubuntu __main__[66819] WARNING Terminating job [0] handler process by signal...
+   [1] terminated env dummy &
+   2020-07-30 12:29:18 ubuntu __main__[66823] WARNING Terminating job [1] handler process by signal...
+   ##############################################################
+   calling environ...
+   SSH_CONNECTION=192.168.28.1 12000 192.168.28.146 22
+   LANG=en_US.UTF-8
+   OLDPWD=/home/xuzh/Projects/ShellDesign/MyShell
+   XDG_SESSION_ID=29
+   USER=xuzh
+   PWD=/home/xuzh/Projects/ShellDesign/MyShell
+   HOME=/home/xuzh
+   SSH_CLIENT=192.168.28.1 12000 22
+   MAIL=/var/mail/xuzh
+   SHELL=/home/xuzh/Projects/ShellDesign/MyShell/MyShell.py
+   SHLVL=2
+   LOGNAME=xuzh
+   DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+   XDG_RUNTIME_DIR=/run/user/1000
+   PATH=/home/xuzh/.vscode-server/bin/91899dcef7b8110878ea59626991a18c8a6a1b3e/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/home/xuzh/.local/bin
+   _=/home/xuzh/Projects/ShellDesign/MyShell/./MyShell.py
+   VSCODE_IPC_HOOK_CLI=/tmp/vscode-ipc-a1c81be6-faa1-49b2-8a12-38a172ae37e9.sock
+   TERM_PROGRAM=vscode
+   TERM_PROGRAM_VERSION=1.47.3
+   COLORTERM=truecolor
+   VSCODE_GIT_IPC_HANDLE=/run/user/1000/vscode-git-2fbb053fa5.sock
+   GIT_ASKPASS=/home/xuzh/.vscode-server/bin/91899dcef7b8110878ea59626991a18c8a6a1b3e/extensions/git/dist/askpass.sh
+   VSCODE_GIT_ASKPASS_NODE=/home/xuzh/.vscode-server/bin/91899dcef7b8110878ea59626991a18c8a6a1b3e/node
+   VSCODE_GIT_ASKPASS_MAIN=/home/xuzh/.vscode-server/bin/91899dcef7b8110878ea59626991a18c8a6a1b3e/extensions/git/dist/askpass-main.js
+   TERM=xterm-256color
+   ZSH=/home/xuzh/.oh-my-zsh
+   PAGER=less
+   LESS=-R
+   LSCOLORS=Gxfxcxdxbxegedabagacad
+   LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:
+   SSH_AUTH_SOCK=/tmp/ssh-sHY4pYyqIN0I/agent.66323
+   SSH_AGENT_PID=66324
+   PS1=$
+   BOLD=\033[1m
+   RED=\033[31m
+   BLUE=\033[34m
+   RESET=\033[0m
+   LINE=\033[1m\033[34m##############################################################\033[0m
+   Arg 0 is: /home/xuzh/Projects/ShellDesign/MyShell/dummy.mysh
+   Arg 1 is: foo
+   Arg 2 is: bar
+   Arg 3 is: foobar
+   Arg 4 is: hello
+   Arg 5 is: world
+   Arg 6 is: linux
+   Arg 7 is: linus
+   Arg 8 is: PyTorch
+   Arg 9 is: CS231n
+   Shifting number 1
+   Arg 0 is: /home/xuzh/Projects/ShellDesign/MyShell/dummy.mysh
+   Arg 1 is: bar
+   Arg 2 is: foobar
+   Arg 3 is: hello
+   Arg 4 is: world
+   Arg 5 is: linux
+   Arg 6 is: linus
+   Arg 7 is: PyTorch
+   Arg 8 is: CS231n
+   2020-07-30 12:29:19 ubuntu __main__[66739] WARNING Unable to get the varible "9", assigning empty string
+   Arg 9 is: 
+   Shifting number 2
+   Arg 1 is: foobar
+   Shifting number 3
+   Arg 1 is: hello
+   Shifting number 4
+   Arg 1 is: world
+   Shifting number 5
+   Arg 1 is: linux
+   Bye!
+   [2] terminated env dummy &
+   [3] terminated env dummy &
+   2020-07-30 12:29:19 ubuntu __main__[66827] WARNING Terminating job [2] handler process by signal...
+   2020-07-30 12:29:19 ubuntu __main__[66831] WARNING Terminating job [3] handler process by signal...
+   ```
+
+3. 复杂`test`命令执行（同时检查注释功能）
+
+   ```shell
+   test ! -z "" -a ( -n "1" -o 1 -ge 1 ) -o 2 -ne 1 # False, -a -o from right to left
+   test ( ! -z "" -a ( -n "1" -o 1 -ge 1 ) ) -o 2 -ne 1 # True
+   ```
+
+   ![image-20200730123122132](MyShell.assets/image-20200730123122132.png)
+
+4. `cd`
+
+   ```shell
+   cd ..
+   cd ..
+   cd
+   cd DoesntExist
+   cd /dev
+   cd /var/log
+   cd .
+   cd ~
+   cd /
+   cd $HOME
+   ```
+
+   ![image-20200730123729371](MyShell.assets/image-20200730123729371.png)
+
+5. `clr`
+
+   ```shell
+   clr
+   ```
+
+   ![image-20200730123917936](MyShell.assets/image-20200730123917936.png)
+
+   ![image-20200730123927598](MyShell.assets/image-20200730123927598.png)
+
+6. `pwd`
+
+   ```shell
+   pwd
+   pwd -a
+   ```
+
+   ![image-20200730124029348](MyShell.assets/image-20200730124029348.png)
+
+7. `dir`
+
+   ```shell
+   dir
+   cd ..
+   dir MyShell DirSync DoesntExist
+   ```
+
+   ![image-20200730124139869](MyShell.assets/image-20200730124139869.png)
+
+8. `echo`
+
+   ```shell
+   echo "\033[1m\033[31mHello, world.\033[0m"
+   echo "\033[1m\033[33mMy name is $SHELL\033[0m"
+   echo -r "\033[1m\031[31mMy name is $SHELL\033[0m"
+   echo without"$SHELL"any"$HOME"space and here come spaces
+   echo "中文测试" # 注释测试
+   ```
+
+   ![image-20200730124532497](MyShell.assets/image-20200730124532497.png)
+
+   ![image-20200730130811070](MyShell.assets/image-20200730130811070.png)
+
+9. `exit`
+
+   ```shell
+   exit
+   ```
+
+   ![image-20200730124551510](MyShell.assets/image-20200730124551510.png)
+
+10. `quit`
+
+    ```shell
+    quit
+    ```
+
+    ![image-20200730124633215](MyShell.assets/image-20200730124633215.png)
+
+11. `jobs, fg, bg, term, exit`任务管理
+
+    ```shell
+    set BOLD="\033[1m"
+    set RED="\033[31m"
+    set BLUE="\033[34m"
+    set RESET="\033[0m"
+    
+    set LINE="$BOLD$BLUE##############################################################$RESET"
+    
+    echo $LINE
+    
+    echo "Opening some sleepy jobs"
+    echo "And calling command jobs"
+    sleep 2s | echo "Sleeping in $0" &
+    echo "waiting 0.25s"
+    jobs
+    sleep 0.25s
+    sleep 2s | echo "This is some job management" &
+    echo "waiting 0.25s"
+    jobs
+    sleep 0.25s
+    sleep 2s | echo "MyShell is $SHELL" &
+    echo "waiting 0.25s"
+    jobs
+    sleep 0.25s
+    sleep 2s &
+    echo "waiting 0.25s"
+    jobs
+    sleep 0.25s
+    sleep 2s &
+    echo "Getting current runnning jobs..."
+    jobs
+    
+    echo "Getting back to fore ground"
+    echo "Waiting for background jobs to terminate"
+    echo "At the same time I can still do other things like testing..."
+    test "" -o "a"
+    test ! -z "a" -a ( -n "1" -o 1 -ge 1 ) -a 2 -ne 1
+    test ! -z "" -a ( -n "1" -o 1 -ge 1 ) -o 2 -ne 1 # False, -a -o from right to left
+    test ( ! -z "" -a ( -n "1" -o 1 -ge 1 ) ) -o 2 -ne 1 # True
+    sleep 2s
+    
+    echo "Should produce empty content"
+    jobs
+    
+    
+    echo "Jobs are done ~"
+    
+    echo "Spawning dummy built_in job that is trying to read from user (will suspend)"
+    
+    dummy &
+    dummy &
+    dummy &
+    dummy &
+    
+    echo "Counting jobs"
+    jobs
+    
+    echo "$RED$BOLD""WE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE""$RESET"
+    
+    term 0 1
+    
+    echo $LINE
+    
+    exit # should see termination message
+    ```
+
+    ![image-20200730124935788](MyShell.assets/image-20200730124935788.png)
+
+    ![image-20200730124957096](MyShell.assets/image-20200730124957096.png)
+
+    ![image-20200730125026166](MyShell.assets/image-20200730125026166.png)
+
+    ```shell
+    dummy &
+    dummy &
+    dummy &
+    dummy &
+    jobs
+    term 0 1
+    bg 2 3
+    term 2 3
+    jobs
+    dummy &
+    dummy &
+    fg 0
+    1
+    2
+    3
+    4
+    5
+    term 1
+    jobs
+    ```
+
+    ![image-20200730125252720](MyShell.assets/image-20200730125252720.png)
+
+12. `environ, set, unset`变量检查
+
+    ```shell
+    echo "Hello, my name is $SHELL"
+    set hello_msg="Hello, my name is"
+    echo -r "$hello_msg $USER, and I live in $HOME"
+    environ | grep hello_msg # should see hello_msg=Hello, my name is
+    unset hello_msg
+    echo "Should get empty output"
+    echo $hello_msg
+    environ | grep hello_msg # should see no hello_msg
+    ```
+
+    ![image-20200730125629997](MyShell.assets/image-20200730125629997.png)
+
+13. `umask`
+
+    ```shell
+    umask
+    echo "Changing UMASK to 0o077"
+    umask 077
+    touch text.txt
+    gcc hello.c -o hello
+    dir | grep -E "hello|text"
+    echo "Displaying UMASK"
+    umask
+    echo "Changing UMASK to 0o002"
+    umask 002
+    ```
+
+    ![image-20200730131709135](MyShell.assets/image-20200730131709135.png)
+
+14. `printio, exec`
+
+    ```shell
+    printio
+    exec < dummy.mysh > result.out
+    exec
+    printio
+    cat
+    exec < result.out > ""
+    printio
+    wc
+    exec < "" > ""
+    printio
+    exec > result.out
+    echo "REPLACING"
+    exec > ""
+    cat result.out
+    exec >> result.out
+    echo "APPENDING"
+    exec > ""
+    cat result.out
+    ```
+
+    ![image-20200730132436052](MyShell.assets/image-20200730132436052.png)
+
+15. `shift`
+
+    通过命令行：`./MyShell.py -w dummy.mysh -a foo bar foobar hello world linux linus PyTorch CS231n`运行MyShell
+
+    ```shell
+    echo $0 $1 $2 $3 $4 $5 $6 $7 $8 $9
+    shift
+    echo $0 $1 $2 $3 $4 $5 $6 $7 $8 $9
+    shift 1
+    echo $0 $1 $2 $3 $4 $5 $6 $7 $8 $9
+    shift 2
+    echo $0 $1 $2 $3 $4 $5 $6 $7 $8 $9
+    shift 3
+    echo $0 $1 $2 $3 $4 $5 $6 $7 $8 $9
+    shift 4
+    echo $0 $1 $2 $3 $4 $5 $6 $7 $8 $9
+    ```
+
+    ![image-20200730155409763](MyShell.assets/image-20200730155409763.png)
+
+16. `sleep`
+
+    ```shell
+    sleep 10s
+    ```
+
+    ![image-20200730155624007](MyShell.assets/image-20200730155624007.png)
+
+17. `time`
+
+    ```shell
+    time
+    ```
+
+    ![image-20200730155659485](MyShell.assets/image-20200730155659485.png)
+
+18. `verbose`
+
+    ```shell
+    verbose
+    verbose -d
+    verbose -e
+    echo $9
+    verbose -w
+    echo $9
+    ```
+
+    ![image-20200730155741888](MyShell.assets/image-20200730155741888.png)
 
 ## 附录
 
