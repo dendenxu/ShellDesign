@@ -590,17 +590,17 @@ class MyShell:
         # 开发者调试用命令，用于检查当前的exec文件重定向
         # note: 由于我们要检查重定向，这里会直接打印到stdout而非输入输出文件
         result = []
-        result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.input_file.fileno() if self.input_file is not None else sys.stdin.fileno())}, redirecting MyShell input to {COLOR.BOLD(self.input_file)}")
-        result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.output_file.fileno() if self.output_file is not None else sys.stdout.fileno())}, redirecting MyShell output to {COLOR.BOLD(self.output_file)}")
+        result.append(f"FILE NUMBER OF INPUT FILE: {COLOR.BOLD(self.input_file.fileno() if self.input_file is not None else sys.__stdin__.fileno())}, redirecting MyShell input to {COLOR.BOLD(self.input_file)}")
+        result.append(f"FILE NUMBER OF OUTPUT FILE: {COLOR.BOLD(self.output_file.fileno() if self.output_file is not None else sys.__stdout__.fileno())}, redirecting MyShell output to {COLOR.BOLD(self.output_file)}")
         # ! debugging command, no redirection
         print("\n".join(result), file=sys.__stdout__)
 
     def builtin_exec(self, pipe="", args=[]):
         # exec命令会修改MyShell命令的输入输出源
         # note: 由于此命令的特殊性，我们会在该函数得到执行的上一层加入一些逻辑
-        if len(args) != 2:
-            log.critical("Internal error, builtin_exec should be executed with exactly two arguments")
-            raise ArgException("Internal error, builtin_exec should be executed with exactly two arguments")
+        if len(args) != 3:
+            log.critical("Internal error, builtin_exec should be executed with exactly three arguments")
+            raise ArgException("Internal error, builtin_exec should be executed with exactly three arguments")
 
         log.debug(f"FILE NUMBER OF SYS.__STDIN__: {COLOR.BOLD(sys.__stdin__.fileno())}")
         log.debug(f"FILE NUMBER OF SYS.__STDOUT__: {COLOR.BOLD(sys.__stdout__.fileno())}")
@@ -638,7 +638,7 @@ class MyShell:
                 log.debug(f"FILE NUMBER OF OUTPUT FILE: {COLOR.BOLD(self.output_file.fileno())}")
             except FileNotFoundError as e:
                 raise FileNotFoundException(e, {"type": "redi_out", "redi_append": args[2]})
-        elif args[0] is None:
+        elif args[1] is None:
             log.debug("Doing nothing...")
         else:
             log.debug(f"Setting output file to None: stdout")
