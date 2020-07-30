@@ -3239,7 +3239,7 @@ function AdminManageStudent() {
                     fi
                     echo "您两次输入的密码不一致，请重新输入"
                 done
-                query_insert_student="insert into student(name, brief, gender, password_hash, enroll_time) value (\"$s_name\",\"$full_string\",\"$s_gender\", \"$password_hash\", now())"
+                query_insert_student="insert into student(name, brief, gender, password_hash, enroll_time) value (\"$s_name\",\"$full_string\",\"$s_gender\", \"$password_hash_ori\", now())"
                 query_last_insert_id="select last_insert_id()"
 
                 sid=$($mysql_prefix -se "$query_insert_student;$query_last_insert_id;")
@@ -3681,7 +3681,7 @@ LoginInUI
 
 #### MySQL
 
-```mysql
+```sql
 # note: we should define the default charset of the database before creating the tables without explicitly
 # defining charset
 
