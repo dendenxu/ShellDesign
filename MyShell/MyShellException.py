@@ -79,3 +79,7 @@ class ArgException(MyShellException):
 class SleepException(MyShellException):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)
+
+class HelpException(MyShellException):
+    def __init__(self, message, errors=None):
+        super().__init__(message, errors)
