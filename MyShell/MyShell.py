@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# MyShell: A simple shell implementation in Python
+# Xu Zhen 3180105504
 import os  # 大部分os相关功能来自此包
 import io  # 用于构建一个stdin的wrapper以捕捉程序的输入/输出请求
 import sys  # 一些系统调用/常数的来源包

@@ -379,7 +379,7 @@ elif [ $3 = "-u" ]; then
     fi
     # 对于同步型复制，我们进行左右复制以保留两个文件夹中都没有的内容
     testDir $2
-    copyContent $1 $2 $3 
+    copyContent $1 $2 $3
     copyContent $2 $1 $3
 elif [ $3 = "-s" ]; then
     if [ -z $4 ]; then
@@ -797,12 +797,12 @@ function PrintTeacher() {
     # TEACHER分隔符，会在老师登陆后的管理界面打印
     clear
     cat <<"EOF"
-   ______   ______     ______     ______     __  __     ______     ______    
-  /\__  _\ /\  ___\   /\  __ \   /\  ___\   /\ \_\ \   /\  ___\   /\  == \   
-  \/_/\ \/ \ \  __\   \ \  __ \  \ \ \____  \ \  __ \  \ \  __\   \ \  __<   
-     \ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\ 
-      \/_/   \/_____/   \/_/\/_/   \/_____/   \/_/\/_/   \/_____/   \/_/ /_/ 
-                                                                             
+   ______   ______     ______     ______     __  __     ______     ______
+  /\__  _\ /\  ___\   /\  __ \   /\  ___\   /\ \_\ \   /\  ___\   /\  == \
+  \/_/\ \/ \ \  __\   \ \  __ \  \ \ \____  \ \  __ \  \ \  __\   \ \  __<
+     \ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\
+      \/_/   \/_____/   \/_/\/_/   \/_____/   \/_/\/_/   \/_____/   \/_/ /_/
+
 EOF
 }
 ```
@@ -869,7 +869,7 @@ done
   target="${Green}${Bold}课程实验/作业${NoColor}"
   # 内容未发布提示信息
   no_publication="${Red}本课程还没有已发布的${NoColor}${target}"
-  
+
   echo "Target is $target"
   echo "No publication infomation is $no_publication"
   ```
@@ -881,7 +881,7 @@ done
   ```bash
   while :; do
       read -rp "请输入您想要管理的课程号：" cid
-  
+
       # 注意到我们使用正则表达式展开数组来进行元素检查
       # 因此表达式右侧的值应用引号括起以保证完全匹配
       # 我们使用了ShellCheck工具，而此工具会对=~右侧的表达式报错，因此我们使用了
@@ -942,26 +942,26 @@ done
       read -rp "请输入您是否需要为${target}添加附件（Y/n）：" need_attach
       if [[ $need_attach =~ ^[1Yy] ]]; then # 正则表达式匹配
           attachment_count+=1
-  
+
           echo "您选择了添加附件"
           read -rp "请输入您想要添加的附件名称：" attach_name
           attach_name=$(RemoveDanger "$attach_name") # 可能包含危险字符
           echo "您的附件名称为：$attach_name"
-  
+
           read -rp "请输入您想要添加的附件URL：" attach_url
           # 对于URL，我们使用不同的转义策略
           attach_url=$(RemoveDanger "$attach_url" "[\"'\.\*;]")
           echo "您的附件URL为：$attach_url"
-  
+
           # 添加附件到附件相关表，并修改attach_to表来对应附件和Content的关系
           # 我们暂时只使用了attach_to表格的一部分功能，在日后的开发中我们可以将一个附件分配给多个不同的Content
           # todo: 可以重用已经上传过的附件，建立多对多的附加/带附件内容的对应
           query_insert_attach="insert into attachment(name, url) value (\"$attach_name\", \"$attach_url\")"
           query_insert_attach_to="insert into attach_to(aid, uid) value (last_insert_id(), $subid)"
-  
+
           # 同样的，我们利用了Transaction功能
           attach_id=$($mysql_prefix -se "set autocommit=0;$query_insert_attach;select last_insert_id();$query_insert_attach_to;commit;set autocommit=1;")
-  
+
           echo "您刚刚添加的附件ID为：$attach_id"
       else
           break
@@ -985,13 +985,13 @@ done
       # 会在初始登陆界面打印
       clear
       cat <<"EOF"
-     _________                                                       __        _____                                                  
-     \_   ___ \  ____  __ _________  ______ ______  _  _____________|  | __   /     \ _____    ____ _____     ____   ___________      
-     /    \  \/ /  _ \|  |  \_  __ \/  ___// __ \ \/ \/ /  _ \_  __ \  |/ /  /  \ /  \\__  \  /    \\__  \   / ___\_/ __ \_  __ \     
-     \     \___(  <_> )  |  /|  | \/\___ \\  ___/\     (  <_> )  | \/    <  /    Y    \/ __ \|   |  \/ __ \_/ /_/  >  ___/|  | \/     
-      \______  /\____/|____/ |__|  /____  >\___  >\/\_/ \____/|__|  |__|_ \ \____|__  (____  /___|  (____  /\___  / \___  >__|        
-             \/                         \/     \/                        \/         \/     \/     \/     \//_____/      \/            
-                                                                                                                                      
+     _________                                                       __        _____
+     \_   ___ \  ____  __ _________  ______ ______  _  _____________|  | __   /     \ _____    ____ _____     ____   ___________
+     /    \  \/ /  _ \|  |  \_  __ \/  ___// __ \ \/ \/ /  _ \_  __ \  |/ /  /  \ /  \\__  \  /    \\__  \   / ___\_/ __ \_  __ \
+     \     \___(  <_> )  |  /|  | \/\___ \\  ___/\     (  <_> )  | \/    <  /    Y    \/ __ \|   |  \/ __ \_/ /_/  >  ___/|  | \/
+      \______  /\____/|____/ |__|  /____  >\___  >\/\_/ \____/|__|  |__|_ \ \____|__  (____  /___|  (____  /\___  / \___  >__|
+             \/                         \/     \/                        \/         \/     \/     \/     \//_____/      \/
+
   EOF
   }
   ```
@@ -1015,7 +1015,7 @@ mysql -uroot -p < tables.sql
   ```sql
   # note: we should define the default charset of the database before creating the tables without explicitly
   # defining charset
-  
+
   drop database if exists ShellDesign;
   drop user if exists ShellDesigner;
   create user ShellDesigner identified by 'ShellDesigner';
@@ -1023,7 +1023,7 @@ mysql -uroot -p < tables.sql
   grant all on ShellDesign.* to ShellDesigner;
   alter database ShellDesign character set utf8mb4 collate utf8mb4_unicode_ci;
   use ShellDesign;
-  
+
   drop table if exists `take`;
   drop table if exists `info`;
   drop table if exists `teach`;
@@ -1051,7 +1051,7 @@ mysql -uroot -p < tables.sql
       title             varchar(500)    default 'Professor',
       password_hash     varchar(64)
   );
-  
+
   create table `student`
   (
       name          varchar(100),
@@ -1061,14 +1061,14 @@ mysql -uroot -p < tables.sql
       enroll_time   datetime,
       password_hash char(64)
   );
-  
+
   create table `admin`
   (
       name          varchar(100),
       id            bigint primary key auto_increment,
       password_hash char(64)
   );
-  
+
   create table `course`
   (
       name_zh  varchar(100),
@@ -1077,7 +1077,7 @@ mysql -uroot -p < tables.sql
       syllabus varchar(4000),
       id       bigint primary key auto_increment
   );
-  
+
   create table `teach`
   (
       tid bigint,
@@ -1085,7 +1085,7 @@ mysql -uroot -p < tables.sql
       foreign key (`tid`) references teacher (`id`) on delete cascade on update cascade,
       foreign key (`cid`) references course (`id`) on delete cascade on update cascade
   );
-  
+
   create table `take`
   (
       cid bigint,
@@ -1093,13 +1093,13 @@ mysql -uroot -p < tables.sql
       foreign key (`sid`) references student (`id`) on delete cascade on update cascade,
       foreign key (`cid`) references course (`id`) on delete cascade on update cascade
   );
-  
+
   # this is a dummy class so that we can ensure foreign key references from attachments to both submissions and homework
   create table `content`
   (
       id bigint primary key auto_increment
   );
-  
+
   create table `info`
   (
       id           bigint primary key,
@@ -1109,7 +1109,7 @@ mysql -uroot -p < tables.sql
       foreign key (`cid`) references course (`id`) on delete cascade on update cascade,
       foreign key (`id`) references content (`id`) on delete cascade on update cascade
   );
-  
+
   create table `homework`
   (
       id            bigint primary key auto_increment,
@@ -1123,7 +1123,7 @@ mysql -uroot -p < tables.sql
       foreign key (`tid`) references teacher (`id`) on delete cascade on update cascade,
       foreign key (`cid`) references course (`id`) on delete cascade on update cascade
   );
-  
+
   create table `submission`
   (
       id                       bigint primary key auto_increment,
@@ -1136,7 +1136,7 @@ mysql -uroot -p < tables.sql
       foreign key (`sid`) references student (`id`) on delete cascade on update cascade,
       foreign key (`hid`) references homework (`id`) on delete cascade on update cascade
   );
-  
+
   create table `attachment`
   (
       id    bigint primary key auto_increment,
@@ -1144,7 +1144,7 @@ mysql -uroot -p < tables.sql
       url   varchar(800),
       brief varchar(2000)
   );
-  
+
   create table `attach_to`
   (
       aid bigint,
@@ -1164,15 +1164,15 @@ mysql -uroot -p < tables.sql
          (4, '计算机图形学', 'Computer Graphics'),
          (5, '视觉识别中的深度卷积神经网络', 'Convolutional Neural Network for Visual Recognition'),
          (6, 'iOS开发', 'iOS Software Development');
-  
+
   insert into `teacher`(id, name, password_hash, registration_time)
   values (1, 'zy', '49aabdaa1b0f6c3506f54521ef81fe5b5fe835d268f1f86e1021a342b59d43bc', now()), # password is zy
          (2, 'xz', 'b44f7d6b5283a44ee5f2bd98f84087a04810092122d75e8fbf8ad85f8f2981f1', now()); # password is xz
-  
+
   insert into `admin`(id, name, password_hash)
   values (1, 'root', '53175bcc0524f37b47062fafdda28e3f8eb91d519ca0a184ca71bbebe72f969a'), # password is root
          (2, 'admin', 'fc8252c8dc55839967c58b9ad755a59b61b67c13227ddae4bd3f78a38bf394f7'); # password is admin
-  
+
   insert into `student`(id, name, password_hash, enroll_time)
   values (1, 'st1', '2238ead9c048f351712c34d22b41f6eec218ea9a9e03e48fad829986b0dafc11', now()), # password is same as name
          (2, 'st2', '5e61d026a7889d9fc72e17f1b25f4d6d48bfe17046fea845aa8c5651ec89c333', now()),
@@ -1182,7 +1182,7 @@ mysql -uroot -p < tables.sql
          (6, 'st6', 'a7a287ffc9cb27131b9dc54199ba96cef87e753968bc620d714af212ef0f7a8c', now()),
          (7, 'st7', '73d0daf13c6159a1fbdeb37b6972325b6e29c312371a0f3d427bd35c0c87b928', now()),
          (8, 'st8', '4ce70fc1eef7303879a2ef33996db2f85058ae06e8590521267ae8d46ec59793', now());
-  
+
   insert into `teach`(cid, tid)
   values (1, 1),
          (1, 2),
@@ -1190,7 +1190,7 @@ mysql -uroot -p < tables.sql
          (3, 1),
          (4, 2),
          (5, 2);
-  
+
   insert into `take`(cid, sid)
   values (1, 1),
          (1, 2),
@@ -1212,8 +1212,9 @@ mysql -uroot -p < tables.sql
          (6, 1),
          (6, 7),
          (6, 8);
-  
-  
+  ```
+
+
   insert into content(id)
   values (1),
          (2),
@@ -1222,25 +1223,25 @@ mysql -uroot -p < tables.sql
          (5),
          (6),
          (7);
-  
+
   insert into homework(id, cid, tid, intro, creation_time, end_time, type)
   values (5, 1, 1, '实验4 JDBC系统的编写和使用', now(), now() + interval 7 day, 'E'),
          (6, 1, 1, '第五周数据库系统作业', now(), now() + interval 10 day, 'H'),
          (7, 1, 2, '课程大作业 MiniSQL的编写与使用', now(), now() + interval 20 day, 'H');
-  
+
   insert into attachment(id, name, url)
   values (1, 'Linux Shell Program Design 3rd Edition.pdf',
           'https://raw.githubusercontent.com/dendenxu/miniSQL/master/miniSQL.tex'),
          (2, '数据库系统实验报告', 'https://raw.githubusercontent.com/dendenxu/miniSQL/master/xz.tex'),
          (3, '蒙特卡洛树搜索实现', 'https://raw.githubusercontent.com/dendenxu/DeepOthello/master/MCTS.py'),
          (4, 'JDBC接口调用参考与举例', 'https://raw.githubusercontent.com/dendenxu/DeepOthello/master/MCTS.py');
-  
+
   insert into info(id, content, cid, release_time)
   values (1, '作业1的提交就要截止啦！请大家及时关注。', 1, NOW()),
          (2, '实验5的验收将在本周六下午4点开始，请需要验收的组长搜索"数据库系统"钉钉群并加入，钉钉群二维码详见附件', 1, NOW()),
          (3, 'ADS考试将在6月24日以线上/机房同时考试的形式进行，YDS老师的复习视频已上传到学在浙大系统，详见附件', 3, NOW()),
          (4, '明天的实验内容为样条插值（Spline）以及贝塞尔曲线的拟合（Bezier Path），请同学们提前预习相关内容，PPT已上传附件并开放下载', 4, NOW());
-  
+
   insert into attach_to(aid, uid)
   values (1, 1),
          (1, 2),
@@ -1290,7 +1291,7 @@ mysql -uroot -p < tables.sql
       mysql_h_default="localhost"
       mysql_d_default="ShellDesign"
       mysql_f=".mysql.cnf"
-  
+
       # 若.mysql.cnf在当前目录不存在，我们会创建一个并将默认内容写入
       if [ ! -f "$mysql_f" ]; then
           echo "Automatically generating configuration file..." >&2
@@ -1300,11 +1301,11 @@ mysql -uroot -p < tables.sql
           echo "host=$mysql_h_default" >>$mysql_f
           echo "database=$mysql_d_default" >>$mysql_f
       fi
-  
+
       # 类似调用alias，我们在下面的Shell语句中执行MySQL调用时都会使用$mysql_prefix来开头
       mysql_prefix="mysql --defaults-extra-file=$mysql_f"
   }
-  
+
   ```
 
 ##### 登陆模块
@@ -1667,12 +1668,12 @@ function LoginInUI() {
          # TEACHER分隔符，会在老师登陆后的管理界面打印
          clear
          cat <<"EOF"
-        ______   ______     ______     ______     __  __     ______     ______    
-       /\__  _\ /\  ___\   /\  __ \   /\  ___\   /\ \_\ \   /\  ___\   /\  == \   
-       \/_/\ \/ \ \  __\   \ \  __ \  \ \ \____  \ \  __ \  \ \  __\   \ \  __<   
-          \ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\ 
-           \/_/   \/_____/   \/_/\/_/   \/_____/   \/_/\/_/   \/_____/   \/_/ /_/ 
-                                                                                  
+        ______   ______     ______     ______     __  __     ______     ______
+       /\__  _\ /\  ___\   /\  __ \   /\  ___\   /\ \_\ \   /\  ___\   /\  == \
+       \/_/\ \/ \ \  __\   \ \  __ \  \ \ \____  \ \  __ \  \ \  __\   \ \  __<
+          \ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\
+           \/_/   \/_____/   \/_/\/_/   \/_____/   \/_/\/_/   \/_____/   \/_/ /_/
+
      EOF
      }
      ```
@@ -1684,12 +1685,12 @@ function LoginInUI() {
          # STUDENT分隔符，会在学生登陆后的管理界面打印
          clear
          cat <<"EOF"
-        ______     ______   __  __     _____     ______     __   __     ______  
-       /\  ___\   /\__  _\ /\ \/\ \   /\  __-.  /\  ___\   /\ "-.\ \   /\__  _\ 
-       \ \___  \  \/_/\ \/ \ \ \_\ \  \ \ \/\ \ \ \  __\   \ \ \-.  \  \/_/\ \/ 
-        \/\_____\    \ \_\  \ \_____\  \ \____-  \ \_____\  \ \_\\"\_\    \ \_\ 
-         \/_____/     \/_/   \/_____/   \/____/   \/_____/   \/_/ \/_/     \/_/ 
-                                                                                
+        ______     ______   __  __     _____     ______     __   __     ______
+       /\  ___\   /\__  _\ /\ \/\ \   /\  __-.  /\  ___\   /\ "-.\ \   /\__  _\
+       \ \___  \  \/_/\ \/ \ \ \_\ \  \ \ \/\ \ \ \  __\   \ \ \-.  \  \/_/\ \/
+        \/\_____\    \ \_\  \ \_____\  \ \____-  \ \_____\  \ \_\\"\_\    \ \_\
+         \/_____/     \/_/   \/_____/   \/____/   \/_____/   \/_/ \/_/     \/_/
+
      EOF
      }
      ```
@@ -1701,12 +1702,12 @@ function LoginInUI() {
          # ADMIN分隔符，会在管理员登陆后的管理界面打印
          clear
          cat <<"EOF"
-        ______     _____     __    __     __     __   __    
-       /\  __ \   /\  __-.  /\ "-./  \   /\ \   /\ "-.\ \   
-       \ \  __ \  \ \ \/\ \ \ \ \-./\ \  \ \ \  \ \ \-.  \  
-        \ \_\ \_\  \ \____-  \ \_\ \ \_\  \ \_\  \ \_\\"\_\ 
-         \/_/\/_/   \/____/   \/_/  \/_/   \/_/   \/_/ \/_/ 
-                                                            
+        ______     _____     __    __     __     __   __
+       /\  __ \   /\  __-.  /\ "-./  \   /\ \   /\ "-.\ \
+       \ \  __ \  \ \ \/\ \ \ \ \-./\ \  \ \ \  \ \ \-.  \
+        \ \_\ \_\  \ \____-  \ \_\ \ \_\  \ \_\  \ \_\\"\_\
+         \/_/\/_/   \/____/   \/_/  \/_/   \/_/   \/_/ \/_/
+
      EOF
      }
      ```
@@ -1934,13 +1935,13 @@ function PrintBanner() {
     # 会在初始登陆界面打印
     clear
     cat <<"EOF"
-   _________                                                       __        _____                                                  
-   \_   ___ \  ____  __ _________  ______ ______  _  _____________|  | __   /     \ _____    ____ _____     ____   ___________      
-   /    \  \/ /  _ \|  |  \_  __ \/  ___// __ \ \/ \/ /  _ \_  __ \  |/ /  /  \ /  \\__  \  /    \\__  \   / ___\_/ __ \_  __ \     
-   \     \___(  <_> )  |  /|  | \/\___ \\  ___/\     (  <_> )  | \/    <  /    Y    \/ __ \|   |  \/ __ \_/ /_/  >  ___/|  | \/     
-    \______  /\____/|____/ |__|  /____  >\___  >\/\_/ \____/|__|  |__|_ \ \____|__  (____  /___|  (____  /\___  / \___  >__|        
-           \/                         \/     \/                        \/         \/     \/     \/     \//_____/      \/            
-                                                                                                                                    
+   _________                                                       __        _____
+   \_   ___ \  ____  __ _________  ______ ______  _  _____________|  | __   /     \ _____    ____ _____     ____   ___________
+   /    \  \/ /  _ \|  |  \_  __ \/  ___// __ \ \/ \/ /  _ \_  __ \  |/ /  /  \ /  \\__  \  /    \\__  \   / ___\_/ __ \_  __ \
+   \     \___(  <_> )  |  /|  | \/\___ \\  ___/\     (  <_> )  | \/    <  /    Y    \/ __ \|   |  \/ __ \_/ /_/  >  ___/|  | \/
+    \______  /\____/|____/ |__|  /____  >\___  >\/\_/ \____/|__|  |__|_ \ \____|__  (____  /___|  (____  /\___  / \___  >__|
+           \/                         \/     \/                        \/         \/     \/     \/     \//_____/      \/
+
 EOF
 }
 
@@ -1948,12 +1949,12 @@ function PrintDelimiter() {
     # SECTION分隔符，会在无法确定用户身份但需要分隔的位置打印
     clear
     cat <<"EOF"
-   ______     ______     ______     ______   __     ______     __   __     
-  /\  ___\   /\  ___\   /\  ___\   /\__  _\ /\ \   /\  __ \   /\ "-.\ \    
-  \ \___  \  \ \  __\   \ \ \____  \/_/\ \/ \ \ \  \ \ \/\ \  \ \ \-.  \   
-   \/\_____\  \ \_____\  \ \_____\    \ \_\  \ \_\  \ \_____\  \ \_\\"\_\  
-    \/_____/   \/_____/   \/_____/     \/_/   \/_/   \/_____/   \/_/ \/_/  
-                                                                           
+   ______     ______     ______     ______   __     ______     __   __
+  /\  ___\   /\  ___\   /\  ___\   /\__  _\ /\ \   /\  __ \   /\ "-.\ \
+  \ \___  \  \ \  __\   \ \ \____  \/_/\ \/ \ \ \  \ \ \/\ \  \ \ \-.  \
+   \/\_____\  \ \_____\  \ \_____\    \ \_\  \ \_\  \ \_____\  \ \_\\"\_\
+    \/_____/   \/_____/   \/_____/     \/_/   \/_/   \/_____/   \/_/ \/_/
+
 EOF
 }
 
@@ -1961,12 +1962,12 @@ function PrintTeacher() {
     # TEACHER分隔符，会在老师登陆后的管理界面打印
     clear
     cat <<"EOF"
-   ______   ______     ______     ______     __  __     ______     ______    
-  /\__  _\ /\  ___\   /\  __ \   /\  ___\   /\ \_\ \   /\  ___\   /\  == \   
-  \/_/\ \/ \ \  __\   \ \  __ \  \ \ \____  \ \  __ \  \ \  __\   \ \  __<   
-     \ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\ 
-      \/_/   \/_____/   \/_/\/_/   \/_____/   \/_/\/_/   \/_____/   \/_/ /_/ 
-                                                                             
+   ______   ______     ______     ______     __  __     ______     ______
+  /\__  _\ /\  ___\   /\  __ \   /\  ___\   /\ \_\ \   /\  ___\   /\  == \
+  \/_/\ \/ \ \  __\   \ \  __ \  \ \ \____  \ \  __ \  \ \  __\   \ \  __<
+     \ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\  \ \_____\  \ \_\ \_\
+      \/_/   \/_____/   \/_/\/_/   \/_____/   \/_/\/_/   \/_____/   \/_/ /_/
+
 EOF
 }
 
@@ -1974,12 +1975,12 @@ function PrintStudent() {
     # STUDENT分隔符，会在学生登陆后的管理界面打印
     clear
     cat <<"EOF"
-   ______     ______   __  __     _____     ______     __   __     ______  
-  /\  ___\   /\__  _\ /\ \/\ \   /\  __-.  /\  ___\   /\ "-.\ \   /\__  _\ 
-  \ \___  \  \/_/\ \/ \ \ \_\ \  \ \ \/\ \ \ \  __\   \ \ \-.  \  \/_/\ \/ 
-   \/\_____\    \ \_\  \ \_____\  \ \____-  \ \_____\  \ \_\\"\_\    \ \_\ 
-    \/_____/     \/_/   \/_____/   \/____/   \/_____/   \/_/ \/_/     \/_/ 
-                                                                           
+   ______     ______   __  __     _____     ______     __   __     ______
+  /\  ___\   /\__  _\ /\ \/\ \   /\  __-.  /\  ___\   /\ "-.\ \   /\__  _\
+  \ \___  \  \/_/\ \/ \ \ \_\ \  \ \ \/\ \ \ \  __\   \ \ \-.  \  \/_/\ \/
+   \/\_____\    \ \_\  \ \_____\  \ \____-  \ \_____\  \ \_\\"\_\    \ \_\
+    \/_____/     \/_/   \/_____/   \/____/   \/_____/   \/_/ \/_/     \/_/
+
 EOF
 }
 
@@ -1987,12 +1988,12 @@ function PrintAdmin() {
     # ADMIN分隔符，会在管理员登陆后的管理界面打印
     clear
     cat <<"EOF"
-   ______     _____     __    __     __     __   __    
-  /\  __ \   /\  __-.  /\ "-./  \   /\ \   /\ "-.\ \   
-  \ \  __ \  \ \ \/\ \ \ \ \-./\ \  \ \ \  \ \ \-.  \  
-   \ \_\ \_\  \ \____-  \ \_\ \ \_\  \ \_\  \ \_\\"\_\ 
-    \/_/\/_/   \/____/   \/_/  \/_/   \/_/   \/_/ \/_/ 
-                                                       
+   ______     _____     __    __     __     __   __
+  /\  __ \   /\  __-.  /\ "-./  \   /\ \   /\ "-.\ \
+  \ \  __ \  \ \ \/\ \ \ \ \-./\ \  \ \ \  \ \ \-.  \
+   \ \_\ \_\  \ \____-  \ \_\ \ \_\  \ \_\  \ \_\\"\_\
+    \/_/\/_/   \/____/   \/_/  \/_/   \/_/   \/_/ \/_/
+
 EOF
 }
 
@@ -4399,10 +4400,10 @@ shell 或者命令行解释器是操作系统中最基本的用户接口。写�
 2. 其他的命令行输入被解释为程序调用，shell 创建并执行这个程序，并作为自己的子进程。程序的执行的环境变量包含一下条目：
    parent=<pathname>/myshell。
 3. shell 必须能够从文件中提取命令行输入，例如shell 使用以下命令行被调用：
-   myshell batchfile 
+   myshell batchfile
    这个批处理文件应该包含一组命令集，当到达文件结尾时shell 退出。很明显，如果shell 被调用时没有使用参数，它会在屏幕上显示提示符请求用户输入。
 4. shell 必须支持I/O 重定向，stdin 和stdout，或者其中之一，例如命令行为：
-   programname arg1 arg2 < inputfile > outputfile 
+   programname arg1 arg2 < inputfile > outputfile
    使用arg1 和arg2 执行程序programname，输入文件流被替换为inputfile，输出文件流被替换为outputfile。
    stdout 重定向应该支持以下内部命令：dir、environ、echo、help。
    使用输出重定向时，如果重定向字符是>，则创建输出文件，如果存在则覆盖之；如果重定向字符为>>，也会创建输出文件，如果存在则添加到文件尾。
@@ -4780,12 +4781,12 @@ shell 或者命令行解释器是操作系统中最基本的用户接口。我�
 
    ```shell
    usage: MyShell.py [-h] [-a [A [A ...]]] [-e] [-w] [-i] [-d] [F]
-   
+
    MyShell by xudenden@gmail.com
-   
+
    positional arguments:
      F               the batch file to be executed
-   
+
    optional arguments:
      -h, --help      show this help message and exit
      -a [A [A ...]]  command line arguments to batch file
@@ -5018,20 +5019,20 @@ prog3 < file2
    set RED="\033[31m"
    set BLUE="\033[34m"
    set RESET="\033[0m"
-   
+
    set LINE="$BOLD$BLUE##############################################################$RESET"
-   
+
    echo $LINE
-   
+
    umask
    echo "Changing UMASK to 0o777"
    umask 777
    umask
    echo "Changing UMASK to 0o002"
    umask 002
-   
+
    echo $LINE
-   
+
    echo "Hello, my name is $SHELL"
    set hello_msg="Hello, my name is"
    echo -r "$hello_msg $USER, and I live in $HOME"
@@ -5039,24 +5040,24 @@ prog3 < file2
    echo "xz" | sha256sum | tr -d " -"
    echo "Should print 1 1 65 in the following line"
    echo "zy" | sha256sum | tr -d " -" | wc
-   
+
    echo $LINE
-   
+
    dir
    pwd
    unset hello_msg
    echo "Should get empty output"
    echo $hello_msg
-   
+
    echo $LINE
-   
+
    echo "Should print /dev/null"
    ls /dev | grep null
    echo "Should print all files containing 1 in /tmp"
    ls /tmp | grep 1
-   
+
    echo $LINE
-   
+
    echo "Should make a file log.log"
    echo "Hello, I'm your logger." > log.log
    dir
@@ -5067,9 +5068,9 @@ prog3 < file2
    cat log.log
    echo "Should display word count of log.log"
    wc < log.log
-   
+
    echo $LINE
-   
+
    echo "Opening some sleepy jobs"
    echo "And calling command jobs"
    sleep 2s | echo "Sleeping in $0" &
@@ -5091,7 +5092,7 @@ prog3 < file2
    sleep 2s &
    echo "Getting current runnning jobs..."
    jobs
-   
+
    echo "Getting back to fore ground"
    echo "Waiting for background jobs to terminate"
    echo "At the same time I can still do other things like testing..."
@@ -5100,31 +5101,31 @@ prog3 < file2
    test ! -z "" -a ( -n "1" -o 1 -ge 1 ) -o 2 -ne 1 # False, -a -o from right to left
    test ( ! -z "" -a ( -n "1" -o 1 -ge 1 ) ) -o 2 -ne 1 # True
    sleep 2s
-   
+
    echo "Should produce empty content"
    jobs
-   
+
    echo "Jobs are done ~"
-   
+
    echo "Spawning dummy built_in job that is trying to read from user (will suspend)"
-   
+
    dummy &
    dummy &
    dummy &
    dummy &
-   
+
    echo "Counting jobs"
    jobs
-   
+
    echo "$RED$BOLD""WE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE""$RESET"
-   
+
    term 0 1
-   
+
    echo $LINE
-   
+
    echo "calling environ..."
    environ
-   
+
    echo "Arg 0 is: $0"
    echo "Arg 1 is: $1"
    echo "Arg 2 is: $2"
@@ -5135,7 +5136,7 @@ prog3 < file2
    echo "Arg 7 is: $7"
    echo "Arg 8 is: $8"
    echo "Arg 9 is: $9"
-   
+
    echo "Shifting number 1"
    shift
    echo "Arg 0 is: $0"
@@ -5148,19 +5149,19 @@ prog3 < file2
    echo "Arg 7 is: $7"
    echo "Arg 8 is: $8"
    echo "Arg 9 is: $9"
-   
+
    echo "Shifting number 2"
    shift
    echo "Arg 1 is: $1"
-   
+
    echo "Shifting number 3"
    shift
    echo "Arg 1 is: $1"
-   
+
    echo "Shifting number 4"
    shift
    echo "Arg 1 is: $1"
-   
+
    echo "Shifting number 5"
    shift
    echo "Arg 1 is: $1"
@@ -5208,7 +5209,7 @@ prog3 < file2
    ~/Projects/ShellDesign/MyShell
    Should get empty output
    2020-07-30 12:29:15 ubuntu __main__[66739] WARNING Unable to get the varible "hello_msg", assigning empty string
-   
+
    ##############################################################
    Should print /dev/null
    null
@@ -5495,11 +5496,11 @@ prog3 < file2
     set RED="\033[31m"
     set BLUE="\033[34m"
     set RESET="\033[0m"
-    
+
     set LINE="$BOLD$BLUE##############################################################$RESET"
-    
+
     echo $LINE
-    
+
     echo "Opening some sleepy jobs"
     echo "And calling command jobs"
     sleep 2s | echo "Sleeping in $0" &
@@ -5521,7 +5522,7 @@ prog3 < file2
     sleep 2s &
     echo "Getting current runnning jobs..."
     jobs
-    
+
     echo "Getting back to fore ground"
     echo "Waiting for background jobs to terminate"
     echo "At the same time I can still do other things like testing..."
@@ -5530,28 +5531,28 @@ prog3 < file2
     test ! -z "" -a ( -n "1" -o 1 -ge 1 ) -o 2 -ne 1 # False, -a -o from right to left
     test ( ! -z "" -a ( -n "1" -o 1 -ge 1 ) ) -o 2 -ne 1 # True
     sleep 2s
-    
+
     echo "Should produce empty content"
     jobs
-    
+
     echo "Jobs are done ~"
-    
+
     echo "Spawning dummy built_in job that is trying to read from user (will suspend)"
-    
+
     dummy &
     dummy &
     dummy &
     dummy &
-    
+
     echo "Counting jobs"
     jobs
-    
+
     echo "$RED$BOLD""WE'RE ONLY TERMINATING JOB [0] AND [1], YOU SHOULD SEE WARMING IF -w. NO ZOMBIE""$RESET"
-    
+
     term 0 1
-    
+
     echo $LINE
-    
+
     exit # should see termination message
     ```
 
@@ -7207,3 +7208,93 @@ if __name__ == "__main__":
 ```
 
 ## 讨论/心得
+
+~~心得实在是太多了……竟然一时不知道从何说起~~
+
+### 关于Python语言的一些感想
+
+在尝试实现MyShell的过程中，我们一开始选定的语言是C/C++，原因也很明显，他们最深入系统底层且速度客观。
+
+开发一段时间后我们决定更换开发语言。因为纵使在系统调用上使用C语言实现会方便许多，在太多太多其他小部分的功能却需要重复制造太多/太多的轮子。单单在读入用户输入这一点上，从零开始实现或许就需要巨大的人力物力投入，才能达到
+
+1. 有历史记录
+2. 方向键会被正确解释的程度
+
+否则在输入过程中键入方向键时，Linux会将其解释为一个单独的特殊字符。
+
+![image-20200805113205366](ShellDesign.assets/image-20200805113205366.png)
+
+采用Python的第二个原因是：跨平台性。
+
+==纵使MyShell在设计时没有以此为根本目的==，但谁不想要一个可以跨平台运行的Shell呢？
+
+我们说，只要涉及到系统调用，`Win32`与`*nix`的很多接口不尽相同，但Python在某种程度上缓解了这一问题
+
+例如，我们可以通过`subprocess`或者`multiprocessing`包对很多内容进行统一管理（虽然在不同系统是还是会有微小的使用差别，在实际实现MyShell过程中，需要在各种奇怪的位置用一些奇怪的手段来规避这些错误）
+
+```python
+# 备份相关内容以便deepcopy时删除
+queues_bak = self.queues
+process_bak = self.process
+jobs_bak = self.jobs
+status_dict_bak = self.status_dict
+input_bak = self.input_file
+output_bak = self.output_file
+
+# note: 为了规避一些pickle error，我们会删除这里的：
+# thread_lock, multiprocessing.Manager, multiproessing.Queue, Manager.dict, io.TextWrapper
+del self.queues
+del self.process
+del self.jobs
+del self.status_dict
+del self.input_file
+del self.output_file
+
+# 获取一个deepcopy的shell以供后台程序执行
+clean_self = copy.deepcopy(self)
+
+# 填充默认内容
+# ! 我们默认后台程序不会尝试再次构建后台的后台指令
+clean_self.queues = {}
+clean_self.jobs = {}
+clean_self.process = {}
+clean_self.status_dict = {}
+clean_self.input_file = None
+clean_self.output_file = None
+
+# 还原到deepcopy以前的状态
+self.queues = queues_bak
+self.process = process_bak
+self.jobs = jobs_bak
+self.status_dict = status_dict_bak
+self.input_file = input_bak
+self.output_file = output_bak
+```
+
+其中一个极为奇怪的问题便是：在Win32系统下调用multiprocessing.Manager会导致Pickle无法正常复制Object
+
+我们不得不承认，相对于C/C++，Python是一种更加高级的语言，它可以让我们的代码变得精简易读。但或许用脚本语言实现的Shell永远无法很好的进入真正的生产环境（速度/与系统底层的接口等问题）。
+
+但我们实现MyShell的根本目的在于学习，因此很多情况下，相对于直接使用系统提供的接口，我们使用==模拟器==的方式来模拟功能。而一个抽象程度更高的语言显然可以让人们在==模拟==Shell功能时有更方便的接口/逻辑。
+
+### 关于工具……
+
+正如系统环境/实验环境介绍的环节中我们提到的，在实现第二个实验的过程中，我们详细介绍本次实验中用到的各色环境。
+
+实际使用过程中，我们主要在`Ubuntu`虚拟机，阿里云`CentOS 7`，搬瓦工`CentOS 7`，`MacOS Catalina`上进行试验。
+
+其中我们使用最多的工具是`Microsoft Visual Studio Code`，让我们抛开其他内容不说，其中最吸引我们的是远程连接功能。
+
+只要能够建立SSH到远程服务器/虚拟机，我们就可以在几乎类似本机的环境/速度上进行开发。
+
+Ubuntu虚拟机：
+
+![image-20200805120738439](ShellDesign.assets/image-20200805120738439.png)
+
+宿主机器VSCode界面：
+
+![image-20200805120910488](ShellDesign.assets/image-20200805120910488.png)
+
+我们甚至可以进行调试：
+
+![image-20200805121034594](ShellDesign.assets/image-20200805121034594.png)
