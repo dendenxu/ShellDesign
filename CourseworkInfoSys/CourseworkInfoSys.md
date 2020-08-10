@@ -4,7 +4,7 @@
 
 - 课程名称：Linux程序设计
 
-- 实验项目名称：Shell命令
+- 实验项目名称：Shell程序设计
 
 - 学生姓名：徐震
 
@@ -43,7 +43,7 @@
 
 ## 需求描述
 
-## 设计文档
+### 设计文档
 
 用bash编写程序，实现一个简单的**作业管理系统。使用数据库软件包来实现**。系统具备以下的基本功能：
 
@@ -113,9 +113,9 @@
      1. 对已经布置的课程作业/实验新建、编辑、删除、显示（进入相关界面直接显示）提交
      2. 根据设定的作业/实验截止时间判断学生是否真的可以创建/修改/删除提交。
 
-### 设计思想
+## 设计思想
 
-#### 数据库交互
+### 数据库交互
 
 我们通过MySQL命令来直接执行数据库操作，这也是本实验的核心内容
 
@@ -291,7 +291,7 @@ function RemoveDanger() {
 
   > [一个解释相关操作的视频](https://www.youtube.com/watch?v=7U-RbOKanYs)
 
-#### 页面逻辑
+### 页面逻辑
 
 我们通过一些页面循环来搭建页面逻辑
 
@@ -435,7 +435,7 @@ echo "..."
 done
 ```
 
-#### 页面交互
+### 页面交互
 
 我们通过设置颜色，字体，以及精心调教read函数和嵌套循环，构成了一套较为流畅的UI导航交互逻辑
 
@@ -591,9 +591,9 @@ done
 
 - 通过清屏功能，我们避免打印太多冗余信息，并模拟了GUI式的交互性操作
 
-### 功能模块
+## 功能模块
 
-#### 数据库定义
+### 数据库定义
 
 为了方便用户，我们定义了一个SQL脚本文件，用于快速初始化用户的数据库。
 
@@ -845,7 +845,7 @@ mysql -uroot -p < tables.sql
          (3, 1);
   ```
 
-#### 初始化模块
+### 初始化模块
 
 我们设计了两个初始化函数，用以定义一些在程序运行过程中全局使用的变量：
 
@@ -900,7 +900,7 @@ mysql -uroot -p < tables.sql
   
   ```
 
-#### 登陆模块
+### 登陆模块
 
 正如前面描述的，我们在登陆模块采用了一些防范攻击的方法：
 
@@ -1000,7 +1000,7 @@ function LoginInUI() {
 }
 ```
 
-#### 学生操作模块
+### 学生操作模块
 
 1. 管理课程
 
@@ -1036,7 +1036,7 @@ function LoginInUI() {
 
 3. 返回上一级
 
-#### 教师操作模块
+### 教师操作模块
 
 1. 管理课程
 
@@ -1114,7 +1114,7 @@ function LoginInUI() {
 
 2. 返回上一级
 
-#### 管理员操作模块
+### 管理员操作模块
 
 1. 管理管理员账户
 
@@ -1202,7 +1202,7 @@ function LoginInUI() {
 
 5. 返回上一级
 
-#### Gadgets小部件
+### Gadgets小部件
 
 - 清除危险字符模块
 
@@ -1314,7 +1314,7 @@ function LoginInUI() {
   }
   ```
 
-#### 主程序
+### 主程序
 
 我们通过函数来设计程序：原因是Bash会在读入整个函数的所有内容后运行，这意味着修改脚本的同时运行脚本是可以进行的（原函数已经在内存中了）
 
@@ -1329,6 +1329,68 @@ DefineColor
 DefineMySQL
 LoginInUI
 ```
+
+## 程序运行结果截图
+
+==由于可供实验的内容的可能性组合着实太多，我们在此仅仅展示一部分的实验结果==
+
+登陆界面：防止恶意登陆的罚时0.1s/1s操作
+
+![image-20200730232133203](CourseworkInfoSys.assets/image-20200730232133203.png)
+
+![image-20200730232900575](CourseworkInfoSys.assets/image-20200730232900575.png)
+
+登录成功界面的Banner以及有颜色的返回上一级信息
+
+![image-20200730232144859](CourseworkInfoSys.assets/image-20200730232144859.png)
+
+管理界面需管理信息的高亮显示以及任意键继续功能
+
+添加新的管理员账户测试（以及登录测试）
+
+![image-20200730232215143](CourseworkInfoSys.assets/image-20200730232215143.png)
+
+![image-20200730232225349](CourseworkInfoSys.assets/image-20200730232225349.png)
+
+测试后可以用新添加的账号重新登陆
+
+![image-20200730233200481](CourseworkInfoSys.assets/image-20200730233200481.png)
+
+课程教师管理功能测试
+
+![image-20200730232248432](CourseworkInfoSys.assets/image-20200730232248432.png)
+
+![image-20200730232256972](CourseworkInfoSys.assets/image-20200730232256972.png)
+
+![image-20200730232318906](CourseworkInfoSys.assets/image-20200730232318906.png)
+
+![image-20200730232323766](CourseworkInfoSys.assets/image-20200730232323766.png)
+
+教师管理界面中可以看到刚刚添加的新老师
+
+![image-20200730232340403](CourseworkInfoSys.assets/image-20200730232340403.png)
+
+作业完成情况统计与检查
+
+![image-20200730232353949](CourseworkInfoSys.assets/image-20200730232353949.png)
+
+![image-20200730232413503](CourseworkInfoSys.assets/image-20200730232413503.png)
+
+SQL注入攻击防护能力测试
+
+![image-20200730232550819](CourseworkInfoSys.assets/image-20200730232550819.png)
+
+学生管理界面
+
+![image-20200730232633672](CourseworkInfoSys.assets/image-20200730232633672.png)
+
+发布作业提交功能测试
+
+![image-20200730232702339](CourseworkInfoSys.assets/image-20200730232702339.png)
+
+退出后界面
+
+![image-20200730232717793](ShellDesign.assets/image-20200730232717793.png)
 
 ## 附录
 
@@ -3239,7 +3301,7 @@ function AdminManageStudent() {
                     fi
                     echo "您两次输入的密码不一致，请重新输入"
                 done
-                query_insert_student="insert into student(name, brief, gender, password_hash, enroll_time) value (\"$s_name\",\"$full_string\",\"$s_gender\", \"$password_hash\", now())"
+                query_insert_student="insert into student(name, brief, gender, password_hash, enroll_time) value (\"$s_name\",\"$full_string\",\"$s_gender\", \"$password_hash_ori\", now())"
                 query_last_insert_id="select last_insert_id()"
 
                 sid=$($mysql_prefix -se "$query_insert_student;$query_last_insert_id;")
@@ -3681,7 +3743,7 @@ LoginInUI
 
 #### MySQL
 
-```mysql
+```sql
 # note: we should define the default charset of the database before creating the tables without explicitly
 # defining charset
 

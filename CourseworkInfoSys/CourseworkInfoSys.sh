@@ -2236,7 +2236,7 @@ function AdminManageAdmin() {
                     fi
                     echo "您两次输入的密码不一致，请重新输入"
                 done
-                query_insert_admin="insert into admin(name, password_hash) value (\"$admin_name\", \"$password_hash\")"
+                query_insert_admin="insert into admin(name, password_hash) value (\"$admin_name\", \"$password_hash_ori\")"
                 query_last_insert_id="select last_insert_id()"
                 admid=$($mysql_prefix -se "$query_insert_admin;$query_last_insert_id;")
 
