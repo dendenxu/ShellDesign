@@ -2,6 +2,9 @@
 	"folders": [
         {
             "path": "MyShell"
+        },
+        {
+            "path": "../../OneDrive - zju.edu.cn/pytorch-mask-rcnn"
         }
     ],
     "settings": {}
